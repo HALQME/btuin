@@ -1,0 +1,67 @@
+# btuin
+
+**btuin** (pronounced _between_) は、Bun ランタイム向けに設計された、モダンで高速な TUI (Terminal User Interface) フレームワークです。
+Vue.js の Composition API に強く影響を受けたリアクティビティシステムを採用しており、宣言的かつ直感的に CLI アプリケーションを構築できます。
+
+## 目的 (Goal)
+
+**Bun** のパフォーマンスを最大限に活かし、快適な開発体験（DX）をターミナルアプリケーション開発にもたらすことを目的としています。
+
+複雑になりがちなカーソル制御や描画更新ロジックを隠蔽し、開発者が状態とビューの定義に集中できる環境を提供します。
+
+## 利点 (Features)
+
+- **Vue ライクなリアクティビティ**: `ref`, `computed`, `watch`, `effect` などを備えた独自のリアクティビティシステムを搭載。状態の変化に応じて画面の差分だけを自動的に効率よく再描画します。
+- **宣言的レイアウト**: `VStack`, `HStack`, `ZStack` などのレイアウトプリミティブを提供。絶対座標を計算することなく、Flexbox のように柔軟な UI を構築できます。
+- **Bun ネイティブ**: Bun の高速な起動と実行速度、および `Bun.color` などのネイティブ API を活用し、軽量かつハイパフォーマンスに動作します。
+- **コンポーネント指向**: `defineComponent` による再利用可能なコンポーネント設計が可能。標準で `List`, `Table`, `Input`, `ProgressBar` などの実用的な UI キットを提供しています。
+- **フォーカス管理**: キーボード操作を前提としたフォーカス移動（Tab や矢印キー）の仕組みが組み込まれています。
+
+## ロードマップ (Roadmap)
+
+以下の機能を計画しています。
+
+- [x] **コア機能**: リアクティビティシステム、基本レンダリングループ
+- [x] **レイアウト**: Stack (Vertical, Horizontal, Z-axis), Box, Center
+- [x] **基本コンポーネント**: Paragraph, TextInput, List, Console
+- [ ] **入力拡張**: マウスイベントのサポート、ショートカットキー管理の強化
+- [ ] **スタイル**: テーマ機能の実装、より高度なボーダー・カラー設定
+
+- [ ] **エコシステム**: デバッグツールの充実、ドキュメント整備
+- [ ] **拡張コンポーネント**: Table, ProgressBar, Spinner, Toast, Selector
+
+## クイックスタート
+
+```typescript
+import { createApp, ref, onKey, Paragraph, VStack } from "btuin";
+
+const app = createApp({
+  setup() {
+    const count = ref(0);
+
+    onKey((key) => {
+      if (key.name === "up") count.value++;
+      if (key.name === "down") count.value--;
+      if (key.name === "q") process.exit(0);
+    });
+
+    return () =>
+      VStack({
+        children: [
+          Paragraph({
+            text: "btuin Counter App",
+            align: "center",
+            color: "magenta",
+          }),
+          Paragraph({ text: `Current Count: ${count.value}`, align: "center" }),
+          Paragraph({
+            text: "[Up/Down] to change, [q] to quit",
+            color: "gray",
+          }),
+        ],
+      });
+  },
+});
+
+app.mount();
+```

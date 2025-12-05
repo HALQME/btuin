@@ -1,0 +1,14 @@
+{
+  "name": "@btuin/types",
+  "type": "module",
+  "private": false,
+  "exports": {
+    "./color": "./src/color.ts",
+    "./key-event": "./src/key-event.ts",
+    "./geometry": "./src/geometry.ts",
+    "./styling": "./src/styling.ts",
+    "./elements": "./src/elements.ts",
+    "./focus": "./src/focus.ts",
+    "./layout": "./src/layout.ts"
+  }
+}

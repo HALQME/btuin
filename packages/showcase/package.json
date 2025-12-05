@@ -1,0 +1,14 @@
+{
+  "name": "@btuin/showcase",
+  "type": "module",
+  "private": true,
+  "module": "src/index.ts",
+  "scripts": {
+    "quick": "bun run src/quick-start.ts",
+    "fetch": "bun run src/async-fetch.ts"
+  },
+  "dependencies": {
+    "btuin": "workspace:*",
+    "@btuin/table": "workspace:*"
+  }
+}

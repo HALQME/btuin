@@ -1,0 +1,15 @@
+{
+  "name": "@btuin/element-kit",
+  "type": "module",
+  "module": "index.ts",
+  "exports": {
+    ".": "./index.ts"
+  },
+  "dependencies": {
+    "btuin": "workspace:*",
+    "@btuin/types": "workspace:*"
+  },
+  "scripts": {
+    "test": "bun test"
+  }
+}
