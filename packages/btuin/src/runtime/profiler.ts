@@ -1,6 +1,5 @@
 import type { Buffer2D } from "@btuin/renderer";
-import * as fsSync from "node:fs";
-import * as path from "node:path";
+import path from "node:path";
 
 export interface ProfileOptions {
   /**
@@ -338,18 +337,10 @@ export class Profiler {
     const dir = path.dirname(this.options.outputFile);
     if (dir && dir !== ".") {
       try {
-        fsSync.mkdirSync(dir, { recursive: true });
+        Bun.$`mkdir -p ${dir}`;
       } catch {}
     }
-    // Bun.write exists in Bun; fall back to fs if needed.
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-    if (typeof Bun !== "undefined" && typeof Bun.write === "function") {
-      await Bun.write(this.options.outputFile, output);
-      return;
-    }
-
-    const fs = await import("node:fs/promises");
-    await fs.writeFile(this.options.outputFile, output, "utf8");
+    await Bun.write(this.options.outputFile, output);
   }
 
   flushSync(): void {
@@ -359,10 +350,9 @@ export class Profiler {
     const dir = path.dirname(this.options.outputFile);
     if (dir && dir !== ".") {
       try {
-        fsSync.mkdirSync(dir, { recursive: true });
+        Bun.$`mkdir -p ${dir}`;
       } catch {}
     }
-    // Keep it synchronous so SIGINT flows can safely persist before exit.
-    fsSync.writeFileSync(this.options.outputFile, output, "utf8");
+    Bun.write(this.options.outputFile, output).then();
   }
 }

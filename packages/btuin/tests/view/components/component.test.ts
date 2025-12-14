@@ -10,7 +10,7 @@ import {
 import type { Component, RenderFunction } from "../../../src/view/components/component";
 import { onKey } from "../../../src/view/components/lifecycle";
 import { ref } from "@btuin/reactivity";
-import { Text } from "../../../src/view/primitives";
+import { Block, Text } from "../../../src/view/primitives";
 
 describe("defineComponent", () => {
   it("should define a component", () => {
@@ -81,6 +81,44 @@ describe("handleComponentKey", () => {
     });
 
     expect(keyPressed).toBe("a");
+  });
+
+  it("should traverse view hierarchy and honor stopPropagation", () => {
+    const order: string[] = [];
+
+    const component = defineComponent({
+      setup() {
+        onKey(() => {
+          order.push("component");
+        });
+
+        const child = Block().onKey(() => {
+          order.push("child");
+          return true;
+        });
+
+        const parent = Block(child).onKey(() => {
+          order.push("parent");
+          return true;
+        });
+
+        return () => parent;
+      },
+    });
+
+    const mounted = mountComponent(component);
+    renderComponent(mounted);
+
+    const handled = handleComponentKey(mounted, {
+      name: "a",
+      sequence: "a",
+      ctrl: false,
+      meta: false,
+      shift: false,
+    });
+
+    expect(handled).toBe(true);
+    expect(order).toEqual(["child"]);
   });
 });
 

@@ -12,6 +12,17 @@ type LayoutEngineWasmModule = {
 let wasmModule: LayoutEngineWasmModule | null = null;
 let wasmImportPromise: Promise<LayoutEngineWasmModule> | null = null;
 
+function nowMs(): number {
+  const p = (globalThis as any).performance;
+  if (p && typeof p.now === "function") return p.now();
+  return Date.now();
+}
+
+function isPerfEnabled(): boolean {
+  const env = (globalThis as any).process?.env;
+  return env?.BTUIN_LAYOUT_ENGINE_PROFILE === "1" || env?.BTUIN_LAYOUT_ENGINE_PROFILE === "true";
+}
+
 async function loadWasmModule(): Promise<LayoutEngineWasmModule> {
   if (wasmModule) return wasmModule;
   if (wasmImportPromise) return wasmImportPromise;
@@ -131,10 +142,15 @@ export function computeLayout(root: LayoutInputNode): ComputedLayout {
     throw new Error("Layout engine module not loaded. Call initLayoutEngine() first.");
   }
 
+  const perfEnabled = isPerfEnabled();
+  const t0 = perfEnabled ? nowMs() : 0;
+
   const nodes: BridgeNode[] = [];
   const elementMap = new Map<number, string>();
 
   flattenTree(root, nodes, elementMap);
+
+  const t1 = perfEnabled ? nowMs() : 0;
 
   let rawResults: any[];
   try {
@@ -142,6 +158,8 @@ export function computeLayout(root: LayoutInputNode): ComputedLayout {
   } catch (cause) {
     throw new Error("Layout computation failed.", { cause });
   }
+
+  const t2 = perfEnabled ? nowMs() : 0;
 
   const computed: ComputedLayout = {};
   rawResults.forEach((res: any, index: number) => {
@@ -155,6 +173,14 @@ export function computeLayout(root: LayoutInputNode): ComputedLayout {
       };
     }
   });
+
+  const t3 = perfEnabled ? nowMs() : 0;
+  if (perfEnabled) {
+    // eslint-disable-next-line no-console
+    console.log(
+      `[layout-engine] nodes=${nodes.length} flattenTree=${(t1 - t0).toFixed(3)}ms wasm.compute_layout=${(t2 - t1).toFixed(3)}ms decode=${(t3 - t2).toFixed(3)}ms total=${(t3 - t0).toFixed(3)}ms`,
+    );
+  }
 
   return computed;
 }

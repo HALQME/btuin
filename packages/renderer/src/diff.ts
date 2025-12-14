@@ -61,16 +61,26 @@ export function renderDiff(prev: Buffer2D, next: Buffer2D, stats?: DiffStats): s
 
       const idx = r * cols + c;
 
-      const nextCode = next.cells[idx] || 32;
-      const prevCode = prev.cells[idx] || 32;
+      const nextWidth = next.widths[idx];
+      if (nextWidth === 0) continue;
+
+      const prevWidth = prev.widths[idx] ?? 0;
+      const nextGlyphKey = next.glyphKeyAtIndex(idx);
+      const prevGlyphKey = prev.glyphKeyAtIndex(idx);
 
       const nextFg = next.fg[idx];
       const nextBg = next.bg[idx];
       const prevFg = prev.fg[idx];
       const prevBg = prev.bg[idx];
 
-      // Force redraw all cells if size changed, otherwise check for differences
-      if (sizeChanged || nextCode !== prevCode || nextFg !== prevFg || nextBg !== prevBg) {
+      const needsDraw =
+        sizeChanged ||
+        prevWidth !== nextWidth ||
+        prevGlyphKey !== nextGlyphKey ||
+        nextFg !== prevFg ||
+        nextBg !== prevBg;
+
+      if (needsDraw) {
         if (stats) {
           stats.changedCells++;
           stats.cursorMoves++;
@@ -99,7 +109,7 @@ export function renderDiff(prev: Buffer2D, next: Buffer2D, stats?: DiffStats): s
           if (stats) stats.bgChanges++;
         }
 
-        out.push(String.fromCodePoint(nextCode));
+        out.push(next.glyphStringAtIndex(idx));
       }
     }
   }

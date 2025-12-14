@@ -1,3 +1,5 @@
+import type { TerminalAdapter } from "../packages/btuin/src/runtime";
+
 type FrameMetrics = {
   id: number;
   time: number;
@@ -41,6 +43,22 @@ export type ProfilerLog = {
     };
   };
 };
+
+export function createNullTerminalAdapter(size: { rows: number; cols: number }): TerminalAdapter {
+  return {
+    setupRawMode() {},
+    clearScreen() {},
+    cleanupWithoutClear() {},
+    patchConsole() {},
+    startCapture() {},
+    onKey() {},
+    getTerminalSize() {
+      return size;
+    },
+    disposeSingletonCapture() {},
+    write() {},
+  };
+}
 
 const formatMs = (value: number) => `${value.toFixed(2)}ms`;
 

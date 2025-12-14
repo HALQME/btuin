@@ -10,6 +10,7 @@ import type { ViewElement } from "../view/types/elements";
 import { isBlock } from "../view/types/elements";
 import { createErrorContext } from "./error-boundary";
 import type { Profiler } from "./profiler";
+import type { ComputedLayout } from "@btuin/layout-engine";
 
 /**
  * Terminal size configuration
@@ -63,6 +64,10 @@ export function createRenderer<State>(config: RenderLoopConfig<State>) {
     prevBuffer: pool.acquire(),
   };
 
+  let prevRootElement: ViewElement | null = null;
+  let prevLayoutResult: ComputedLayout | null = null;
+  let prevLayoutSizeKey: string | null = null;
+
   /**
    * Performs a render cycle
    *
@@ -85,6 +90,7 @@ export function createRenderer<State>(config: RenderLoopConfig<State>) {
       }
 
       const rootElement = config.view(config.getState());
+      const layoutSizeKey = `${state.currentSize.cols}x${state.currentSize.rows}`;
 
       const nodeCount =
         config.profiler?.isEnabled() && config.profiler.options.nodeCount
@@ -93,16 +99,25 @@ export function createRenderer<State>(config: RenderLoopConfig<State>) {
       const frame = config.profiler?.beginFrame(state.currentSize, { nodeCount }) ?? null;
 
       const layoutResult =
-        config.profiler?.measure(frame, "layoutMs", () =>
-          layout(rootElement, {
-            width: state.currentSize.cols,
-            height: state.currentSize.rows,
-          }),
-        ) ??
-        layout(rootElement, {
-          width: state.currentSize.cols,
-          height: state.currentSize.rows,
-        });
+        rootElement === prevRootElement &&
+        prevLayoutResult &&
+        prevLayoutSizeKey === layoutSizeKey &&
+        !sizeChanged
+          ? prevLayoutResult
+          : config.profiler?.measure(frame, "layoutMs", () =>
+              layout(rootElement, {
+                width: state.currentSize.cols,
+                height: state.currentSize.rows,
+              }),
+            ) ??
+            layout(rootElement, {
+              width: state.currentSize.cols,
+              height: state.currentSize.rows,
+            });
+
+      prevRootElement = rootElement;
+      prevLayoutResult = layoutResult;
+      prevLayoutSizeKey = layoutSizeKey;
 
       const buf = pool.acquire();
       config.profiler?.measure(frame, "renderMs", () => {

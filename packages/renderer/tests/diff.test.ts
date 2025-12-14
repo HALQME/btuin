@@ -4,6 +4,12 @@ import { FlatBuffer } from "../src/buffer";
 import type { Buffer2D } from "../src/types";
 import type { DiffStats } from "../src/diff";
 
+function setCharAt(buf: Buffer2D, idx: number, ch: string) {
+  const row = Math.floor(idx / buf.cols);
+  const col = idx % buf.cols;
+  buf.set(row, col, ch);
+}
+
 // Helper to create a mock buffer
 function createMockBuffer(
   rows: number,
@@ -12,13 +18,14 @@ function createMockBuffer(
   fg?: string,
   bg?: string,
 ): Buffer2D {
-  const size = rows * cols;
   const buf = new FlatBuffer(rows, cols);
-  buf.cells.fill(fillChar.codePointAt(0)!);
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      buf.set(r, c, fillChar);
+    }
+  }
   buf.fg.fill(fg);
   buf.bg.fill(bg);
-  // keep lint/ts happy with unused local
-  void size;
   return buf;
 }
 
@@ -35,7 +42,7 @@ describe("renderDiff", () => {
   it("should render only the changed cells", () => {
     const prev = createMockBuffer(2, 2, "a");
     const next = createMockBuffer(2, 2, "a");
-    next.cells[2] = "b".codePointAt(0)!; // Change one cell
+    setCharAt(next, 2, "b");
     next.fg[2] = "\x1b[31m"; // red
 
     const output = renderDiff(prev, next);
@@ -67,7 +74,10 @@ describe("renderDiff", () => {
   it("should batch color changes", () => {
     const prev = createMockBuffer(1, 5, " ");
     const next = createMockBuffer(1, 5, " ");
-    next.cells.set([..."abcd "].map((c) => c.codePointAt(0)!));
+    const message = "abcd ";
+    for (let i = 0; i < message.length; i++) {
+      setCharAt(next, i, message[i] ?? " ");
+    }
     next.fg.fill("\x1b[32m", 0, 2); // green for 'a' and 'b'
     next.fg.fill("\x1b[34m", 2, 4); // blue for 'c' and 'd'
 
@@ -83,9 +93,9 @@ describe("renderDiff", () => {
   it("should reset colors when necessary", () => {
     const prev = createMockBuffer(1, 3, " ");
     const next = createMockBuffer(1, 3, " ");
-    next.cells[0] = "a".codePointAt(0)!;
+    setCharAt(next, 0, "a");
     next.fg[0] = "\x1b[31m"; // red
-    next.cells[1] = "b".codePointAt(0)!;
+    setCharAt(next, 1, "b");
     // next.fg[1] is undefined
 
     const output = renderDiff(prev, next);
@@ -102,11 +112,11 @@ describe("renderDiff", () => {
     const prev = createMockBuffer(2, 2, " ");
     const next = createMockBuffer(2, 2, " ");
 
-    next.cells[0] = "A".codePointAt(0)!;
+    setCharAt(next, 0, "A");
     next.fg[0] = "\x1b[31m";
-    next.cells[1] = "B".codePointAt(0)!;
+    setCharAt(next, 1, "B");
     next.fg[1] = "\x1b[31m";
-    next.cells[2] = "C".codePointAt(0)!;
+    setCharAt(next, 2, "C");
     next.fg[2] = "\x1b[32m";
 
     const stats: DiffStats = {

@@ -1,8 +1,8 @@
 import { test, describe, expect } from "bun:test";
 import { existsSync } from "node:fs";
 
-import { createApp, ref, Block, Text, type TerminalAdapter } from "../packages/btuin";
-import { printSummary, type ProfilerLog } from "./profiler-core";
+import { createApp, ref, Block, Text } from "../packages/btuin";
+import { createNullTerminalAdapter, printSummary, type ProfilerLog } from "./profiler-core";
 
 // This test intentionally mutates layout-relevant props every frame to stress:
 // - view() construction cost
@@ -22,22 +22,6 @@ let resolveFinished: (() => void) | null = null;
 const finished = new Promise<void>((resolve) => {
   resolveFinished = resolve;
 });
-
-function createNullTerminalAdapter(size: { rows: number; cols: number }): TerminalAdapter {
-  return {
-    setupRawMode() {},
-    clearScreen() {},
-    cleanupWithoutClear() {},
-    patchConsole() {},
-    startCapture() {},
-    onKey() {},
-    getTerminalSize() {
-      return size;
-    },
-    disposeSingletonCapture() {},
-    write() {},
-  };
-}
 
 // Reuse leaf Text nodes to avoid making this purely an allocation benchmark.
 const leaves = Array.from({ length: n }, (_, i) => Text(`item ${i}`).foreground("gray"));
@@ -114,12 +98,13 @@ describe("Layout Change Stress Test", () => {
     { timeout: 60_000 },
   );
 
-  test("parsable jsonfile", async () => {
+  test("Performance Requirements", async () => {
     const log = await import(`../${out}`, { with: { type: "json" } }) as ProfilerLog
-    expect(log.startedAt).toBeDefined();
-    expect(log.endedAt).toBeDefined();
-    expect(log.frames).toBeDefined();
-    expect(log.frames.length).toEqual(frames);
     printSummary(log);
+    expect(log.summary.totals.frameMs / log.summary.frameCount).toBeLessThan(33.4)
+    expect(log.summary.frameMs.max).toBeLessThan(50)
+    expect(log.summary.frameMs.p99).toBeGreaterThan(33.4)
+    expect(log.summary.frameMs.p95).toBeLessThan(30)
+    expect(log.summary.frameMs.p50).toBeLessThan(25)
   });
 });

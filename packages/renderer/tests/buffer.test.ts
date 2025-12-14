@@ -10,13 +10,15 @@ describe("FlatBuffer", () => {
     const buffer = new FlatBuffer(rows, cols);
     expect(buffer.rows).toBe(rows);
     expect(buffer.cols).toBe(cols);
-    expect(buffer.cells.length).toBe(size);
+    expect(buffer.codes.length).toBe(size);
+    expect(buffer.widths.length).toBe(size);
     expect(buffer.fg.length).toBe(size);
     expect(buffer.bg.length).toBe(size);
 
     // Check that it's cleared initially
     for (let i = 0; i < size; i++) {
-      expect(buffer.cells[i]).toBe(32); // space
+      expect(buffer.glyphStringAtIndex(i)).toBe(" ");
+      expect(buffer.widths[i]).toBe(1);
       expect(buffer.fg[i]).toBeUndefined();
       expect(buffer.bg[i]).toBeUndefined();
     }
@@ -32,16 +34,15 @@ describe("FlatBuffer", () => {
 
   it("should clear the buffer", () => {
     const buffer = new FlatBuffer(rows, cols);
-    // Modify the buffer
     const idx = buffer.index(2, 2);
-    buffer.cells[idx] = "X".codePointAt(0)!;
+    buffer.set(2, 2, "X");
     buffer.fg[idx] = "red";
     buffer.bg[idx] = "blue";
 
     buffer.clear();
 
-    // Check if it's reset
-    expect(buffer.cells[idx]).toBe(32);
+    expect(buffer.glyphStringAtIndex(idx)).toBe(" ");
+    expect(buffer.widths[idx]).toBe(1);
     expect(buffer.fg[idx]).toBeUndefined();
     expect(buffer.bg[idx]).toBeUndefined();
   });

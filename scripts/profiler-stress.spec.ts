@@ -2,7 +2,7 @@ import { test, describe, expect } from "bun:test";
 import { existsSync } from "node:fs";
 
 import { createApp, ref, Block, Text, type TerminalAdapter } from "../packages/btuin";
-import { printSummary, type ProfilerLog } from "./profiler-core";
+import { createNullTerminalAdapter, printSummary, type ProfilerLog } from "./profiler-core";
 
 const n = 10_000;
 const frames = 120;
@@ -15,22 +15,6 @@ let resolveFinished: (() => void) | null = null;
 const finished = new Promise<void>((resolve) => {
   resolveFinished = resolve;
 });
-
-function createNullTerminalAdapter(size: { rows: number; cols: number }): TerminalAdapter {
-  return {
-    setupRawMode() {},
-    clearScreen() {},
-    cleanupWithoutClear() {},
-    patchConsole() {},
-    startCapture() {},
-    onKey() {},
-    getTerminalSize() {
-      return size;
-    },
-    disposeSingletonCapture() {},
-    write() {},
-  };
-}
 
 // Pre-build a large, mostly-static tree to stress layout+render traversal.
 const items = Array.from({ length: n }, (_, i) => Text(`item ${i}`).foreground("gray"));
@@ -66,7 +50,7 @@ const app = createApp({
   },
 });
 
-describe("Profiler Stress Test", () => {
+describe("Profiler Stress Test", async () => {
   test(
     "should run without errors",
     async () => {
@@ -79,12 +63,13 @@ describe("Profiler Stress Test", () => {
     { timeout: 45_000 },
   );
 
-  test("parsable jsonfile", async () => {
-    const log = await import(`../${out}`, { with: { type: "json" } }) as ProfilerLog;
-    expect(log.startedAt).toBeDefined();
-    expect(log.endedAt).toBeDefined();
-    expect(log.frames).toBeDefined();
-    expect(log.frames.length).toEqual(frames);
+  test("Performance Requirements", async () => {
+    const log = await import(`../${out}`, { with: { type: "json" } }) as ProfilerLog
     printSummary(log);
+    expect(log.summary.totals.frameMs / log.summary.frameCount).toBeLessThan(16.7)
+    expect(log.summary.frameMs.max).toBeLessThan(50)
+    expect(log.summary.frameMs.p99).toBeGreaterThan(0.2)
+    expect(log.summary.frameMs.p95).toBeLessThan(0.5)
+    expect(log.summary.frameMs.p50).toBeLessThan(1)
   });
 });
