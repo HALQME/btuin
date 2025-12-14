@@ -3,30 +3,22 @@ import type { ComputedLayout } from "@btuin/layout-engine";
 import type { FocusTarget } from "../view/types/focus";
 import { isBlock } from "../view/types/elements";
 
-/**
- * レイアウト計算済みの座標情報を使って、フォーカス可能な要素を収集する
- */
-export function collectFocusTargets(
+function visitFocusTargets(
   element: ViewElement,
   layoutMap: ComputedLayout,
-  parentX = 0,
-  parentY = 0,
-): FocusTarget[] {
-  const targets: FocusTarget[] = [];
-
-  // この要素のレイアウト結果を取得
-  // (要素には一意な key が割り当てられている前提)
-  const layout = element.key ? layoutMap[element.key] : undefined;
-
-  // レイアウト情報がない場合は描画されないのでフォーカスも不可
-  if (!layout) return [];
+  parentX: number,
+  parentY: number,
+  effectiveKey: string | undefined,
+  visit: (target: FocusTarget) => void,
+) {
+  const layout = effectiveKey ? layoutMap[effectiveKey] : undefined;
+  if (!layout) return;
 
   const absX = parentX + layout.x;
   const absY = parentY + layout.y;
 
-  // focusKey を持っていればターゲットとして登録
   if (element.focusKey) {
-    targets.push({
+    visit({
       focusKey: element.focusKey,
       element,
       rect: {
@@ -38,12 +30,39 @@ export function collectFocusTargets(
     });
   }
 
-  // 子要素があれば再帰的に探索 (BlockViewの場合)
-  if (isBlock(element)) {
-    for (const child of element.children) {
-      targets.push(...collectFocusTargets(child, layoutMap, absX, absY));
-    }
+  if (!isBlock(element)) return;
+
+  for (let i = 0; i < element.children.length; i++) {
+    const child = element.children[i]!;
+    const childKey = child.key ?? (effectiveKey ? `${effectiveKey}/${child.type}-${i}` : undefined);
+    visitFocusTargets(child, layoutMap, absX, absY, childKey, visit);
   }
+}
+
+/**
+ * レイアウト計算済みの座標情報を使って、フォーカス可能な要素を収集する
+ */
+export function collectFocusTargets(
+  element: ViewElement,
+  layoutMap: ComputedLayout,
+  parentX = 0,
+  parentY = 0,
+  effectiveKey: string | undefined = element.key,
+): FocusTarget[] {
+  const targets: FocusTarget[] = [];
+  visitFocusTargets(element, layoutMap, parentX, parentY, effectiveKey, (t) => targets.push(t));
 
   return targets;
+}
+
+export function collectFocusTargetMap(
+  element: ViewElement,
+  layoutMap: ComputedLayout,
+  parentX = 0,
+  parentY = 0,
+  effectiveKey: string | undefined = element.key,
+): Map<string, FocusTarget> {
+  const map = new Map<string, FocusTarget>();
+  visitFocusTargets(element, layoutMap, parentX, parentY, effectiveKey, (t) => map.set(t.focusKey, t));
+  return map;
 }

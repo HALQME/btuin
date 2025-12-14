@@ -1,91 +1,113 @@
-import { describe, expect, test } from "bun:test";
-import { createBuffer } from "@btuin/renderer";
-import { HStack } from "../../src/view/layout";
-import { VStack } from "../../src/view/layout";
-import { Text } from "../../src/view/primitives";
-import { initLayoutEngine, layout } from "../../src/layout/index";
+import { describe, expect, test, beforeAll } from "bun:test";
 import { renderElement } from "../../src/layout/renderer";
+import { layout, initLayoutEngine } from "../../src/layout";
+import { Block, Text } from "../../src/view/primitives";
+import { createBuffer, fillRect, drawText } from "@btuin/renderer";
+import type { Buffer2D } from "@btuin/renderer";
+import { resolveColor } from "@btuin/renderer";
 
-function bufferToString(buf: { rows: number; cols: number; cells: Uint32Array }): string {
+// Helper to visualize the buffer
+function bufferToString(buf: Buffer2D): string {
   let out = "";
   for (let r = 0; r < buf.rows; r++) {
     for (let c = 0; c < buf.cols; c++) {
-      out += String.fromCodePoint(buf.cells[r * buf.cols + c]!);
+      out += String.fromCodePoint(buf.get(r, c).char.codePointAt(0)!);
     }
     out += "\n";
   }
   return out;
 }
 
-describe("btuin renderElement", () => {
-  test("renders outlined HStack without crashing", async () => {
+describe("renderElement", () => {
+  beforeAll(async () => {
     await initLayoutEngine();
-
-    const a = Text("A");
-    a.key = "a";
-    const b = Text("B");
-    b.key = "b";
-
-    const root = HStack([a, b]).gap(1).outline({ color: "blue" }).width(10).height(3);
-
-    const layoutMap = layout(root);
-    const buf = createBuffer(3, 10);
-
-    expect(() => renderElement(root, buf, layoutMap)).not.toThrow();
-    expect(String.fromCodePoint(buf.cells[buf.index(0, 0)]!)).toBe("┌");
   });
 
-  test("renders text inside outlined containers", async () => {
-    await initLayoutEngine();
+  test("should render a simple text element", () => {
+    const root = Text({ value: "Hello" }).setKey("root").build();
+    const layoutMap = layout(root, { width: 10, height: 1 });
+    const buffer = createBuffer(1, 10);
 
-    const root = VStack([Text("Counter"), Text("Count: 0")])
-      .outline({ color: "blue" })
-      .width(20)
-      .height(6);
+    renderElement(root, buffer, layoutMap);
 
-    const layoutMap = layout(root);
-    const buf = createBuffer(6, 20);
-    renderElement(root, buf, layoutMap);
-
-    expect(bufferToString(buf)).toContain("Counter");
+    expect(bufferToString(buffer).trim()).toBe("Hello");
   });
 
-  test("resolves root 100% size from container", async () => {
-    await initLayoutEngine();
+  test("should render a block with a background color", () => {
+    const root = Block().background("blue").setKey("root").build();
+    const layoutMap = layout(root, { width: 5, height: 2 });
+    const buffer = createBuffer(2, 5);
 
-    const root = VStack([Text("X")])
-      .width("100%")
-      .height("100%");
-    const layoutMap = layout(root, { width: 10, height: 6 });
+    renderElement(root, buffer, layoutMap);
 
-    expect(layoutMap[root.key!]?.width).toBe(10);
-    expect(layoutMap[root.key!]?.height).toBe(6);
+    // Check if the background was applied
+    for (let i = 0; i < buffer.cells.length; i++) {
+      expect(buffer.bg[i]).toBe(resolveColor("blue", "bg"));
+    }
   });
 
-  test("draws nested children with parent offsets", async () => {
-    await initLayoutEngine();
+  test("should draw a single-style outline", () => {
+    const root = Block().outline({ style: "single" }).setKey("root").build();
+    const layoutMap = layout(root, { width: 3, height: 3 });
+    const buffer = createBuffer(3, 3);
 
-    const nestedText = Text("C");
-    const nested = HStack([nestedText]);
-    const root = VStack([Text("Header"), nested])
-      .width(12)
-      .height(5)
-      .justify("flex-start")
-      .align("flex-start");
+    renderElement(root, buffer, layoutMap);
 
-    const layoutMap = layout(root, { width: 12, height: 5 });
-    const buf = createBuffer(5, 12);
-    renderElement(root, buf, layoutMap);
+    const expected = "┌─┐\n" + "│ │\n" + "└─┘\n";
 
-    const nestedLayout = layoutMap[nested.key!];
-    const textLayout = layoutMap[nestedText.key!];
-    expect(nestedLayout).toBeDefined();
-    expect(textLayout).toBeDefined();
+    expect(bufferToString(buffer)).toBe(expected);
+  });
 
-    const targetRow = nestedLayout!.y + textLayout!.y;
-    const targetCol = nestedLayout!.x + textLayout!.x;
-    const charCode = buf.cells[targetRow * buf.cols + targetCol];
+  test("should draw a double-style outline with a color", () => {
+    const root = Block().outline({ style: "double", color: "red" }).setKey("root").build();
+    const layoutMap = layout(root, { width: 3, height: 3 });
+    const buffer = createBuffer(3, 3);
 
-    expect(String.fromCodePoint(charCode!)).toBe("C");
+    renderElement(root, buffer, layoutMap);
+
+    const expected = "╔═╗\n" + "║ ║\n" + "╚═╝\n";
+
+    expect(bufferToString(buffer)).toBe(expected);
+    // Check a corner and a side for the color
+    expect(buffer.get(0, 0).style.fg).toBe(resolveColor("red", "fg"));
+    expect(buffer.get(0, 1).style.fg).toBe(resolveColor("red", "fg"));
+  });
+
+  test("should render nested children with parent offsets", () => {
+    const child = Text({ value: "Hi" }).setKey("child").build();
+    const parent = Block(child).setKey("parent").build();
+    const root = Block(parent).setKey("root").build();
+
+    const layoutMap = {
+      root: { x: 0, y: 0, width: 10, height: 5 },
+      parent: { x: 2, y: 1, width: 5, height: 3 },
+      child: { x: 1, y: 1, width: 2, height: 1 },
+    };
+    const buffer = createBuffer(5, 10);
+
+    renderElement(root, buffer, layoutMap);
+
+    // The child's absolute position should be parent's + child's
+    // absX = 2 + 1 = 3
+    // absY = 1 + 1 = 2
+    expect(buffer.get(2, 3).char).toBe("H");
+    expect(buffer.get(2, 4).char).toBe("i");
+  });
+
+  test("should apply parentX and parentY offsets", () => {
+    const root = Text({ value: "Offset" }).setKey("root").build();
+    const layoutMap = {
+      root: { x: 1, y: 1, width: 6, height: 1 },
+    };
+    const buffer = createBuffer(3, 10);
+    const parentX = 2;
+    const parentY = 1;
+
+    renderElement(root, buffer, layoutMap, parentX, parentY);
+
+    // The text absolute position should be parent offset + layout offset
+    // absX = 2 + 1 = 3
+    // absY = 1 + 1 = 2
+    expect(buffer.get(2, 3).char).toBe("O");
   });
 });

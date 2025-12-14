@@ -1,6 +1,6 @@
 import {
   initLayoutEngine as initWasm,
-  computeLayout,
+  computeLayout as computeLayoutWasm,
   type LayoutInputNode,
   type ComputedLayout,
 } from "@btuin/layout-engine";
@@ -8,13 +8,9 @@ import { isBlock, isText, type ViewElement } from "../view/types/elements";
 
 export { renderElement } from "./renderer";
 
-export async function initLayoutEngine() {
-  await initWasm();
-}
-
-export interface LayoutContainerSize {
-  width: number;
-  height: number;
+export interface LayoutEngine {
+  initLayoutEngine(): Promise<void>;
+  computeLayout(root: LayoutInputNode): ComputedLayout;
 }
 
 function ensureKeys(element: ViewElement, prefix: string) {
@@ -28,6 +24,11 @@ function ensureKeys(element: ViewElement, prefix: string) {
       ensureKeys(child, `${element.key}/${child.type}-${i}`);
     }
   }
+}
+
+export interface LayoutContainerSize {
+  width: number;
+  height: number;
 }
 
 function viewElementToLayoutNode(element: ViewElement): LayoutInputNode {
@@ -63,10 +64,24 @@ function resolveRootSize(root: ViewElement, containerSize?: LayoutContainerSize)
   }
 }
 
-export function layout(root: ViewElement, containerSize?: LayoutContainerSize): ComputedLayout {
-  ensureKeys(root, "root");
-  resolveRootSize(root, containerSize);
+export function createLayout(engine: LayoutEngine = wasmLayoutEngine()) {
+  return {
+    initLayoutEngine: () => engine.initLayoutEngine(),
+    layout: (root: ViewElement, containerSize?: LayoutContainerSize): ComputedLayout => {
+      ensureKeys(root, "root");
+      resolveRootSize(root, containerSize);
 
-  const layoutNode = viewElementToLayoutNode(root);
-  return computeLayout(layoutNode);
+      const layoutNode = viewElementToLayoutNode(root);
+      return engine.computeLayout(layoutNode);
+    },
+  };
 }
+
+function wasmLayoutEngine(): LayoutEngine {
+  return {
+    initLayoutEngine: () => initWasm(),
+    computeLayout: (root: LayoutInputNode) => computeLayoutWasm(root),
+  };
+}
+
+export const { initLayoutEngine, layout } = createLayout();

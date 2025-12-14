@@ -20,7 +20,6 @@ let currentInstance: ComponentInstance | null = null;
 export interface ComponentInstance {
   uid: number;
   isMounted: boolean;
-  isUnmounted: boolean;
 
   // Lifecycle hooks
   mountedHooks: LifecycleHook[];
@@ -56,7 +55,6 @@ export function createComponentInstance(): ComponentInstance {
   return {
     uid: uidGenerator.next(),
     isMounted: false,
-    isUnmounted: false,
     mountedHooks: [],
     unmountedHooks: [],
     updatedHooks: [],
@@ -276,7 +274,7 @@ export function startTickTimers(instance: ComponentInstance) {
           console.error("Error in tick hook:", error);
         }
       },
-      Math.max(16, tickHook.interval),
+      Math.max(1, tickHook.interval),
     );
 
     tickHook.timer = timer;
@@ -301,17 +299,16 @@ export function stopTickTimers(instance: ComponentInstance) {
  * @internal
  */
 export function unmountInstance(instance: ComponentInstance) {
-  if (instance.isUnmounted) {
-    return;
-  }
-
-  instance.isUnmounted = true;
-
   // Stop tick timers
   stopTickTimers(instance);
 
-  // Run unmounted hooks
-  invokeHooks(instance.unmountedHooks);
+  const shouldInvokeUnmountedHooks = instance.isMounted;
+  instance.isMounted = false;
+
+  if (shouldInvokeUnmountedHooks) {
+    // Run unmounted hooks
+    invokeHooks(instance.unmountedHooks);
+  }
 
   // Run effect cleanups
   for (const cleanup of instance.effects) {

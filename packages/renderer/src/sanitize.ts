@@ -20,7 +20,8 @@ const ANSI_ESCAPE_REGEX = new RegExp(
 const CONTROL_RANGES: [number, number][] = [
   [0x00, 0x08],
   [0x0b, 0x0c],
-  [0x0e, 0x1f],
+  [0x0e, 0x1a],
+  [0x1c, 0x1f],
 ];
 const CONTROL_CHAR_CLASS =
   CONTROL_RANGES.map(
@@ -152,6 +153,54 @@ export function truncateInput(input: string, maxLength: number, suffix: string =
   return input.slice(0, truncateLen) + suffix;
 }
 
+function truncateVisibleWithAnsi(input: string, maxLength: number): string {
+  const cap = Math.max(0, Math.floor(maxLength));
+  if (cap === 0) {
+    return "";
+  }
+
+  const ansiRegex = new RegExp(ANSI_ESCAPE_REGEX.source, "g");
+  const ansiMatches: RegExpMatchArray[] = [];
+  let match: RegExpMatchArray | null;
+  while ((match = ansiRegex.exec(input)) !== null) {
+    ansiMatches.push(match);
+  }
+
+  let result = "";
+  let visibleCount = 0;
+  let index = 0;
+  let matchIndex = 0;
+
+  while (index < input.length && visibleCount < cap) {
+    const nextMatch = ansiMatches[matchIndex];
+    const nextIndex = nextMatch?.index ?? -1;
+    if (nextMatch && nextIndex === index) {
+      result += nextMatch[0];
+      index += nextMatch[0].length;
+      matchIndex++;
+      continue;
+    }
+
+    result += input[index];
+    visibleCount++;
+    index++;
+  }
+
+  while (matchIndex < ansiMatches.length) {
+    const currentMatch = ansiMatches[matchIndex]!;
+    const currentIndex = currentMatch.index ?? -1;
+    if (currentIndex !== index) {
+      break;
+    }
+    const seq = currentMatch[0];
+    result += seq;
+    index += seq.length;
+    matchIndex++;
+  }
+
+  return result;
+}
+
 /**
  * Creates a comprehensive sanitizer that removes harmful content
  * Combines multiple sanitization strategies
@@ -196,8 +245,8 @@ export function createSanitizer(options: {
       result = sanitizeControl(result);
     }
 
-    if (maxLength !== Infinity && result.length > maxLength) {
-      result = result.slice(0, maxLength);
+    if (maxLength !== Infinity && Number.isFinite(maxLength)) {
+      result = truncateVisibleWithAnsi(result, maxLength);
     }
 
     return result;

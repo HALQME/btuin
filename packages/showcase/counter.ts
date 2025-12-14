@@ -22,12 +22,8 @@ const app = createApp({
     return () =>
       VStack([
         Text("Counter"),
-        HStack([
-          Text("Count: "),
-          Text(`${count.value}`)
-            .foreground("red")
-        ]),
-        Text(count.value.toString())
+        HStack([Text("Count: "), Text(`${count.value}`).foreground("red")]),
+        Text(count.value.toString()),
       ])
         .outline({ color: "blue" })
         .width("100%")

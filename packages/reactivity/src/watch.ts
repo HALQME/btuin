@@ -184,11 +184,10 @@ function doWatch(
     if (callback) {
       const newValue = effect.run();
       if (deep || isMultiSource || hasChanged(newValue, oldValue)) {
-        // Run cleanup before callback
+        callback(newValue, oldValue, onCleanup);
         if (cleanup) {
           cleanup();
         }
-        callback(newValue, oldValue, onCleanup);
         oldValue = newValue;
       }
     } else {

@@ -13,6 +13,9 @@ class TextElement extends BaseView implements TextView {
   }
 }
 
-export function Text(content: string): TextElement {
+export function Text(content: string): TextElement;
+export function Text(props: { value: string }): TextElement;
+export function Text(contentOrProps: string | { value: string }): TextElement {
+  const content = typeof contentOrProps === "string" ? contentOrProps : contentOrProps.value;
   return new TextElement(content);
 }

@@ -1,4 +1,3 @@
-import { write } from "@btuin/terminal";
 import type { Buffer2D } from "./types";
 
 /**
@@ -15,16 +14,17 @@ import type { Buffer2D } from "./types";
  * @param prev - Previous buffer state
  * @param next - New buffer state to render
  */
-export function renderDiff(prev: Buffer2D, next: Buffer2D) {
+export function renderDiff(prev: Buffer2D, next: Buffer2D): string {
   const rows = next.rows;
   const cols = next.cols;
-  if (rows === 0 || cols === 0) return;
+  if (rows === 0 || cols === 0) return "";
 
   // Check if buffer sizes match
   const sizeChanged = prev.rows !== rows || prev.cols !== cols;
 
   let currentFg: string | undefined;
   let currentBg: string | undefined;
+  let styleDirty = false;
 
   // Local output buffer to batch terminal writes
   const out: string[] = [];
@@ -53,6 +53,7 @@ export function renderDiff(prev: Buffer2D, next: Buffer2D) {
             out.push(nextFg);
           }
           currentFg = nextFg;
+          styleDirty = true;
         }
         if (nextBg !== currentBg) {
           if (nextBg === undefined) {
@@ -61,6 +62,7 @@ export function renderDiff(prev: Buffer2D, next: Buffer2D) {
             out.push(nextBg);
           }
           currentBg = nextBg;
+          styleDirty = true;
         }
 
         out.push(String.fromCodePoint(nextCode));
@@ -68,11 +70,9 @@ export function renderDiff(prev: Buffer2D, next: Buffer2D) {
     }
   }
 
-  if (currentFg !== undefined || currentBg !== undefined) {
+  if (styleDirty) {
     out.push("\x1b[0m");
   }
 
-  if (out.length > 0) {
-    write(out.join(""));
-  }
+  return out.length > 0 ? out.join("") : "";
 }

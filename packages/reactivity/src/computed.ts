@@ -5,14 +5,18 @@
  * track dependencies and update when dependencies change.
  */
 
-import { ReactiveEffect } from "./effect";
-import { track, trigger } from "./effect";
+import { ReactiveEffect, hasDep, track, trigger } from "./effect";
 import { type Ref } from "./ref";
 
 const IS_REF_KEY = Symbol("__v_isRef");
 
 export interface ComputedRef<T = any> extends Ref<T> {
   readonly value: T;
+  [IS_REF_KEY]: true;
+}
+
+export interface WritableComputedRef<T = any> extends Ref<T> {
+  value: T;
   [IS_REF_KEY]: true;
 }
 
@@ -61,10 +65,10 @@ export interface WritableComputedOptions<T> {
  * @returns Computed ref
  */
 export function computed<T>(getter: ComputedGetter<T>): ComputedRef<T>;
-export function computed<T>(options: WritableComputedOptions<T>): ComputedRef<T>;
+export function computed<T>(options: WritableComputedOptions<T>): WritableComputedRef<T>;
 export function computed<T>(
   getterOrOptions: ComputedGetter<T> | WritableComputedOptions<T>,
-): ComputedRef<T> {
+): ComputedRef<T> | WritableComputedRef<T> {
   let getter: ComputedGetter<T>;
   let setter: ComputedSetter<T> | undefined;
 
@@ -76,12 +80,12 @@ export function computed<T>(
   }
 
   const impl = new ComputedRefImpl(getter, setter);
-  return impl as unknown as ComputedRef<T>;
+  return impl as unknown as any;
 }
 
 class ComputedRefImpl<T> {
   public readonly [IS_REF_KEY] = true;
-  public readonly __v_isReadonly = true;
+  public readonly __v_isReadonly: boolean;
 
   private _value!: T;
   private _dirty = true;
@@ -91,10 +95,21 @@ class ComputedRefImpl<T> {
     getter: ComputedGetter<T>,
     private readonly _setter?: ComputedSetter<T>,
   ) {
+    this.__v_isReadonly = !_setter;
     this.effect = new ReactiveEffect(getter, () => {
-      // Scheduler: mark as dirty when dependencies change
-      if (!this._dirty) {
+      // Only notify dependents if the computed value actually changes.
+      if (this._dirty) {
+        return;
+      }
+
+      if (!hasDep(this, "value")) {
         this._dirty = true;
+        return;
+      }
+
+      const nextValue = this.effect.run()!;
+      if (!Object.is(nextValue, this._value)) {
+        this._value = nextValue;
         trigger(this, "value");
       }
     });

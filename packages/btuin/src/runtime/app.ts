@@ -2,16 +2,6 @@ import type { KeyEvent } from "@btuin/terminal";
 import { Block } from "../view/primitives";
 import { initLayoutEngine } from "../layout";
 import {
-  setupRawMode,
-  clearScreen,
-  cleanupWithoutClear,
-  patchConsole,
-  startCapture,
-  onKey as terminalOnKey,
-  getTerminalSize,
-  disposeSingletonCapture,
-} from "@btuin/terminal";
-import {
   defineComponent,
   mountComponent,
   unmountComponent,
@@ -23,6 +13,8 @@ import {
 import { effect, stop, type ReactiveEffect } from "@btuin/reactivity";
 import { createRenderer } from "./render-loop";
 import { createErrorHandler, createErrorContext } from "./error-boundary";
+import { createDefaultTerminalAdapter, type TerminalAdapter } from "./terminal-adapter";
+import { createDefaultPlatformAdapter, type PlatformAdapter } from "./platform-adapter";
 
 export interface AppConfig {
   /**
@@ -59,6 +51,16 @@ export interface AppConfig {
    * Optional handler called when the app is about to exit.
    */
   onExit?: () => void;
+
+  /**
+   * Optional terminal adapter (for tests/custom IO).
+   */
+  terminal?: TerminalAdapter;
+
+  /**
+   * Optional platform adapter (process hooks/exit).
+   */
+  platform?: PlatformAdapter;
 }
 
 export interface AppInstance {
@@ -131,6 +133,8 @@ export function createApp(config: AppConfig): AppInstance {
   let renderEffect: ReactiveEffect | null = null;
   let isMounted = false;
   let isUnmounting = false;
+  const term = config.terminal ?? createDefaultTerminalAdapter();
+  const platform = config.platform ?? createDefaultPlatformAdapter();
 
   // Convert config to component definition
   const rootComponent = defineComponent({
@@ -153,16 +157,16 @@ export function createApp(config: AppConfig): AppInstance {
       const cols = options.cols ?? 0;
 
       // Patch console to prevent output interference
-      patchConsole();
-      startCapture();
+      term.patchConsole();
+      term.startCapture();
 
       // Setup terminal
-      setupRawMode();
-      clearScreen();
+      term.setupRawMode();
+      term.clearScreen();
 
       // Terminal size resolver
       const getSize = () => {
-        const termSize = getTerminalSize();
+        const termSize = term.getTerminalSize();
         return {
           rows: rows === 0 ? termSize.rows : rows,
           cols: cols === 0 ? termSize.cols : cols,
@@ -186,6 +190,7 @@ export function createApp(config: AppConfig): AppInstance {
         // Create renderer once
         const renderer = createRenderer({
           getSize,
+          write: term.write,
           view: () => {
             if (!mounted) return Block();
             return renderComponent(mounted);
@@ -206,7 +211,7 @@ export function createApp(config: AppConfig): AppInstance {
         });
 
         // Setup keyboard event handler
-        terminalOnKey((event: KeyEvent) => {
+        term.onKey((event: KeyEvent) => {
           if (!mounted) return;
 
           try {
@@ -219,9 +224,9 @@ export function createApp(config: AppConfig): AppInstance {
 
         // Setup resize handler if auto-sizing
         if (rows === 0 || cols === 0) {
-          process.stdout.on("resize", () => {
+          platform.onStdoutResize(() => {
             try {
-              clearScreen();
+              term.clearScreen();
               if (renderEffect) {
                 renderEffect.run();
               }
@@ -239,14 +244,14 @@ export function createApp(config: AppConfig): AppInstance {
           appInstance.unmount();
         };
 
-        process.once("exit", exitHandler);
-        process.once("SIGINT", () => {
+        platform.onExit(exitHandler);
+        platform.onSigint(() => {
           exitHandler();
-          process.exit(0);
+          platform.exit(0);
         });
-        process.once("SIGTERM", () => {
+        platform.onSigterm(() => {
           exitHandler();
-          process.exit(0);
+          platform.exit(0);
         });
       } catch (error) {
         handleError(createErrorContext("mount", error));
@@ -281,10 +286,10 @@ export function createApp(config: AppConfig): AppInstance {
         }
 
         // Dispose console capture
-        disposeSingletonCapture();
+        term.disposeSingletonCapture();
 
         // Clean up terminal
-        cleanupWithoutClear();
+        term.cleanupWithoutClear();
 
         isMounted = false;
       } catch (error) {

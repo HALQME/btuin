@@ -41,6 +41,35 @@ class EffectTracker {
 const effectTracker = new EffectTracker();
 
 /**
+ * Track control state - encapsulated in a singleton
+ */
+class TrackController {
+  private shouldTrack = true;
+  private readonly trackStack: boolean[] = [];
+
+  pause(): void {
+    this.trackStack.push(this.shouldTrack);
+    this.shouldTrack = false;
+  }
+
+  enable(): void {
+    this.trackStack.push(this.shouldTrack);
+    this.shouldTrack = true;
+  }
+
+  reset(): void {
+    const last = this.trackStack.pop();
+    this.shouldTrack = last === undefined ? true : last;
+  }
+
+  isTracking(): boolean {
+    return this.shouldTrack;
+  }
+}
+
+const trackController = new TrackController();
+
+/**
  * Reactive Effect class
  * Represents a function that depends on reactive data
  */
@@ -122,9 +151,7 @@ export function effect(fn: EffectFn, options?: ReactiveEffectOptions): ReactiveE
     _effect.onStop = options.onStop;
   }
 
-  if (!options?.lazy) {
-    _effect.run();
-  }
+  _effect.run();
 
   return _effect;
 }
@@ -158,6 +185,9 @@ export function stop(effect: ReactiveEffect) {
 export function track(target: object, key: string | symbol) {
   const activeEffect = effectTracker.getActiveEffect();
   if (!activeEffect) {
+    return;
+  }
+  if (!trackController.isTracking()) {
     return;
   }
 
@@ -216,6 +246,14 @@ export function trigger(target: object, key: string | symbol) {
   });
 }
 
+export function hasDep(target: object, key: string | symbol): boolean {
+  const targetMap = effectTracker.getTargetMap();
+  const depsMap = targetMap.get(target);
+  if (!depsMap) return false;
+  const dep = depsMap.get(key);
+  return !!dep && dep.size > 0;
+}
+
 /**
  * Pauses tracking of reactive dependencies.
  * Useful when you want to read reactive values without creating dependencies.
@@ -231,35 +269,6 @@ export function trigger(target: object, key: string | symbol) {
  * });
  * ```
  */
-/**
- * Track control state - encapsulated in a singleton
- */
-class TrackController {
-  private shouldTrack = true;
-  private readonly trackStack: boolean[] = [];
-
-  pause(): void {
-    this.trackStack.push(this.shouldTrack);
-    this.shouldTrack = false;
-  }
-
-  enable(): void {
-    this.trackStack.push(this.shouldTrack);
-    this.shouldTrack = true;
-  }
-
-  reset(): void {
-    const last = this.trackStack.pop();
-    this.shouldTrack = last === undefined ? true : last;
-  }
-
-  isTracking(): boolean {
-    return this.shouldTrack;
-  }
-}
-
-const trackController = new TrackController();
-
 export function pauseTracking() {
   trackController.pause();
 }

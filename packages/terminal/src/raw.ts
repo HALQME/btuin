@@ -16,6 +16,10 @@ class TerminalState {
     return this.keyHandlers;
   }
 
+  clearKeyHandlers(): void {
+    this.keyHandlers.length = 0;
+  }
+
   isRawModeActive(): boolean {
     return this.rawModeActive;
   }
@@ -253,6 +257,10 @@ export function setupRawMode() {
  */
 export function onKey(handler: KeyHandler) {
   terminalState.addKeyHandler(handler);
+}
+
+export function resetKeyHandlers() {
+  terminalState.clearKeyHandlers();
 }
 
 /**

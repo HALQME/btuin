@@ -71,4 +71,13 @@ export abstract class BaseView implements ViewProps {
     this.focusKey = key;
     return this;
   }
+
+  setKey(value: string): this {
+    this.key = value;
+    return this;
+  }
+
+  build(): this {
+    return this;
+  }
 }

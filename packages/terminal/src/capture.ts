@@ -274,7 +274,6 @@ export function clearCapturedOutput(): void {
   state.capturedOutput = [];
 }
 
-
 export interface ConsoleLine {
   text: string;
   type: "stdout" | "stderr";

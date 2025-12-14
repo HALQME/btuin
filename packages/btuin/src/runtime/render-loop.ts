@@ -23,6 +23,8 @@ export interface TerminalSize {
 export interface RenderLoopConfig<State> {
   /** Function to get current terminal size */
   getSize: () => TerminalSize;
+  /** Function to write output to the terminal */
+  write: (output: string) => void;
   /** Function to generate view from state */
   view: (state: State) => ViewElement;
   /** Function to get current state */
@@ -87,7 +89,10 @@ export function createRenderer<State>(config: RenderLoopConfig<State>) {
 
       const buf = pool.acquire();
       renderElement(rootElement, buf, layoutResult, 0, 0);
-      renderDiff(state.prevBuffer, buf);
+      const output = renderDiff(state.prevBuffer, buf);
+      if (output) {
+        config.write(output);
+      }
 
       // Return old prev buffer to the pool and keep the new one
       pool.release(state.prevBuffer);
