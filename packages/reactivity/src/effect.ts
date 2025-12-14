@@ -88,13 +88,14 @@ export class ReactiveEffect {
       return this.fn();
     }
 
+    const parent = effectTracker.getActiveEffect();
     try {
       effectTracker.setActiveEffect(this);
       // Clean up existing dependencies before re-tracking
       cleanupEffect(this);
       return this.fn();
     } finally {
-      effectTracker.setActiveEffect(undefined);
+      effectTracker.setActiveEffect(parent);
     }
   }
 

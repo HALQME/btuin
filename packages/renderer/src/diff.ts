@@ -31,6 +31,10 @@ export function renderDiff(prev: Buffer2D, next: Buffer2D): string {
 
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
+      // Avoid printing into the terminal's bottom-right cell, which can trigger
+      // an implicit line wrap/scroll on some terminals.
+      if (r === rows - 1 && c === cols - 1) continue;
+
       const idx = r * cols + c;
 
       const nextCode = next.cells[idx] || 32;

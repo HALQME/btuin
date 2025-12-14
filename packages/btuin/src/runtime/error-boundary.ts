@@ -29,6 +29,7 @@ export type ErrorHandler = (context: ErrorContext) => void;
  * @returns Error handling function
  */
 import { createWriteStream } from "fs";
+import { getOriginalStderr } from "@btuin/terminal";
 
 // ...
 
@@ -68,6 +69,12 @@ export function createErrorHandler(
           errorLogStream.end();
         }
       }
+    } else if (!errorLogPath) {
+      const meta = context.metadata ? `\nmetadata: ${JSON.stringify(context.metadata)}` : "";
+      const stack = context.error.stack ? `\n${context.error.stack}` : "";
+      getOriginalStderr().write(
+        `[btuin] error(${context.phase}): ${context.error.message}${meta}${stack}\n`,
+      );
     }
   };
 }

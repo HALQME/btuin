@@ -183,6 +183,23 @@ export function createApp(config: AppConfig): AppInstance {
         config.errorLog,
       );
 
+      // Buffer key events that may arrive before the app finishes mounting.
+      const pendingKeyEvents: KeyEvent[] = [];
+
+      // Setup keyboard event handler early to avoid losing initial input.
+      term.onKey((event: KeyEvent) => {
+        if (!mounted) {
+          pendingKeyEvents.push(event);
+          return;
+        }
+
+        try {
+          handleComponentKey(mounted, event);
+        } catch (error) {
+          handleError(createErrorContext("key", error, { keyEvent: event }));
+        }
+      });
+
       try {
         // Mount root component
         mounted = mountComponent(rootComponent, {});
@@ -210,17 +227,18 @@ export function createApp(config: AppConfig): AppInstance {
           }
         });
 
-        // Setup keyboard event handler
-        term.onKey((event: KeyEvent) => {
-          if (!mounted) return;
-
-          try {
-            // Handle component key events
-            handleComponentKey(mounted, event);
-          } catch (error) {
-            handleError(createErrorContext("key", error, { keyEvent: event }));
+        // Flush any key events received during mount.
+        if (pendingKeyEvents.length && mounted) {
+          for (const event of pendingKeyEvents.splice(0)) {
+            try {
+              handleComponentKey(mounted, event);
+            } catch (error) {
+              handleError(createErrorContext("key", error, { keyEvent: event }));
+            }
           }
-        });
+          // Ensure a render after applying buffered events.
+          renderEffect.run();
+        }
 
         // Setup resize handler if auto-sizing
         if (rows === 0 || cols === 0) {

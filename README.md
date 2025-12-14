@@ -31,3 +31,81 @@ Bunのパフォーマンスを最大限に活かし、快適な開発体験を�
 - [ ] **拡張コンポーネント**: Table, ProgressBar, Spinner, Toast, Selector
 
 ## クイックスタート
+
+> **前提**: Bun（`bun` コマンド）がインストール済みであること。
+
+### セットアップ
+
+```bash
+pnpm install
+```
+
+### テスト
+
+```bash
+pnpm test
+```
+
+### すぐ動くサンプル（showcase）
+
+```bash
+# 矢印キーでカウント / q で終了
+bun packages/showcase/counter.ts
+
+# ダッシュボード（↑/↓でページ移動 / space で一時停止 / q で終了）
+bun packages/showcase/dashboard.ts
+```
+
+## 使い方（最小例）
+
+```ts
+import { createApp, VStack, Text, ref, onKey } from "btuin";
+
+const app = createApp({
+  setup() {
+    const count = ref(0);
+    onKey((k) => {
+      if (k.name === "up") count.value++;
+      if (k.name === "down") count.value--;
+      if (k.name === "q") process.exit(0);
+    });
+
+    return () =>
+      VStack([Text("Counter"), Text(String(count.value))])
+        .width("100%")
+        .height("100%")
+        .justify("center")
+        .align("center");
+  },
+});
+
+await app.mount();
+```
+
+## 設計メモ（ざっくり）
+
+- `@btuin/reactivity`: `ref/computed/effect/watch` による状態管理
+- `@btuin/layout-engine`: Flexbox ライクなレイアウト（WASM）
+- `@btuin/renderer`: バッファ描画 + 差分レンダリング（`renderDiff` は文字列を返す純粋関数）
+- `@btuin/terminal`: raw mode / 入力 / stdout 書き込み
+- `btuin`: それらを束ねる “アプリ実行” と View API
+
+## アダプタ（テスト/差し替え用）
+
+通常はそのまま `createApp()` を使えば動きます。必要なら I/O を差し替えできます。
+
+```ts
+import { createApp } from "btuin";
+
+createApp({
+  terminal: {
+    // write/onKey/getTerminalSize... など
+  },
+  platform: {
+    // resize/exit/signal... など
+  },
+  setup() {
+    return () => /* view */;
+  },
+});
+```

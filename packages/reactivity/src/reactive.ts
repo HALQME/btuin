@@ -10,6 +10,13 @@ import { track, trigger } from "./effect";
 const RAW_KEY = Symbol("__v_raw");
 const IS_REACTIVE_KEY = Symbol("__v_isReactive");
 
+function shouldMakeReactive(value: unknown): value is object {
+  if (value === null || typeof value !== "object") return false;
+  if (value instanceof Date) return false;
+  if (value instanceof RegExp) return false;
+  return true;
+}
+
 export interface ReactiveFlags {
   [RAW_KEY]?: any;
   [IS_REACTIVE_KEY]?: boolean;
@@ -65,7 +72,7 @@ export function reactive<T extends object>(target: T): T {
       const result = Reflect.get(target, key, receiver);
 
       // Deep reactive: if result is object, make it reactive too
-      if (result !== null && typeof result === "object") {
+      if (shouldMakeReactive(result)) {
         return reactive(result);
       }
 

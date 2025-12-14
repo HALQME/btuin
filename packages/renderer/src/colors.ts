@@ -22,7 +22,7 @@ export function resolveColor(value: ColorValue, channel: "fg" | "bg"): string | 
     }
 
     const colorCode = colorMap[value.toLowerCase()];
-    if (colorCode) {
+    if (colorCode !== undefined) {
       return channel === "fg" ? `\x1b[${colorCode}m` : `\x1b[${colorCode + 10}m`;
     }
   }

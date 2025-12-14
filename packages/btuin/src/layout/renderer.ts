@@ -2,6 +2,22 @@ import { type ViewElement, isBlock, isText } from "../view/types/elements";
 import type { ComputedLayout } from "@btuin/layout-engine";
 import { type Buffer2D, drawText, fillRect } from "@btuin/renderer";
 
+function resolvePadding(padding: unknown): { top: number; right: number; bottom: number; left: number } {
+  if (typeof padding === "number") {
+    return { top: padding, right: padding, bottom: padding, left: padding };
+  }
+  if (Array.isArray(padding) && padding.length === 4) {
+    const [top, right, bottom, left] = padding as number[];
+    return {
+      top: typeof top === "number" ? top : 0,
+      right: typeof right === "number" ? right : 0,
+      bottom: typeof bottom === "number" ? bottom : 0,
+      left: typeof left === "number" ? left : 0,
+    };
+  }
+  return { top: 0, right: 0, bottom: 0, left: 0 };
+}
+
 /**
  * Draw the element tree to the buffer.
  */
@@ -33,6 +49,7 @@ export function renderElement(
       " ",
       {
         bg,
+        fg: undefined,
       },
     );
   }
@@ -50,26 +67,40 @@ export function renderElement(
     const w = Math.floor(width);
     const h = Math.floor(height);
 
-    fillRect(buffer, y, x, w, 1, chars.h, { fg: color });
-    fillRect(buffer, y + h - 1, x, w, 1, chars.h, { fg: color });
-    fillRect(buffer, y, x, 1, h, chars.v, { fg: color });
-    fillRect(buffer, y, x + w - 1, 1, h, chars.v, { fg: color });
+    const borderStyle = color !== undefined ? { fg: color } : undefined;
 
-    drawText(buffer, y, x, chars.tl, { fg: color });
-    drawText(buffer, y, x + w - 1, chars.tr, { fg: color });
-    drawText(buffer, y + h - 1, x, chars.bl, { fg: color });
-    drawText(buffer, y + h - 1, x + w - 1, chars.br, { fg: color });
+    fillRect(buffer, y, x, w, 1, chars.h, borderStyle);
+    fillRect(buffer, y + h - 1, x, w, 1, chars.h, borderStyle);
+    fillRect(buffer, y, x, 1, h, chars.v, borderStyle);
+    fillRect(buffer, y, x + w - 1, 1, h, chars.v, borderStyle);
+
+    drawText(buffer, y, x, chars.tl, borderStyle);
+    drawText(buffer, y, x + w - 1, chars.tr, borderStyle);
+    drawText(buffer, y + h - 1, x, chars.bl, borderStyle);
+    drawText(buffer, y + h - 1, x + w - 1, chars.br, borderStyle);
   }
 
   if (isText(element)) {
     const fg = element.style?.foreground;
     const bg = element.style?.background;
-    drawText(buffer, Math.floor(absY), Math.floor(absX), element.content, { fg, bg });
+    const style: { fg?: string | number; bg?: string | number } = {};
+    if (fg !== undefined) style.fg = fg;
+    if (bg !== undefined) style.bg = bg;
+    drawText(buffer, Math.floor(absY), Math.floor(absX), element.content, style);
   }
 
   if (isBlock(element)) {
-    for (const child of element.children) {
-      renderElement(child, buffer, layoutMap, absX, absY);
+    const stack = element.style?.stack;
+    if (stack === "z") {
+      // Layout engine already overlays children (absolute positioning).
+      // Keep normal render recursion so child layout positions are respected.
+      for (const child of element.children) {
+        renderElement(child, buffer, layoutMap, absX, absY);
+      }
+    } else {
+      for (const child of element.children) {
+        renderElement(child, buffer, layoutMap, absX, absY);
+      }
     }
   }
 }

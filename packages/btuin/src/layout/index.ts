@@ -3,6 +3,7 @@ import {
   computeLayout as computeLayoutWasm,
   type LayoutInputNode,
   type ComputedLayout,
+  type Dimension,
 } from "@btuin/layout-engine";
 import { isBlock, isText, type ViewElement } from "../view/types/elements";
 
@@ -31,7 +32,42 @@ export interface LayoutContainerSize {
   height: number;
 }
 
-function viewElementToLayoutNode(element: ViewElement): LayoutInputNode {
+function isPercent(value: unknown): value is string {
+  return typeof value === "string" && /^\s*\d+(\.\d+)?%\s*$/.test(value);
+}
+
+function percentToNumber(value: string, base: number): number {
+  const n = Number.parseFloat(value);
+  if (!Number.isFinite(n)) return base;
+  return (base * n) / 100;
+}
+
+function resolvePadding(padding: unknown): { top: number; right: number; bottom: number; left: number } {
+  if (typeof padding === "number") {
+    return { top: padding, right: padding, bottom: padding, left: padding };
+  }
+  if (Array.isArray(padding) && padding.length === 4) {
+    const [top, right, bottom, left] = padding as number[];
+    return {
+      top: typeof top === "number" ? top : 0,
+      right: typeof right === "number" ? right : 0,
+      bottom: typeof bottom === "number" ? bottom : 0,
+      left: typeof left === "number" ? left : 0,
+    };
+  }
+  return { top: 0, right: 0, bottom: 0, left: 0 };
+}
+
+function resolveDimension(dim: unknown, base: number): Dimension | undefined {
+  if (!isPercent(dim)) return dim as Dimension | undefined;
+  return percentToNumber(dim, base);
+}
+
+function viewElementToLayoutNode(
+  element: ViewElement,
+  parentSize?: LayoutContainerSize,
+  isRoot = false,
+): LayoutInputNode {
   const { key, style } = element;
 
   const node: LayoutInputNode = {
@@ -41,27 +77,71 @@ function viewElementToLayoutNode(element: ViewElement): LayoutInputNode {
   };
 
   if (isBlock(element)) {
-    node.children = element.children.map(viewElementToLayoutNode);
+    if (parentSize) {
+      const baseWidth = parentSize.width;
+      const baseHeight = parentSize.height;
+
+      if (isRoot) {
+        if (node.width === undefined || node.width === "100%") node.width = baseWidth;
+        if (node.height === undefined || node.height === "100%") node.height = baseHeight;
+      }
+
+      if (node.width !== undefined) node.width = resolveDimension(node.width, baseWidth);
+      if (node.height !== undefined) node.height = resolveDimension(node.height, baseHeight);
+      if (node.minWidth !== undefined) node.minWidth = resolveDimension(node.minWidth, baseWidth);
+      if (node.minHeight !== undefined) node.minHeight = resolveDimension(node.minHeight, baseHeight);
+      if (node.maxWidth !== undefined) node.maxWidth = resolveDimension(node.maxWidth, baseWidth);
+      if (node.maxHeight !== undefined) node.maxHeight = resolveDimension(node.maxHeight, baseHeight);
+      if (node.flexBasis !== undefined) node.flexBasis = resolveDimension(node.flexBasis, baseWidth);
+    }
+
+    const pad = resolvePadding(node.padding);
+    const contentSize =
+      typeof node.width === "number" && typeof node.height === "number"
+        ? {
+            width: Math.max(0, node.width - pad.left - pad.right),
+            height: Math.max(0, node.height - pad.top - pad.bottom),
+          }
+        : parentSize;
+
+    const stack = element.style?.stack;
+    if (stack === "z") {
+      if (node.position === undefined) node.position = "relative";
+      node.children = element.children.map((child) => {
+        const childNode = viewElementToLayoutNode(child, contentSize);
+        if (childNode.position === undefined) childNode.position = "absolute";
+        if (childNode.type === "block") {
+          if (childNode.width === undefined && contentSize) {
+            childNode.width = resolveDimension("100%", contentSize.width);
+          }
+          if (childNode.height === undefined && contentSize) {
+            childNode.height = resolveDimension("100%", contentSize.height);
+          }
+        }
+        return childNode;
+      });
+    } else {
+      node.children = element.children.map((child) => viewElementToLayoutNode(child, contentSize));
+    }
   } else if (isText(element)) {
     const textWidth = element.content.length;
     node.measuredSize = { width: textWidth, height: 1 };
     if (node.width === undefined) node.width = textWidth;
     if (node.height === undefined) node.height = 1;
+  } else if (parentSize) {
+    const baseWidth = parentSize.width;
+    const baseHeight = parentSize.height;
+
+    if (isRoot) {
+      if (node.width === undefined || node.width === "100%") node.width = baseWidth;
+      if (node.height === undefined || node.height === "100%") node.height = baseHeight;
+    }
+
+    if (node.width !== undefined) node.width = resolveDimension(node.width, baseWidth);
+    if (node.height !== undefined) node.height = resolveDimension(node.height, baseHeight);
   }
 
   return node;
-}
-
-function resolveRootSize(root: ViewElement, containerSize?: LayoutContainerSize) {
-  if (!containerSize) return;
-  const style = (root.style ??= {});
-
-  if (style.width === undefined || style.width === "100%") {
-    style.width = containerSize.width;
-  }
-  if (style.height === undefined || style.height === "100%") {
-    style.height = containerSize.height;
-  }
 }
 
 export function createLayout(engine: LayoutEngine = wasmLayoutEngine()) {
@@ -69,9 +149,7 @@ export function createLayout(engine: LayoutEngine = wasmLayoutEngine()) {
     initLayoutEngine: () => engine.initLayoutEngine(),
     layout: (root: ViewElement, containerSize?: LayoutContainerSize): ComputedLayout => {
       ensureKeys(root, "root");
-      resolveRootSize(root, containerSize);
-
-      const layoutNode = viewElementToLayoutNode(root);
+      const layoutNode = viewElementToLayoutNode(root, containerSize, true);
       return engine.computeLayout(layoutNode);
     },
   };

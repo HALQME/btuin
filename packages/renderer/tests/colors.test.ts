@@ -5,11 +5,13 @@ describe("resolveColor", () => {
   // Test named colors
   it("should resolve named foreground colors", () => {
     expect(resolveColor("red", "fg")).toBe("\x1b[31m");
+    expect(resolveColor("black", "fg")).toBe("\x1b[30m");
     expect(resolveColor("GREEN", "fg")).toBe("\x1b[32m");
   });
 
   it("should resolve named background colors", () => {
     expect(resolveColor("blue", "bg")).toBe("\x1b[44m");
+    expect(resolveColor("black", "bg")).toBe("\x1b[40m");
     expect(resolveColor("WHITE", "bg")).toBe("\x1b[47m");
   });
 

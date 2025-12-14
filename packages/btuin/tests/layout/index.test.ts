@@ -77,4 +77,22 @@ describe("layout", () => {
     expect(receivedLayoutNode?.width).toBe(100);
     expect(receivedLayoutNode?.height).toBe(50);
   });
+
+  it("should resolve nested percent dimensions", () => {
+    const { layout } = createLayout({
+      initLayoutEngine: async () => {},
+      computeLayout: (node: LayoutInputNode): ComputedLayout => {
+        receivedLayoutNode = node;
+        return mockComputedLayout;
+      },
+    });
+
+    const child = Block().width("100%").height("100%");
+    const root = Block(child);
+    layout(root, { width: 40, height: 10 });
+
+    const childNode = receivedLayoutNode?.children?.[0];
+    expect(childNode?.width).toBe(40);
+    expect(childNode?.height).toBe(10);
+  });
 });

@@ -12,3 +12,11 @@ export function HStack(children: ViewElement[] = []): BlockElement {
     .direction("row")
     .align("center");
 }
+
+// ZStack は子要素を同じ原点に重ねて描画するための Block
+// レイアウトは通常通り計算しつつ、描画時に子のオフセットを揃える。
+export function ZStack(children: ViewElement[] = []): BlockElement {
+  const el = Block(...children);
+  el.style.stack = "z";
+  return el;
+}

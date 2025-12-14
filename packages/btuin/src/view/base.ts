@@ -13,6 +13,7 @@ export interface ViewProps {
     foreground?: string | number;
     background?: string | number;
     outline?: OutlineOptions;
+    stack?: "z";
   };
 }
 
@@ -48,7 +49,20 @@ export abstract class BaseView implements ViewProps {
     return this;
   }
 
-  // --- 見た目 (Renderer用) ---
+  padding(value: NonNullable<LayoutStyle["padding"]>): this {
+    this.style.padding = value;
+    return this;
+  }
+
+  grow(value = 1): this {
+    this.style.flexGrow = value;
+    return this;
+  }
+
+  shrink(value = 1): this {
+    this.style.flexShrink = value;
+    return this;
+  }
 
   foreground(color: string | number): this {
     this.style.foreground = color;
@@ -62,10 +76,12 @@ export abstract class BaseView implements ViewProps {
 
   outline(options: OutlineOptions): this {
     this.style.outline = options;
+    // Border occupies the outermost cells; default padding avoids children overlapping it.
+    if (this.style.padding === undefined) {
+      this.style.padding = 1;
+    }
     return this;
   }
-
-  // --- システム ---
 
   focus(key: string): this {
     this.focusKey = key;

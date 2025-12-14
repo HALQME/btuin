@@ -58,6 +58,25 @@ describe("computed", () => {
     expect(result).toBe(10);
   });
 
+  it("should not break outer effect tracking when evaluating computed", () => {
+    const a = ref(1);
+    const b = computed(() => a.value * 2);
+    const c = ref(0);
+    let runs = 0;
+
+    effect(() => {
+      runs++;
+      // Access computed first (nested effect), then a plain ref.
+      // The plain ref must still be tracked by the outer effect.
+      void b.value;
+      void c.value;
+    });
+
+    expect(runs).toBe(1);
+    c.value = 1;
+    expect(runs).toBe(2);
+  });
+
   it("should support writable computed properties", () => {
     const firstName = ref("John");
     const lastName = ref("Doe");

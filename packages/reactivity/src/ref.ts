@@ -100,6 +100,8 @@ function createRef<T>(rawValue: T, shallow: boolean): Ref<T> {
  */
 function convert<T>(value: T): T {
   if (value !== null && typeof value === "object") {
+    if (value instanceof Date) return value;
+    if (value instanceof RegExp) return value;
     return reactive(value as T extends object ? T : never) as T;
   }
   return value;

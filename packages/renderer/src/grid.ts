@@ -119,6 +119,9 @@ export function drawText(
   if (row < 0 || row >= buf.rows) return;
   if (buf.cols === 0) return;
 
+  const hasFg = style ? Object.prototype.hasOwnProperty.call(style, "fg") : false;
+  const hasBg = style ? Object.prototype.hasOwnProperty.call(style, "bg") : false;
+
   const fg = style?.fg !== undefined ? resolveColor(style.fg, "fg") : undefined;
   const bg = style?.bg !== undefined ? resolveColor(style.bg, "bg") : undefined;
 
@@ -129,8 +132,8 @@ export function drawText(
     const idx = indexOf(buf, row, c);
     const ch = text[i] ?? " ";
     buf.cells[idx] = ch.codePointAt(0) ?? 32;
-    if (fg !== undefined) buf.fg[idx] = fg;
-    if (bg !== undefined) buf.bg[idx] = bg;
+    if (hasFg) buf.fg[idx] = fg;
+    if (hasBg) buf.bg[idx] = bg;
   }
 }
 
@@ -171,6 +174,9 @@ export function fillRect(
 
   if (width <= 0 || height <= 0) return;
 
+  const hasFg = style ? Object.prototype.hasOwnProperty.call(style, "fg") : false;
+  const hasBg = style ? Object.prototype.hasOwnProperty.call(style, "bg") : false;
+
   const fg = style?.fg !== undefined ? resolveColor(style.fg, "fg") : undefined;
   const bg = style?.bg !== undefined ? resolveColor(style.bg, "bg") : undefined;
 
@@ -183,8 +189,8 @@ export function fillRect(
     for (let c = Math.max(0, col); c < maxCol; c++) {
       const idx = indexOf(buf, r, c);
       buf.cells[idx] = chCode;
-      if (fg !== undefined) buf.fg[idx] = fg;
-      if (bg !== undefined) buf.bg[idx] = bg;
+      if (hasFg) buf.fg[idx] = fg;
+      if (hasBg) buf.bg[idx] = bg;
     }
   }
 }

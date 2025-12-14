@@ -55,19 +55,19 @@ describe("renderDiff", () => {
 
     const output = renderDiff(prev, next);
 
-    // Expect it to draw 9 'b's
+    // Avoid bottom-right cell (can cause terminal scroll); expect 8 'b's
     const occurrences = (output.match(/b/g) || []).length;
-    expect(occurrences).toBe(9);
+    expect(occurrences).toBe(8);
 
     // Check if it moves to each cell
     expect(output).toContain("\x1b[1;1H");
-    expect(output).toContain("\x1b[3;3H");
+    expect(output).toContain("\x1b[3;2H");
   });
 
   it("should batch color changes", () => {
-    const prev = createMockBuffer(1, 4, " ");
-    const next = createMockBuffer(1, 4, " ");
-    next.cells.set([..."abcd"].map((c) => c.codePointAt(0)!));
+    const prev = createMockBuffer(1, 5, " ");
+    const next = createMockBuffer(1, 5, " ");
+    next.cells.set([..."abcd "].map((c) => c.codePointAt(0)!));
     next.fg.fill("\x1b[32m", 0, 2); // green for 'a' and 'b'
     next.fg.fill("\x1b[34m", 2, 4); // blue for 'c' and 'd'
 
@@ -81,8 +81,8 @@ describe("renderDiff", () => {
   });
 
   it("should reset colors when necessary", () => {
-    const prev = createMockBuffer(1, 2, " ");
-    const next = createMockBuffer(1, 2, " ");
+    const prev = createMockBuffer(1, 3, " ");
+    const next = createMockBuffer(1, 3, " ");
     next.cells[0] = "a".codePointAt(0)!;
     next.fg[0] = "\x1b[31m"; // red
     next.cells[1] = "b".codePointAt(0)!;
