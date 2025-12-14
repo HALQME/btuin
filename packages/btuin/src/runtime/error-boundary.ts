@@ -4,8 +4,6 @@
  * Handles error contexts and provides error handling utilities for the runtime.
  */
 
-import { appendFile } from "node:fs/promises";
-
 /**
  * Error context information for error handlers
  */
@@ -30,6 +28,11 @@ export type ErrorHandler = (context: ErrorContext) => void;
  * @param errorLogPath - Optional file path to write error logs to
  * @returns Error handling function
  */
+import { createWriteStream } from "fs";
+import { getOriginalStderr } from "@btuin/terminal";
+
+// ...
+
 export function createErrorHandler(
   userHandler: ErrorHandler | undefined,
   errorLogPath?: string,
@@ -44,10 +47,9 @@ export function createErrorHandler(
         (context.metadata ? `  Metadata: ${JSON.stringify(context.metadata)}\n` : "") +
         `  Stack: ${context.error.stack}\n\n`;
 
-      // Fire-and-forget write (non-blocking)
-      appendFile(errorLogPath, errorText).catch(() => {
-        // Silently ignore write errors to avoid recursion
-      });
+      const errorLogStream = createWriteStream(errorLogPath, { flags: "a" });
+      errorLogStream.write(errorText);
+      errorLogStream.end();
     }
 
     if (userHandler) {
@@ -62,9 +64,17 @@ export function createErrorHandler(
             `  Message: ${handlerError instanceof Error ? handlerError.message : String(handlerError)}\n` +
             `  Original error: ${context.error.message}\n\n`;
 
-          appendFile(errorLogPath, handlerErrorText).catch(() => {});
+          const errorLogStream = createWriteStream(errorLogPath, { flags: "a" });
+          errorLogStream.write(handlerErrorText);
+          errorLogStream.end();
         }
       }
+    } else if (!errorLogPath) {
+      const meta = context.metadata ? `\nmetadata: ${JSON.stringify(context.metadata)}` : "";
+      const stack = context.error.stack ? `\n${context.error.stack}` : "";
+      getOriginalStderr().write(
+        `[btuin] error(${context.phase}): ${context.error.message}${meta}${stack}\n`,
+      );
     }
   };
 }

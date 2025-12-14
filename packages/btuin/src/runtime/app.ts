@@ -1,21 +1,6 @@
-/**
- * App Creation and Mounting System
- *
- * Vue-like app creation and mounting for btuin TUI framework.
- */
-
-import type { ViewElement } from "@btuin/types/elements";
-import type { KeyEvent } from "@btuin/types/key-event";
-import {
-  setupRawMode,
-  clearScreen,
-  cleanupWithoutClear,
-  patchConsole,
-  startCapture,
-  onKey as terminalOnKey,
-  getTerminalSize,
-} from "../terminal";
-import { disposeSingletonCapture } from "../terminal/console-capture";
+import type { KeyEvent } from "@btuin/terminal";
+import { Block } from "../view/primitives";
+import { initLayoutEngine } from "../layout";
 import {
   defineComponent,
   mountComponent,
@@ -24,10 +9,12 @@ import {
   handleComponentKey,
   type Component,
   type MountedComponent,
-} from "../component";
-import { effect, stop, type ReactiveEffect } from "../reactivity";
+} from "../view/components";
+import { effect, stop, type ReactiveEffect } from "@btuin/reactivity";
 import { createRenderer } from "./render-loop";
 import { createErrorHandler, createErrorContext } from "./error-boundary";
+import { createDefaultTerminalAdapter, type TerminalAdapter } from "./terminal-adapter";
+import { createDefaultPlatformAdapter, type PlatformAdapter } from "./platform-adapter";
 
 export interface AppConfig {
   /**
@@ -64,6 +51,16 @@ export interface AppConfig {
    * Optional handler called when the app is about to exit.
    */
   onExit?: () => void;
+
+  /**
+   * Optional terminal adapter (for tests/custom IO).
+   */
+  terminal?: TerminalAdapter;
+
+  /**
+   * Optional platform adapter (process hooks/exit).
+   */
+  platform?: PlatformAdapter;
 }
 
 export interface AppInstance {
@@ -71,9 +68,9 @@ export interface AppInstance {
    * Mounts the app to the terminal.
    *
    * @param options - Mount options
-   * @returns AppInstance for chaining
+   * @returns Promise<AppInstance> for chaining
    */
-  mount(options?: MountOptions): AppInstance;
+  mount(options?: MountOptions): Promise<AppInstance>;
 
   /**
    * Unmounts the app and cleans up resources.
@@ -136,6 +133,8 @@ export function createApp(config: AppConfig): AppInstance {
   let renderEffect: ReactiveEffect | null = null;
   let isMounted = false;
   let isUnmounting = false;
+  const term = config.terminal ?? createDefaultTerminalAdapter();
+  const platform = config.platform ?? createDefaultPlatformAdapter();
 
   // Convert config to component definition
   const rootComponent = defineComponent({
@@ -144,26 +143,30 @@ export function createApp(config: AppConfig): AppInstance {
   });
 
   const appInstance: AppInstance = {
-    mount(options: MountOptions = {}) {
+    async mount(options: MountOptions = {}) {
+      // asyncに変更
       if (isMounted) {
         console.warn("App is already mounted");
         return appInstance;
       }
 
+      // Wasmレイアウトエンジンの初期化待機
+      await initLayoutEngine();
+
       const rows = options.rows ?? 0;
       const cols = options.cols ?? 0;
 
       // Patch console to prevent output interference
-      patchConsole();
-      startCapture();
+      term.patchConsole();
+      term.startCapture();
 
       // Setup terminal
-      setupRawMode();
-      clearScreen();
+      term.setupRawMode();
+      term.clearScreen();
 
       // Terminal size resolver
       const getSize = () => {
-        const termSize = getTerminalSize();
+        const termSize = term.getTerminalSize();
         return {
           rows: rows === 0 ? termSize.rows : rows,
           cols: cols === 0 ? termSize.cols : cols,
@@ -180,6 +183,23 @@ export function createApp(config: AppConfig): AppInstance {
         config.errorLog,
       );
 
+      // Buffer key events that may arrive before the app finishes mounting.
+      const pendingKeyEvents: KeyEvent[] = [];
+
+      // Setup keyboard event handler early to avoid losing initial input.
+      term.onKey((event: KeyEvent) => {
+        if (!mounted) {
+          pendingKeyEvents.push(event);
+          return;
+        }
+
+        try {
+          handleComponentKey(mounted, event);
+        } catch (error) {
+          handleError(createErrorContext("key", error, { keyEvent: event }));
+        }
+      });
+
       try {
         // Mount root component
         mounted = mountComponent(rootComponent, {});
@@ -187,8 +207,9 @@ export function createApp(config: AppConfig): AppInstance {
         // Create renderer once
         const renderer = createRenderer({
           getSize,
+          write: term.write,
           view: () => {
-            if (!mounted) return { type: "paragraph", text: "" } as ViewElement;
+            if (!mounted) return Block();
             return renderComponent(mounted);
           },
           getState: () => ({}),
@@ -206,23 +227,24 @@ export function createApp(config: AppConfig): AppInstance {
           }
         });
 
-        // Setup keyboard event handler
-        terminalOnKey((event: KeyEvent) => {
-          if (!mounted) return;
-
-          try {
-            // Handle component key events
-            handleComponentKey(mounted, event);
-          } catch (error) {
-            handleError(createErrorContext("key", error, { keyEvent: event }));
+        // Flush any key events received during mount.
+        if (pendingKeyEvents.length && mounted) {
+          for (const event of pendingKeyEvents.splice(0)) {
+            try {
+              handleComponentKey(mounted, event);
+            } catch (error) {
+              handleError(createErrorContext("key", error, { keyEvent: event }));
+            }
           }
-        });
+          // Ensure a render after applying buffered events.
+          renderEffect.run();
+        }
 
         // Setup resize handler if auto-sizing
         if (rows === 0 || cols === 0) {
-          process.stdout.on("resize", () => {
+          platform.onStdoutResize(() => {
             try {
-              clearScreen();
+              term.clearScreen();
               if (renderEffect) {
                 renderEffect.run();
               }
@@ -240,14 +262,14 @@ export function createApp(config: AppConfig): AppInstance {
           appInstance.unmount();
         };
 
-        process.once("exit", exitHandler);
-        process.once("SIGINT", () => {
+        platform.onExit(exitHandler);
+        platform.onSigint(() => {
           exitHandler();
-          process.exit(0);
+          platform.exit(0);
         });
-        process.once("SIGTERM", () => {
+        platform.onSigterm(() => {
           exitHandler();
-          process.exit(0);
+          platform.exit(0);
         });
       } catch (error) {
         handleError(createErrorContext("mount", error));
@@ -282,10 +304,10 @@ export function createApp(config: AppConfig): AppInstance {
         }
 
         // Dispose console capture
-        disposeSingletonCapture();
+        term.disposeSingletonCapture();
 
         // Clean up terminal
-        cleanupWithoutClear();
+        term.cleanupWithoutClear();
 
         isMounted = false;
       } catch (error) {

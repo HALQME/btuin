@@ -1,52 +1,66 @@
-import { describe, it, expect, mock } from "bun:test";
-import {
-  collectFocusTargets,
-  handleInternalElementKey,
-  registerElementModule,
-} from "../../src/layout";
-import type { ViewElement, LaidOutElement } from "@btuin/types/elements";
+import { describe, it, expect } from "bun:test";
+import { collectFocusTargets } from "../../src/layout/focus";
+import { Block, Text } from "../../src/view/primitives";
+import type { ViewElement } from "../../src/view/types/elements";
+import type { ComputedLayout } from "@btuin/layout-engine";
 
-describe("focus helpers", () => {
-  it("collects focus targets through nested trees", () => {
-    const child: ViewElement = {
-      type: "paragraph",
-      text: "hi",
-      focusKey: "name",
-      rect: { x: 1, y: 1, width: 2, height: 1 },
-    } as any;
-    const parent: LaidOutElement = {
-      type: "box",
-      rect: { x: 0, y: 0, width: 4, height: 4 },
-      focusKey: "box",
-      child,
-    } as any;
+describe("collectFocusTargets", () => {
+  it("should collect focusable elements from a simple tree", () => {
+    const root: ViewElement = Block(
+      Text({ value: "Foo" }).focus("text1").build(),
+      Block(Text({ value: "Bar" }).focus("text2").build())
+        .setKey("inner-block")
+        .build(),
+    )
+      .setKey("root")
+      .build();
 
-    const targets = collectFocusTargets(parent as LaidOutElement);
+    const layoutMap: ComputedLayout = {
+      root: { x: 0, y: 0, width: 20, height: 2 },
+      "root/text-0": { x: 1, y: 0, width: 3, height: 1 },
+      "inner-block": { x: 0, y: 1, width: 20, height: 1 },
+      "inner-block/text-0": { x: 5, y: 0, width: 3, height: 1 },
+    };
 
-    expect(targets.map((t) => t.key)).toEqual(["box", "name"]);
-    expect(targets[0]?.rect).toEqual(parent.rect);
-    expect(targets[1]?.rect).toEqual(child.rect);
+    const targets = collectFocusTargets(root, layoutMap);
+
+    expect(targets.length).toBe(2);
+
+    const target1 = targets.find((t) => t.focusKey === "text1");
+    expect(target1).toBeDefined();
+    expect(target1?.rect).toEqual({ x: 1, y: 0, width: 3, height: 1 });
+
+    const target2 = targets.find((t) => t.focusKey === "text2");
+    expect(target2).toBeDefined();
+    // absX = parentX(0) + layout.x(0) + child.layout.x(5) = 5
+    // absY = parentY(0) + layout.y(1) + child.layout.y(0) = 1
+    expect(target2?.rect).toEqual({ x: 5, y: 1, width: 3, height: 1 });
   });
 
-  it("delegates to element module collect and handleKey", () => {
-    const module = {
-      collectFocus: mock((element, acc, helpers) => {
-        acc.push({ key: "custom", rect: element.rect!, element });
-        helpers.collectChild({ ...element, type: "paragraph", focusKey: "nested" });
-      }),
-      handleKey: mock(() => true),
+  it("should return an empty array if no elements are focusable", () => {
+    const root: ViewElement = Block(Text({ value: "Foo" }).build())
+      .setKey("root")
+      .build();
+    const layoutMap: ComputedLayout = {
+      root: { x: 0, y: 0, width: 10, height: 1 },
+      "root/text-0": { x: 0, y: 0, width: 3, height: 1 },
     };
-    registerElementModule("custom-focus", module as any);
 
-    const element: LaidOutElement = {
-      type: "custom-focus",
-      rect: { x: 0, y: 0, width: 1, height: 1 },
-    } as any;
-    const targets = collectFocusTargets(element);
-    const handled = handleInternalElementKey(element, { key: "enter" } as any);
+    const targets = collectFocusTargets(root, layoutMap);
+    expect(targets).toEqual([]);
+  });
 
-    expect(module.collectFocus.mock.calls.length).toBe(1);
-    expect(targets.map((t) => t.key)).toEqual(["custom", "nested"]);
-    expect(handled).toBe(true);
+  it("should not collect targets if they have no layout", () => {
+    const root: ViewElement = Block(
+      Text({ value: "I have no key and no layout" }).focus("unreachable").build(),
+    )
+      .setKey("root")
+      .build();
+
+    const layoutMap: ComputedLayout = {
+      root: { x: 0, y: 0, width: 10, height: 1 },
+    };
+    const targets = collectFocusTargets(root, layoutMap);
+    expect(targets.length).toBe(0);
   });
 });

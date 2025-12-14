@@ -4,10 +4,9 @@
  * Handles the rendering loop, including buffer management and diff rendering.
  */
 
-import { getGlobalBufferPool, renderDiff, type Buffer2D } from "../buffer";
+import { getGlobalBufferPool, renderDiff, type Buffer2D } from "@btuin/renderer";
 import { layout, renderElement } from "../layout";
-import type { ViewElement } from "@btuin/types/elements";
-import type { Rect } from "@btuin/types/geometry";
+import type { ViewElement } from "../view/types/elements";
 import { createErrorContext } from "./error-boundary";
 
 /**
@@ -24,6 +23,8 @@ export interface TerminalSize {
 export interface RenderLoopConfig<State> {
   /** Function to get current terminal size */
   getSize: () => TerminalSize;
+  /** Function to write output to the terminal */
+  write: (output: string) => void;
   /** Function to generate view from state */
   view: (state: State) => ViewElement;
   /** Function to get current state */
@@ -79,17 +80,19 @@ export function createRenderer<State>(config: RenderLoopConfig<State>) {
         state.prevBuffer = pool.acquire();
       }
 
-      const buf = pool.acquire();
       const rootElement = config.view(config.getState());
-      const rootRect: Rect = {
-        x: 0,
-        y: 0,
+
+      const layoutResult = layout(rootElement, {
         width: state.currentSize.cols,
         height: state.currentSize.rows,
-      };
-      const laidOut = layout(rootElement, rootRect);
-      renderElement(laidOut, buf, {});
-      renderDiff(state.prevBuffer, buf);
+      });
+
+      const buf = pool.acquire();
+      renderElement(rootElement, buf, layoutResult, 0, 0);
+      const output = renderDiff(state.prevBuffer, buf);
+      if (output) {
+        config.write(output);
+      }
 
       // Return old prev buffer to the pool and keep the new one
       pool.release(state.prevBuffer);

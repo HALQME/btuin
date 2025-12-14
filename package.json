@@ -8,15 +8,11 @@
   "scripts": {
     "start": "bun run --cwd packages/btuin src/app.ts",
     "build": "bun run --cwd packages/btuin build.ts",
-    "benchmark": "bun run scripts/benchmark.ts",
-    "load-test": "bun run scripts/load-test.ts",
-    "stress-test": "bun run scripts/stress-test.ts",
     "lint": "oxlint packages/*",
     "lint:fix": "oxlint packages/* --fix",
     "format": "oxfmt packages/*",
     "test:all": "bun test packages",
-    "test": "bun test packages/btuin",
-    "profiler": "bun test scripts/profiler",
+    "test": "bun test packages/btuin packages/layout-engine packages/reactivity packages/renderer packages/terminal",
     "check": "bunx tsc --noEmit"
   },
   "devDependencies": {
