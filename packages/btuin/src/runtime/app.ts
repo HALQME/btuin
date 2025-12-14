@@ -15,6 +15,7 @@ import { createRenderer } from "./render-loop";
 import { createErrorHandler, createErrorContext } from "./error-boundary";
 import { createDefaultTerminalAdapter, type TerminalAdapter } from "./terminal-adapter";
 import { createDefaultPlatformAdapter, type PlatformAdapter } from "./platform-adapter";
+import { Profiler, type ProfileOptions } from "./profiler";
 
 export interface AppConfig {
   /**
@@ -61,6 +62,11 @@ export interface AppConfig {
    * Optional platform adapter (process hooks/exit).
    */
   platform?: PlatformAdapter;
+
+  /**
+   * Optional profiler configuration.
+   */
+  profile?: ProfileOptions;
 }
 
 export interface AppInstance {
@@ -135,6 +141,7 @@ export function createApp(config: AppConfig): AppInstance {
   let isUnmounting = false;
   const term = config.terminal ?? createDefaultTerminalAdapter();
   const platform = config.platform ?? createDefaultPlatformAdapter();
+  const profiler = new Profiler(config.profile ?? {});
 
   // Convert config to component definition
   const rootComponent = defineComponent({
@@ -214,6 +221,7 @@ export function createApp(config: AppConfig): AppInstance {
           },
           getState: () => ({}),
           handleError,
+          profiler: profiler.isEnabled() ? profiler : undefined,
         });
 
         // Create reactive render effect
@@ -265,10 +273,12 @@ export function createApp(config: AppConfig): AppInstance {
         platform.onExit(exitHandler);
         platform.onSigint(() => {
           exitHandler();
+          profiler.flushSync();
           platform.exit(0);
         });
         platform.onSigterm(() => {
           exitHandler();
+          profiler.flushSync();
           platform.exit(0);
         });
       } catch (error) {
@@ -305,6 +315,9 @@ export function createApp(config: AppConfig): AppInstance {
 
         // Dispose console capture
         term.disposeSingletonCapture();
+
+        // Persist profile results (if enabled)
+        profiler.flushSync();
 
         // Clean up terminal
         term.cleanupWithoutClear();

@@ -4,10 +4,12 @@
  * Handles the rendering loop, including buffer management and diff rendering.
  */
 
-import { getGlobalBufferPool, renderDiff, type Buffer2D } from "@btuin/renderer";
+import { getGlobalBufferPool, renderDiff, type Buffer2D, type DiffStats } from "@btuin/renderer";
 import { layout, renderElement } from "../layout";
 import type { ViewElement } from "../view/types/elements";
+import { isBlock } from "../view/types/elements";
 import { createErrorContext } from "./error-boundary";
+import type { Profiler } from "./profiler";
 
 /**
  * Terminal size configuration
@@ -31,6 +33,8 @@ export interface RenderLoopConfig<State> {
   getState: () => State;
   /** Error handler */
   handleError: (context: import("./error-boundary").ErrorContext) => void;
+  /** Optional profiler */
+  profiler?: Profiler;
 }
 
 /**
@@ -82,21 +86,61 @@ export function createRenderer<State>(config: RenderLoopConfig<State>) {
 
       const rootElement = config.view(config.getState());
 
-      const layoutResult = layout(rootElement, {
-        width: state.currentSize.cols,
-        height: state.currentSize.rows,
-      });
+      const nodeCount =
+        config.profiler?.isEnabled() && config.profiler.options.nodeCount
+          ? countElements(rootElement)
+          : undefined;
+      const frame = config.profiler?.beginFrame(state.currentSize, { nodeCount }) ?? null;
+
+      const layoutResult =
+        config.profiler?.measure(frame, "layoutMs", () =>
+          layout(rootElement, {
+            width: state.currentSize.cols,
+            height: state.currentSize.rows,
+          }),
+        ) ??
+        layout(rootElement, {
+          width: state.currentSize.cols,
+          height: state.currentSize.rows,
+        });
 
       const buf = pool.acquire();
-      renderElement(rootElement, buf, layoutResult, 0, 0);
-      const output = renderDiff(state.prevBuffer, buf);
+      config.profiler?.measure(frame, "renderMs", () => {
+        renderElement(rootElement, buf, layoutResult, 0, 0);
+      });
+
+      config.profiler?.drawHud(buf);
+
+      const diffStats: DiffStats | undefined = frame
+        ? {
+            sizeChanged: false,
+            fullRedraw: false,
+            changedCells: 0,
+            cursorMoves: 0,
+            fgChanges: 0,
+            bgChanges: 0,
+            resets: 0,
+            ops: 0,
+          }
+        : undefined;
+
+      const output =
+        config.profiler?.measure(frame, "diffMs", () =>
+          renderDiff(state.prevBuffer, buf, diffStats),
+        ) ?? renderDiff(state.prevBuffer, buf);
+      if (frame && diffStats) {
+        config.profiler?.recordDiffStats(frame, diffStats);
+      }
       if (output) {
-        config.write(output);
+        config.profiler?.recordOutput(frame, output);
+        config.profiler?.measure(frame, "writeMs", () => config.write(output));
       }
 
       // Return old prev buffer to the pool and keep the new one
       pool.release(state.prevBuffer);
       state.prevBuffer = buf;
+
+      config.profiler?.endFrame(frame);
     } catch (error) {
       config.handleError(createErrorContext("render", error));
     }
@@ -113,4 +157,12 @@ export function createRenderer<State>(config: RenderLoopConfig<State>) {
     render,
     getState,
   };
+}
+
+function countElements(root: ViewElement): number {
+  let count = 1;
+  if (isBlock(root)) {
+    for (const child of root.children) count += countElements(child);
+  }
+  return count;
 }

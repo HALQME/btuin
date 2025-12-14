@@ -25,4 +25,3 @@ export function createDefaultPlatformAdapter(): PlatformAdapter {
     },
   };
 }
-

@@ -63,6 +63,8 @@ export function collectFocusTargetMap(
   effectiveKey: string | undefined = element.key,
 ): Map<string, FocusTarget> {
   const map = new Map<string, FocusTarget>();
-  visitFocusTargets(element, layoutMap, parentX, parentY, effectiveKey, (t) => map.set(t.focusKey, t));
+  visitFocusTargets(element, layoutMap, parentX, parentY, effectiveKey, (t) =>
+    map.set(t.focusKey, t),
+  );
   return map;
 }

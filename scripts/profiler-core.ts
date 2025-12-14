@@ -1,399 +1,142 @@
-import type { Buffer2D } from "../packages/renderer/src/types/buffer";
-
-/**
- * Performance profiler core for btuin package.
- *
- * - CPU時間・メモリ使用量の計測
- * - フレーム単位の計測（P95/P99）
- * - フラグメンテーション／スケーラビリティ測定
- *
- * このモジュールはテストやスクリプトから再利用される「コアロジック」として切り出されており、
- * 実際のプロファイリングシナリオは `scripts/profiler.spec.ts` や
- * `scripts/profiler.io.spec.ts` 側で定義する。
- */
-
-/**
- * プロファイルメトリクス（1つの測定単位ごと）
- */
-export interface ProfileMetrics {
-  name: string;
-  duration: number;
-  memoryBefore?: number;
-  memoryAfter?: number;
-  memoryDelta?: number;
-  peakMemory?: number;
-  operationCount: number;
-  opsPerSecond: number;
-  memoryEfficiency?: number; // ops per MB
-  p99Duration?: number;
-  p95Duration?: number;
-}
-
-/**
- * フレーム単位メトリクス
- */
-export interface FrameMetrics {
-  frameNumber: number;
-  duration: number;
-  timestamp: number;
-}
-
-/**
- * プロファイラ全体の集約統計。
- * 1回のプロファイル実行内での分布やホットスポットを俯瞰するために使う。
- */
-export interface ProfilerSummary {
-  // 時間系（全メトリクスの duration 分布）
-  totalDuration: number;
-  meanDuration: number;
-  medianDuration: number;
-  p95Duration: number;
-  p99Duration: number;
-
-  // メモリ系
-  peakMemory: number;
-  totalPositiveMemoryDelta: number;
-  totalNegativeMemoryDelta: number;
-
-  // ホットスポット（上位N件）
-  topByDuration: ProfileMetrics[];
-  topByMemoryDelta: ProfileMetrics[];
-
-  // フレーム統計（measureFrames が使われた場合のみ）
-  frameStats?: {
-    count: number;
-    mean: number;
-    min: number;
-    max: number;
-    p95: number;
-    p99: number;
+type FrameMetrics = {
+  id: number;
+  time: number;
+  rows: number;
+  cols: number;
+  nodeCount?: number;
+  outputBytes?: number;
+  diffCellsChanged?: number;
+  diffOps?: number;
+  diffCursorMoves?: number;
+  diffStyleChanges?: number;
+  diffResets?: number;
+  diffFullRedraw?: boolean;
+  layoutMs: number;
+  renderMs: number;
+  diffMs: number;
+  writeMs: number;
+  frameMs: number;
+  memory?: {
+    rss: number;
+    heapTotal: number;
+    heapUsed: number;
+    external: number;
   };
+};
+
+export type ProfilerLog = {
+  version: 1;
+  startedAt: string;
+  endedAt: string;
+  frames: FrameMetrics[];
+  summary: {
+    frameCount: number;
+    frameMs: { p50: number; p95: number; p99: number; max: number };
+    totals: {
+      layoutMs: number;
+      renderMs: number;
+      diffMs: number;
+      writeMs: number;
+      frameMs: number;
+    };
+  };
+};
+
+const formatMs = (value: number) => `${value.toFixed(2)}ms`;
+
+function describeFrame(frame: FrameMetrics) {
+  const diffCells = frame.diffCellsChanged ?? 0;
+  const diffOps = frame.diffOps ?? 0;
+  return `frame ${frame.id} → ${formatMs(frame.frameMs)} (layout ${formatMs(frame.layoutMs)}, render ${formatMs(
+    frame.renderMs,
+  )}, diff ${formatMs(frame.diffMs)}, write ${formatMs(frame.writeMs)}) diffCells=${diffCells} diffOps=${diffOps}`;
 }
 
-/**
- * btuin 向け汎用プロファイラコア。
- *
- * - できるだけ「計測ロジック」に責務を絞る
- * - 実際に何を計測するか（List, BufferPool, IO など）は呼び出し側に委ねる
- */
-export class Profiler {
-  private metrics: ProfileMetrics[] = [];
-  private frameMetrics: FrameMetrics[] = [];
-  private peakMemoryUsage: number = 0;
+function summarizeFrames(frames: FrameMetrics[], key: keyof FrameMetrics, limit = 3) {
+  return [...frames]
+    .filter((frame) => typeof frame[key] === "number")
+    .sort((a, b) => (b[key] as number) - (a[key] as number))
+    .slice(0, limit);
+}
 
-  /**
-   * 任意の関数の実行時間とメモリ使用量を計測する。
-   */
-  measure(
-    name: string,
-    fn: () => void,
-    operationCount: number = 1,
-  ): ProfileMetrics {
-    const memBefore = process.memoryUsage();
-    const start = performance.now();
-
-    fn();
-
-    const end = performance.now();
-    const memAfter = process.memoryUsage();
-    const duration = end - start;
-    const opsPerSecond = (operationCount / duration) * 1000;
-
-    const memoryDelta = memAfter.heapUsed - memBefore.heapUsed;
-    const peakMemory = Math.max(this.peakMemoryUsage, memAfter.heapUsed);
-    this.peakMemoryUsage = peakMemory;
-
-    const memoryEfficiency =
-      memoryDelta > 0
-        ? operationCount / (memoryDelta / 1024 / 1024)
-        : undefined;
-
-    const metric: ProfileMetrics = {
-      name,
-      duration,
-      memoryBefore: memBefore.heapUsed,
-      memoryAfter: memAfter.heapUsed,
-      memoryDelta,
-      peakMemory,
-      operationCount,
-      opsPerSecond,
-      memoryEfficiency,
-    };
-
-    this.metrics.push(metric);
-    return metric;
-  }
-
-  /**
-   * フレームループ（レンダリングシミュレーション）の計測。
-   *
-   * - 各フレームの duration を記録
-   * - P95/P99 フレーム時間を集計
-   */
-  measureFrames(
-    name: string,
-    fn: (frameNumber: number) => void,
-    frameCount: number = 60,
-  ): FrameMetrics[] {
-    const frames: FrameMetrics[] = [];
-    const startTime = performance.now();
-
-    for (let i = 0; i < frameCount; i++) {
-      const frameStart = performance.now();
-      fn(i);
-      const frameEnd = performance.now();
-      const duration = frameEnd - frameStart;
-
-      frames.push({
-        frameNumber: i,
-        duration,
-        timestamp: frameStart - startTime,
-      });
-    }
-
-    const totalDuration = frames.reduce((sum, f) => sum + f.duration, 0);
-
-    const metric: ProfileMetrics = {
-      name: `${name} (frame simulation)`,
-      duration: totalDuration,
-      operationCount: frameCount,
-      opsPerSecond: (frameCount / totalDuration) * 1000,
-      p99Duration: this.calculatePercentile(
-        frames.map((f) => f.duration),
-        99,
-      ),
-      p95Duration: this.calculatePercentile(
-        frames.map((f) => f.duration),
-        95,
-      ),
-    };
-
-    this.metrics.push(metric);
-    this.frameMetrics.push(...frames);
-
-    return frames;
-  }
-
-  /**
-   * バッファのアロケーション/デアロケーションを複数サイクル実行し、
-   * フラグメンテーションパターンとメモリ変化を測定する。
-   */
-  measureFragmentation(
-    name: string,
-    allocFn: () => Buffer2D[],
-    deallocFn: (buffers: Buffer2D[]) => void,
-    cycles: number = 100,
-  ): ProfileMetrics {
-    const memBefore = process.memoryUsage();
-    const start = performance.now();
-
-    for (let i = 0; i < cycles; i++) {
-      const buffers = allocFn();
-      deallocFn(buffers);
-    }
-
-    const end = performance.now();
-    const memAfter = process.memoryUsage();
-    const duration = end - start;
-    const opsPerSecond = (cycles / duration) * 1000;
-
-    const memoryDelta = memAfter.heapUsed - memBefore.heapUsed;
-    const peakMemory = Math.max(this.peakMemoryUsage, memAfter.heapUsed);
-    this.peakMemoryUsage = peakMemory;
-
-    const metric: ProfileMetrics = {
-      name: `${name} (fragmentation test)`,
-      duration,
-      memoryBefore: memBefore.heapUsed,
-      memoryAfter: memAfter.heapUsed,
-      memoryDelta,
-      peakMemory,
-      operationCount: cycles,
-      opsPerSecond,
-    };
-
-    this.metrics.push(metric);
-    return metric;
-  }
-
-  /**
-   * データサイズを変化させながらスケーラビリティを測定する。
-   *
-   * 1サイズにつき1回実行し、その duration / ops/sec / memoryDelta を記録する。
-   */
-  measureScalability(
-    name: string,
-    fn: (size: number) => void,
-    sizes: number[],
-  ): void {
-    for (const size of sizes) {
-      const memBefore = process.memoryUsage();
-      const start = performance.now();
-
-      fn(size);
-
-      const end = performance.now();
-      const memAfter = process.memoryUsage();
-      const duration = end - start;
-
-      const memoryDelta = memAfter.heapUsed - memBefore.heapUsed;
-      const peakMemory = Math.max(this.peakMemoryUsage, memAfter.heapUsed);
-      this.peakMemoryUsage = peakMemory;
-
-      const metric: ProfileMetrics = {
-        name: `${name} (size: ${size})`,
-        duration,
-        memoryBefore: memBefore.heapUsed,
-        memoryAfter: memAfter.heapUsed,
-        memoryDelta,
-        peakMemory,
-        operationCount: 1,
-        opsPerSecond: (1 / duration) * 1000,
-      };
-
-      this.metrics.push(metric);
-    }
-  }
-
-  /**
-   * 単純なパーセンタイル計算（昇順ソート → インデックス計算）。
-   */
-  private calculatePercentile(
-    values: number[],
-    percentile: number,
-  ): number {
-    const sorted = [...values].sort((a, b) => a - b);
-    const index = Math.ceil((percentile / 100) * sorted.length) - 1;
-    return sorted[Math.max(0, index)]!;
-  }
-
-  /**
-   * 人間向けの簡易レポートを stdout に出力する。
-   *
-   * - 各メトリクスの duration / ops/sec / メモリ情報
-   * - P95/P99（存在する場合）
-   * - 全体時間および最も遅いメトリクス名
-   * - 追加で、集約統計（summary）も表示する
-   */
-  report(): void {
-    if (this.metrics.length === 0) return;
-
-    let totalTime = 0;
-    for (const metric of this.metrics) {
-      totalTime += metric.duration;
-    }
-
-    for (const metric of this.metrics) {
-      const percentage =
-        totalTime > 0
-          ? ((metric.duration / totalTime) * 100).toFixed(1)
-          : "0.0";
-      console.log(`📊 ${metric.name}`);
-      console.log(
-        `   Duration: ${metric.duration.toFixed(2)}ms (${percentage}% of total)`,
-      );
-      console.log(`   Operations: ${metric.operationCount}`);
-      console.log(`   Ops/sec: ${metric.opsPerSecond.toFixed(0)}`);
-
-      if (metric.memoryDelta !== undefined && metric.memoryDelta !== 0) {
-        const sign = metric.memoryDelta >= 0 ? "+" : "";
-        console.log(
-          `   Memory Δ: ${sign}${(
-            metric.memoryDelta /
-            1024 /
-            1024
-          ).toFixed(2)}MB`,
-        );
+function peakMemory(frames: FrameMetrics[]) {
+  return frames.reduce(
+    (acc, frame) => {
+      if (frame.memory && frame.memory.heapUsed > acc.heapUsed) {
+        acc.heapUsed = frame.memory.heapUsed;
+        acc.frame = frame;
       }
+      return acc;
+    },
+    { heapUsed: -Infinity, frame: null as FrameMetrics | null },
+  );
+}
 
-      if (metric.memoryEfficiency !== undefined) {
-        console.log(
-          `   Memory Efficiency: ${metric.memoryEfficiency.toFixed(
-            0,
-          )} ops/MB`,
-        );
-      }
+export function printSummary(log: ProfilerLog) {
+  const { frames } = log;
+  const totals = log.summary.totals;
+  const avgFrame = frames.length ? totals.frameMs / frames.length : 0;
+  const renderShare = totals.frameMs ? (totals.renderMs / totals.frameMs) * 100 : 0;
+  console.log("-".repeat(60));
+  console.log(`Profile summary (${log.startedAt} → ${log.endedAt})`);
+  console.log(`  total frames : ${log.summary.frameCount} (avg ${formatMs(avgFrame)})`);
+  console.log(
+    `  distribution : p50 ${formatMs(log.summary.frameMs.p50)}, p95 ${formatMs(
+      log.summary.frameMs.p95,
+    )}, p99 ${formatMs(log.summary.frameMs.p99)}, max ${formatMs(log.summary.frameMs.max)}`,
+  );
+  console.log(
+    `  totals       : layout ${formatMs(totals.layoutMs)}, render ${formatMs(totals.renderMs)}, diff ${formatMs(
+      totals.diffMs,
+    )}, write ${formatMs(totals.writeMs)} (render share ${renderShare.toFixed(1)}%)`,
+  );
 
-      if (metric.p99Duration !== undefined) {
-        console.log(
-          `   P99 Frame Time: ${metric.p99Duration.toFixed(
-            2,
-          )}ms (tail latency)`,
-        );
-      }
-
-      if (metric.p95Duration !== undefined) {
-        console.log(
-          `   P95 Frame Time: ${metric.p95Duration.toFixed(
-            2,
-          )}ms (95th percentile)`,
-        );
-      }
-
-      console.log();
-    }
-
-    if (this.peakMemoryUsage > 0) {
-      console.log(
-        `📈 Peak Memory Usage: ${(
-          this.peakMemoryUsage /
-          1024 /
-          1024
-        ).toFixed(2)}MB`,
-      );
-    }
-
-    console.log(`⏱️  Total Time: ${totalTime.toFixed(2)}ms`);
-    const slowest = this.getSlowest();
-    console.log(`🔥 Hotspot: ${slowest?.name || "N/A"}`);
-    console.log();
-
+  if (frames.length === 0) {
+    console.log("  (no frames recorded)");
+    return;
   }
 
-  /**
-   * 最も遅いメトリクスを返す。
-   */
-  getSlowest(): ProfileMetrics | null {
-    if (this.metrics.length === 0) return null;
-    return this.metrics.reduce((prev, curr) =>
-      curr.duration > prev.duration ? curr : prev,
+  const [slowest, ...rest] = summarizeFrames(frames, "frameMs", 3);
+  console.log("  spikes:");
+  if (slowest) {
+    console.log(`   - Slowest: ${describeFrame(slowest)}`);
+  }
+  rest.forEach((frame) => console.log(`   - ${describeFrame(frame)}`));
+
+  const smallest = [...frames].sort((a, b) => a.frameMs - b.frameMs)[0];
+  if (smallest) {
+    console.log(`  smoothest: ${describeFrame(smallest)} (best frame)`);
+  }
+
+  const renderPeaks = summarizeFrames(frames, "renderMs", 3);
+  console.log("  render bottlenecks:");
+  renderPeaks.forEach((frame) =>
+    console.log(`   - ${describeFrame(frame)} (render-heavy)`),
+  );
+
+  const layoutPeak = summarizeFrames(frames, "layoutMs", 1)[0];
+  if (layoutPeak) {
+    console.log(`  layout peak : frame ${layoutPeak.id} (${formatMs(layoutPeak.layoutMs)})`);
+  }
+
+  const diffPeak = summarizeFrames(frames, "diffCellsChanged", 1)[0];
+  if (diffPeak && (diffPeak.diffCellsChanged ?? 0) > 0) {
+    console.log(
+      `  diff spike  : frame ${diffPeak.id}, ${diffPeak.diffCellsChanged} cells (${diffPeak.diffOps ?? 0} ops)`,
     );
   }
 
-  /**
-   * duration 降順にソートしたメトリクス一覧を返す。
-   */
-  getSorted(): ProfileMetrics[] {
-    return [...this.metrics].sort((a, b) => b.duration - a.duration);
+  const { frame: memFrame, heapUsed } = peakMemory(frames);
+  if (memFrame) {
+    console.log(
+      `  memory peak : frame ${memFrame.id}, heapUsed ${Math.round(heapUsed / 1024 / 1024)}MB (rss ${Math.round(
+        (memFrame.memory?.rss ?? 0) / 1024 / 1024,
+      )}MB)`,
+    );
   }
 
-  /**
-   * 全メトリクスをコピーで返す。
-   */
-  getMetrics(): ProfileMetrics[] {
-    return [...this.metrics];
-  }
-
-  /**
-   * フレームメトリクス一覧をコピーで返す。
-   */
-  getFrameMetrics(): FrameMetrics[] {
-    return [...this.frameMetrics];
-  }
-
-  /**
-   * 記録されたピークメモリ（heapUsed）の生値を返す（バイト）。
-   */
-  getPeakMemory(): number {
-    return this.peakMemoryUsage;
-  }
-
-  /**
-   * 全メトリクスとピークメモリ情報をクリアする。
-   */
-  clear(): void {
-    this.metrics = [];
-    this.frameMetrics = [];
-    this.peakMemoryUsage = 0;
-  }
+  console.log("  takeaways:");
+  console.log("   - Render is responsible for the biggest time slices; look into partial rendering or memoization.");
+  console.log("   - Layout, diff, and write stay low, so efforts should focus on taming render-heavy spikes.");
+  console.log("-".repeat(60));
 }

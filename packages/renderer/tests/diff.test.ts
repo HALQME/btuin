@@ -2,6 +2,7 @@ import { describe, it, expect, mock, beforeEach } from "bun:test";
 import { renderDiff } from "../src/diff";
 import { FlatBuffer } from "../src/buffer";
 import type { Buffer2D } from "../src/types";
+import type { DiffStats } from "../src/diff";
 
 // Helper to create a mock buffer
 function createMockBuffer(
@@ -22,8 +23,7 @@ function createMockBuffer(
 }
 
 describe("renderDiff", () => {
-  beforeEach(() => {
-  });
+  beforeEach(() => {});
 
   it("should not write anything if buffers are identical", () => {
     const prev = createMockBuffer(2, 2, "a");
@@ -96,5 +96,36 @@ describe("renderDiff", () => {
       "\x1b[0m";
 
     expect(output).toBe(expected);
+  });
+
+  it("should report diff stats", () => {
+    const prev = createMockBuffer(2, 2, " ");
+    const next = createMockBuffer(2, 2, " ");
+
+    next.cells[0] = "A".codePointAt(0)!;
+    next.fg[0] = "\x1b[31m";
+    next.cells[1] = "B".codePointAt(0)!;
+    next.fg[1] = "\x1b[31m";
+    next.cells[2] = "C".codePointAt(0)!;
+    next.fg[2] = "\x1b[32m";
+
+    const stats: DiffStats = {
+      sizeChanged: false,
+      fullRedraw: false,
+      changedCells: 0,
+      cursorMoves: 0,
+      fgChanges: 0,
+      bgChanges: 0,
+      resets: 0,
+      ops: 0,
+    };
+
+    const output = renderDiff(prev, next, stats);
+
+    expect(output.length).toBeGreaterThan(0);
+    expect(stats.changedCells).toBe(3);
+    expect(stats.cursorMoves).toBe(3);
+    expect(stats.fgChanges).toBe(2);
+    expect(stats.ops).toBe(stats.cursorMoves + stats.fgChanges + stats.bgChanges + stats.resets);
   });
 });

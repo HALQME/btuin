@@ -42,7 +42,12 @@ function percentToNumber(value: string, base: number): number {
   return (base * n) / 100;
 }
 
-function resolvePadding(padding: unknown): { top: number; right: number; bottom: number; left: number } {
+function resolvePadding(padding: unknown): {
+  top: number;
+  right: number;
+  bottom: number;
+  left: number;
+} {
   if (typeof padding === "number") {
     return { top: padding, right: padding, bottom: padding, left: padding };
   }
@@ -89,10 +94,13 @@ function viewElementToLayoutNode(
       if (node.width !== undefined) node.width = resolveDimension(node.width, baseWidth);
       if (node.height !== undefined) node.height = resolveDimension(node.height, baseHeight);
       if (node.minWidth !== undefined) node.minWidth = resolveDimension(node.minWidth, baseWidth);
-      if (node.minHeight !== undefined) node.minHeight = resolveDimension(node.minHeight, baseHeight);
+      if (node.minHeight !== undefined)
+        node.minHeight = resolveDimension(node.minHeight, baseHeight);
       if (node.maxWidth !== undefined) node.maxWidth = resolveDimension(node.maxWidth, baseWidth);
-      if (node.maxHeight !== undefined) node.maxHeight = resolveDimension(node.maxHeight, baseHeight);
-      if (node.flexBasis !== undefined) node.flexBasis = resolveDimension(node.flexBasis, baseWidth);
+      if (node.maxHeight !== undefined)
+        node.maxHeight = resolveDimension(node.maxHeight, baseHeight);
+      if (node.flexBasis !== undefined)
+        node.flexBasis = resolveDimension(node.flexBasis, baseWidth);
     }
 
     const pad = resolvePadding(node.padding);

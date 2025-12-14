@@ -56,6 +56,22 @@ bun packages/showcase/counter.ts
 bun packages/showcase/dashboard.ts
 ```
 
+### Profiling / Perf Regression
+
+```bash
+# 大量要素のストレス（JSON出力、--io=off で stdout を捨てて純粋な計算寄りに）
+bun run profile:stress --n=10000 --frames=120 --io=off --out=profiles/stress.json
+
+# パフォーマンス予算テスト（将来的にCIで回帰検知に使う想定）
+# 例: まずは計測してから budget を詰めるのがおすすめ
+bun run perf:budget --task=frame --n=10000 --iterations=30 --out=profiles/budget.json
+bun run perf:budget --task=diff --rows=200 --cols=400 --iterations=20 --out=profiles/budget-diff.json
+
+# bun test に載せる場合（CI or BTUIN_PERF=1 のときのみ実行）
+CI=1 bun run test:perf
+# 予算/サイズは env で上書き可能（例: BTUIN_BUDGET_FRAME_P95=120 など）
+```
+
 ## 使い方（最小例）
 
 ```ts

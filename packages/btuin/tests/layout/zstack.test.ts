@@ -20,7 +20,11 @@ describe("ZStack", () => {
   });
 
   test("should overlay children at the same origin", () => {
-    const root = ZStack([Text("Hello"), Text("X")]).setKey("root").width(5).height(1).build();
+    const root = ZStack([Text("Hello"), Text("X")])
+      .setKey("root")
+      .width(5)
+      .height(1)
+      .build();
 
     const layoutMap = layout(root, { width: 5, height: 1 });
     const buffer = createBuffer(1, 5);

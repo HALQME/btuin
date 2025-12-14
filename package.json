@@ -13,6 +13,8 @@
     "format": "oxfmt packages/*",
     "test:all": "bun test packages",
     "test": "bun test packages/btuin packages/layout-engine packages/reactivity packages/renderer packages/terminal",
+    "profile:stress": "bun test scripts/profiler-stress.test.ts",
+    "profile:layout": "bun test scripts/profiler-layout.test.ts",
     "check": "bunx tsc --noEmit"
   },
   "devDependencies": {

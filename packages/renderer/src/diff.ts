@@ -1,5 +1,16 @@
 import type { Buffer2D } from "./types";
 
+export interface DiffStats {
+  sizeChanged: boolean;
+  fullRedraw: boolean;
+  changedCells: number;
+  cursorMoves: number;
+  fgChanges: number;
+  bgChanges: number;
+  resets: number;
+  ops: number;
+}
+
 /**
  * Renders the difference between two buffers, only updating changed cells.
  * If buffer sizes differ (e.g., after terminal resize), forces a full redraw.
@@ -13,14 +24,27 @@ import type { Buffer2D } from "./types";
  *
  * @param prev - Previous buffer state
  * @param next - New buffer state to render
+ * @param stats - Optional stats collector
  */
-export function renderDiff(prev: Buffer2D, next: Buffer2D): string {
+export function renderDiff(prev: Buffer2D, next: Buffer2D, stats?: DiffStats): string {
   const rows = next.rows;
   const cols = next.cols;
   if (rows === 0 || cols === 0) return "";
 
   // Check if buffer sizes match
   const sizeChanged = prev.rows !== rows || prev.cols !== cols;
+  const fullRedraw = sizeChanged;
+
+  if (stats) {
+    stats.sizeChanged = sizeChanged;
+    stats.fullRedraw = fullRedraw;
+    stats.changedCells = 0;
+    stats.cursorMoves = 0;
+    stats.fgChanges = 0;
+    stats.bgChanges = 0;
+    stats.resets = 0;
+    stats.ops = 0;
+  }
 
   let currentFg: string | undefined;
   let currentBg: string | undefined;
@@ -47,6 +71,10 @@ export function renderDiff(prev: Buffer2D, next: Buffer2D): string {
 
       // Force redraw all cells if size changed, otherwise check for differences
       if (sizeChanged || nextCode !== prevCode || nextFg !== prevFg || nextBg !== prevBg) {
+        if (stats) {
+          stats.changedCells++;
+          stats.cursorMoves++;
+        }
         // Move cursor: \x1b[row;colH
         out.push(`\x1b[${r + 1};${c + 1}H`);
 
@@ -58,6 +86,7 @@ export function renderDiff(prev: Buffer2D, next: Buffer2D): string {
           }
           currentFg = nextFg;
           styleDirty = true;
+          if (stats) stats.fgChanges++;
         }
         if (nextBg !== currentBg) {
           if (nextBg === undefined) {
@@ -67,6 +96,7 @@ export function renderDiff(prev: Buffer2D, next: Buffer2D): string {
           }
           currentBg = nextBg;
           styleDirty = true;
+          if (stats) stats.bgChanges++;
         }
 
         out.push(String.fromCodePoint(nextCode));
@@ -76,6 +106,11 @@ export function renderDiff(prev: Buffer2D, next: Buffer2D): string {
 
   if (styleDirty) {
     out.push("\x1b[0m");
+    if (stats) stats.resets++;
+  }
+
+  if (stats) {
+    stats.ops = stats.cursorMoves + stats.fgChanges + stats.bgChanges + stats.resets;
   }
 
   return out.length > 0 ? out.join("") : "";

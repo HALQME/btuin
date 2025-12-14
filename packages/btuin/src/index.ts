@@ -2,8 +2,7 @@
  * btuin core entry point
  */
 
-export * from "./runtime/app";
-export * from "./runtime/error-boundary";
+export * from "./runtime";
 
 export * from "./view/components";
 
