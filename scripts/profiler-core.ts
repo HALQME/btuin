@@ -1,4 +1,4 @@
-import type { Buffer2D } from "../packages/btuin/src/buffer/types";
+import type { Buffer2D } from "../packages/renderer/src/types/buffer";
 
 /**
  * Performance profiler core for btuin package.

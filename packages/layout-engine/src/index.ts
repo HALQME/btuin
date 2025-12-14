@@ -53,6 +53,7 @@ export interface LayoutStyle {
 
 export interface LayoutInputNode extends LayoutElementShape, LayoutStyle {
   key?: string;
+  type: string;
   measuredSize?: { width: number; height: number };
   children?: LayoutInputNode[];
 }

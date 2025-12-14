@@ -113,6 +113,9 @@ export function drawText(
   text: string,
   style?: { fg?: ColorValue; bg?: ColorValue },
 ) {
+  row = Math.floor(row);
+  col = Math.floor(col);
+
   if (row < 0 || row >= buf.rows) return;
   if (buf.cols === 0) return;
 
@@ -161,6 +164,11 @@ export function fillRect(
   char = " ",
   style?: { fg?: ColorValue; bg?: ColorValue },
 ) {
+  row = Math.floor(row);
+  col = Math.floor(col);
+  width = Math.floor(width);
+  height = Math.floor(height);
+
   if (width <= 0 || height <= 0) return;
 
   const fg = style?.fg !== undefined ? resolveColor(style.fg, "fg") : undefined;

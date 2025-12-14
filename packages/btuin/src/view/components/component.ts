@@ -4,9 +4,8 @@
  * Provides Vue-like component definition with setup() function,
  * props, emits, and render function.
  */
-
-import type { ViewElement } from "@btuin/types/elements";
-import type { KeyEvent } from "@btuin/types/key-event";
+import type { ViewElement } from "../types/elements";
+import type { KeyEvent } from "@btuin/terminal";
 import {
   createComponentInstance,
   setCurrentInstance,
@@ -206,19 +205,7 @@ export function renderComponent(mounted: MountedComponent): ViewElement {
   }
 
   // Render the component
-  let element: ViewElement;
-
-  try {
-    element = render();
-  } catch (error) {
-    console.error("Error rendering component:", error);
-    // Return fallback element
-    element = {
-      type: "paragraph",
-      text: `[Render Error: ${error instanceof Error ? error.message : String(error)}]`,
-      color: "red",
-    } as ViewElement;
-  }
+  let element: ViewElement = render();
 
   mounted.lastElement = element;
 
@@ -229,7 +216,6 @@ export function renderComponent(mounted: MountedComponent): ViewElement {
 
   return element;
 }
-
 /**
  * Handles key events for a component.
  * Returns true if the event was handled and should stop propagation.

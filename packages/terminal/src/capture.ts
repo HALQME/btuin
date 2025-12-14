@@ -273,3 +273,141 @@ export function getCapturedOutput(): string {
 export function clearCapturedOutput(): void {
   state.capturedOutput = [];
 }
+
+
+export interface ConsoleLine {
+  text: string;
+  type: "stdout" | "stderr";
+  timestamp: number;
+}
+
+export interface ConsoleCaptureHandle {
+  /**
+   * Get all captured lines.
+   */
+  getLines(): ConsoleLine[];
+
+  /**
+   * Get only stdout lines.
+   */
+  getStdoutLines(): ConsoleLine[];
+
+  /**
+   * Get only stderr lines.
+   */
+  getStderrLines(): ConsoleLine[];
+
+  /**
+   * Clear all captured lines.
+   */
+  clear(): void;
+
+  /**
+   * Stop capturing and clean up listeners.
+   */
+  dispose(): void;
+}
+
+/**
+ * Create a console capture handle that stores output in memory.
+ *
+ * @param options Configuration options
+ * @returns A handle to access and manage captured output
+ *
+ * @example
+ * ```typescript
+ * const capture = createConsoleCapture({ maxLines: 100 });
+ * const lines = capture.getLines();
+ * ```
+ */
+export function createConsoleCapture(options?: { maxLines?: number }): ConsoleCaptureHandle {
+  const maxLines = options?.maxLines ?? 1000;
+  const lines: ConsoleLine[] = [];
+
+  // Capture stdout
+  const cleanupStdout = onStdout((text) => {
+    const textLines = text.split("\n");
+    for (const line of textLines) {
+      if (line) {
+        lines.push({
+          text: line,
+          type: "stdout",
+          timestamp: Date.now(),
+        });
+
+        // Limit buffer size
+        if (lines.length > maxLines) {
+          lines.shift();
+        }
+      }
+    }
+  });
+
+  // Capture stderr
+  const cleanupStderr = onStderr((text) => {
+    const textLines = text.split("\n");
+    for (const line of textLines) {
+      if (line) {
+        lines.push({
+          text: line,
+          type: "stderr",
+          timestamp: Date.now(),
+        });
+
+        // Limit buffer size
+        if (lines.length > maxLines) {
+          lines.shift();
+        }
+      }
+    }
+  });
+
+  return {
+    getLines: () => [...lines],
+
+    getStdoutLines: () => lines.filter((l) => l.type === "stdout"),
+
+    getStderrLines: () => lines.filter((l) => l.type === "stderr"),
+
+    clear: () => {
+      lines.length = 0;
+    },
+
+    dispose: () => {
+      cleanupStdout();
+      cleanupStderr();
+      lines.length = 0;
+    },
+  };
+}
+
+/**
+ * Singleton console capture instance.
+ * Lazily initialized on first access.
+ */
+let singletonCapture: ConsoleCaptureHandle | null = null;
+
+/**
+ * Get or create the singleton console capture instance.
+ * This ensures only one capture instance exists throughout the application.
+ *
+ * @param options Configuration options (only used on first call)
+ * @returns The singleton console capture handle
+ */
+export function getConsoleCaptureInstance(options?: { maxLines?: number }): ConsoleCaptureHandle {
+  if (!singletonCapture) {
+    singletonCapture = createConsoleCapture(options);
+  }
+  return singletonCapture;
+}
+
+/**
+ * Dispose the singleton console capture instance.
+ * Stops capturing and frees resources.
+ */
+export function disposeSingletonCapture(): void {
+  if (singletonCapture) {
+    singletonCapture.dispose();
+    singletonCapture = null;
+  }
+}

@@ -3,11 +3,14 @@
  */
 
 export * from "./runtime/app";
-export * from "./runtime/index";
+export * from "./runtime/error-boundary";
 
-export * from "./components";
+export * from "./view/components";
 
 export * from "./view/base";
+export * from "./view/layout";
+export * from "./view/primitives";
+export * from "./layout";
 
 export * from "@btuin/reactivity";
 

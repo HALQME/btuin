@@ -1,5 +1,16 @@
 import type { ColorValue } from "./types/color";
 
+const colorMap: Record<string, number> = {
+  black: 30,
+  red: 31,
+  green: 32,
+  yellow: 33,
+  blue: 34,
+  magenta: 35,
+  cyan: 36,
+  white: 37,
+};
+
 export function resolveColor(value: ColorValue, channel: "fg" | "bg"): string | undefined {
   if (typeof value === "number") {
     return channel === "fg" ? `\x1b[38;5;${value}m` : `\x1b[48;5;${value}m`;
@@ -7,22 +18,14 @@ export function resolveColor(value: ColorValue, channel: "fg" | "bg"): string | 
 
   if (typeof value === "string") {
     if (value.startsWith("\x1b[")) {
-      return channel === "fg" ? value : swapToBackgroundChannel(value);
+      return channel === "fg" ? value : value.replace("[38;", "[48;");
     }
 
-    try {
-      const seq = Bun.color(value, "ansi");
-      if (!seq) return undefined;
-      return channel === "fg" ? seq : swapToBackgroundChannel(seq);
-    } catch {
-      return undefined;
+    const colorCode = colorMap[value.toLowerCase()];
+    if (colorCode) {
+      return channel === "fg" ? `\x1b[${colorCode}m` : `\x1b[${colorCode + 10}m`;
     }
   }
 
   return undefined;
-}
-
-function swapToBackgroundChannel(seq: string): string {
-  // Bun.color always emits foreground escape codes, so swap the CSI prefix to use the BG channel.
-  return seq.replace("[38;", "[48;");
 }

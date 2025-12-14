@@ -1,0 +1,6 @@
+{
+  "name": "showcase",
+  "dependencies": {
+    "btuin": "workspace:*"
+  }
+}

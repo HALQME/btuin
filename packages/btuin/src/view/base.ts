@@ -1,43 +1,74 @@
-import type { ColorValue, OutlineOptions } from "@btuin/renderer";
-import type { ViewElement } from "./types/elements";
+import type { KeyEvent } from "@btuin/terminal";
+import type { OutlineOptions } from "@btuin/renderer";
+import type { Dimension, LayoutStyle } from "@btuin/layout-engine";
 
+// 1. 基本的なプロパティ定義（スタイリング以外）
 export interface ViewProps {
-  width?: number | "auto";
-  height?: number | "auto";
-  foregroundColor?: ColorValue;
-  backgroundColor?: ColorValue;
-  outline?: OutlineOptions;
-
   key?: string;
+  focusKey?: string;
+  onFocus?: (e: KeyEvent) => void;
+  // Taffy用のスタイル定義を含める
+  style?: Partial<LayoutStyle> & {
+    // Taffyにない独自の見た目プロパティもここに入れると管理しやすい
+    foreground?: string | number;
+    background?: string | number;
+    outline?: OutlineOptions;
+  };
 }
 
-export abstract class View<Props extends ViewProps = ViewProps> {
-  constructor(protected props: Props) {}
+// 2. 基底クラス (Method Chainの核)
+// 名前を ViewElement から BaseView に変更して衝突回避
+export abstract class BaseView implements ViewProps {
+  // 実際のデータ保持場所
+  public style: NonNullable<ViewProps["style"]> = {};
+  public key?: string;
+  public focusKey?: string;
 
-  protected clone(overrides: Partial<Props>): this {
-    const Constructor = this.constructor as new (props: Props) => this;
-    return new Constructor({ ...this.props, ...overrides });
+  constructor(props: ViewProps = {}) {
+    this.style = { ...props.style };
+    if (props.key) this.key = props.key;
+    if (props.focusKey) this.focusKey = props.focusKey;
   }
 
-  width(value: number | "auto"): this {
-    return this.clone({ width: value } as Partial<Props>);
+  // --- レイアウト (Taffy直結) ---
+
+  width(value: Dimension): this {
+    this.style.width = value;
+    return this;
   }
 
-  height(value: number | "auto"): this {
-    return this.clone({ height: value } as Partial<Props>);
+  height(value: Dimension): this {
+    this.style.height = value;
+    return this;
   }
 
-  foreground(color: ColorValue): this {
-    return this.clone({ foregroundColor: color } as Partial<Props>);
+  gap(value: number): this {
+    // Taffyのgap定義に合わせる (number | { width, height })
+    this.style.gap = value;
+    return this;
   }
 
-  background(color: ColorValue): this {
-    return this.clone({ backgroundColor: color } as Partial<Props>);
+  // --- 見た目 (Renderer用) ---
+
+  foreground(color: string | number): this {
+    this.style.foreground = color;
+    return this;
   }
 
-  border(style: "single" | "double" = "single", color?: ColorValue): this {
-    return this.clone({ outline: { style, color } } as Partial<Props>);
+  background(color: string | number): this {
+    this.style.background = color;
+    return this;
   }
 
-  abstract render(): ViewElement;
+  outline(options: OutlineOptions): this {
+    this.style.outline = options;
+    return this;
+  }
+
+  // --- システム ---
+
+  focus(key: string): this {
+    this.focusKey = key;
+    return this;
+  }
 }

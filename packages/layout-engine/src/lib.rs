@@ -26,6 +26,7 @@ struct JsStyle {
     min_height: Option<JsDimension>,
     max_width: Option<JsDimension>,
     max_height: Option<JsDimension>,
+    size: Option<JsSize>,
 
     padding: Option<Vec<f32>>, // [left, right, top, bottom]
     margin: Option<Vec<f32>>,  // [left, right, top, bottom]
@@ -95,11 +96,18 @@ impl From<&JsStyle> for Style {
         }
 
         // Size
-        if let Some(d) = &js.width {
-            style.size.width = d.to_dimension();
-        }
-        if let Some(d) = &js.height {
-            style.size.height = d.to_dimension();
+        if let Some(s) = &js.size {
+            style.size = Size {
+                width: length(s.width),
+                height: length(s.height),
+            };
+        } else {
+            if let Some(d) = &js.width {
+                style.size.width = d.to_dimension();
+            }
+            if let Some(d) = &js.height {
+                style.size.height = d.to_dimension();
+            }
         }
         if let Some(d) = &js.min_width {
             style.min_size.width = d.to_dimension();
@@ -247,17 +255,8 @@ pub fn compute_layout(nodes_js: JsValue) -> Result<JsValue, JsValue> {
     }
 
     if let Some(&root_id) = node_ids.first() {
-        // コンテキストを利用した計測関数を指定して計算
         taffy
-            .compute_layout_with_measure(
-                root_id,
-                Size::MAX_CONTENT,
-                |_known_dimensions, _available_space, _node_id, node_context, _style| {
-                    let width = node_context.as_ref().map(|c| c.width).unwrap_or(0.0);
-                    let height = node_context.as_ref().map(|c| c.height).unwrap_or(0.0);
-                    Size { width, height }
-                },
-            )
+            .compute_layout(root_id, Size::MAX_CONTENT)
             .map_err(|e| e.to_string())?;
     }
 

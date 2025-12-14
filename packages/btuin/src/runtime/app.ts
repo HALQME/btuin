@@ -1,11 +1,5 @@
-/**
- * App Creation and Mounting System
- *
- * Vue-like app creation and mounting for btuin TUI framework.
- */
-
 import type { KeyEvent } from "@btuin/terminal";
-import type { ViewElement } from "../view/types/elements";
+import { Block } from "../view/primitives";
 import { initLayoutEngine } from "../layout";
 import {
   setupRawMode,
@@ -25,7 +19,7 @@ import {
   handleComponentKey,
   type Component,
   type MountedComponent,
-} from "../components";
+} from "../view/components";
 import { effect, stop, type ReactiveEffect } from "@btuin/reactivity";
 import { createRenderer } from "./render-loop";
 import { createErrorHandler, createErrorContext } from "./error-boundary";
@@ -145,14 +139,15 @@ export function createApp(config: AppConfig): AppInstance {
   });
 
   const appInstance: AppInstance = {
-      async mount(options: MountOptions = {}) { // asyncに変更
-        if (isMounted) {
-          console.warn("App is already mounted");
-          return appInstance;
-        }
+    async mount(options: MountOptions = {}) {
+      // asyncに変更
+      if (isMounted) {
+        console.warn("App is already mounted");
+        return appInstance;
+      }
 
-        // Wasmレイアウトエンジンの初期化待機
-        await initLayoutEngine();
+      // Wasmレイアウトエンジンの初期化待機
+      await initLayoutEngine();
 
       const rows = options.rows ?? 0;
       const cols = options.cols ?? 0;
@@ -192,7 +187,7 @@ export function createApp(config: AppConfig): AppInstance {
         const renderer = createRenderer({
           getSize,
           view: () => {
-            if (!mounted) return { type: "paragraph", text: "" } as ViewElement;
+            if (!mounted) return Block();
             return renderComponent(mounted);
           },
           getState: () => ({}),

@@ -28,6 +28,10 @@ export type ErrorHandler = (context: ErrorContext) => void;
  * @param errorLogPath - Optional file path to write error logs to
  * @returns Error handling function
  */
+import { createWriteStream } from "fs";
+
+// ...
+
 export function createErrorHandler(
   userHandler: ErrorHandler | undefined,
   errorLogPath?: string,
@@ -42,9 +46,9 @@ export function createErrorHandler(
         (context.metadata ? `  Metadata: ${JSON.stringify(context.metadata)}\n` : "") +
         `  Stack: ${context.error.stack}\n\n`;
 
-      const errorLogFile = Bun.file(errorLogPath).writer();
-      errorLogFile.write(errorText);
-      errorLogFile.end();
+      const errorLogStream = createWriteStream(errorLogPath, { flags: "a" });
+      errorLogStream.write(errorText);
+      errorLogStream.end();
     }
 
     if (userHandler) {
@@ -59,9 +63,9 @@ export function createErrorHandler(
             `  Message: ${handlerError instanceof Error ? handlerError.message : String(handlerError)}\n` +
             `  Original error: ${context.error.message}\n\n`;
 
-          const errorLogFile = Bun.file(errorLogPath).writer();
-          errorLogFile.write(handlerErrorText);
-          errorLogFile.end();
+          const errorLogStream = createWriteStream(errorLogPath, { flags: "a" });
+          errorLogStream.write(handlerErrorText);
+          errorLogStream.end();
         }
       }
     }

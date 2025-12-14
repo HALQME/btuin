@@ -7,7 +7,6 @@
 import { getGlobalBufferPool, renderDiff, type Buffer2D } from "@btuin/renderer";
 import { layout, renderElement } from "../layout";
 import type { ViewElement } from "../view/types/elements";
-import type { Rect } from "@btuin/layout-engine";
 import { createErrorContext } from "./error-boundary";
 
 /**
@@ -79,12 +78,15 @@ export function createRenderer<State>(config: RenderLoopConfig<State>) {
         state.prevBuffer = pool.acquire();
       }
 
-      const buf = pool.acquire();
       const rootElement = config.view(config.getState());
 
-      const layoutResult = layout(rootElement)
+      const layoutResult = layout(rootElement, {
+        width: state.currentSize.cols,
+        height: state.currentSize.rows,
+      });
 
-      renderElement(rootElement, buf, layoutResult, 0, 0)
+      const buf = pool.acquire();
+      renderElement(rootElement, buf, layoutResult, 0, 0);
       renderDiff(state.prevBuffer, buf);
 
       // Return old prev buffer to the pool and keep the new one
