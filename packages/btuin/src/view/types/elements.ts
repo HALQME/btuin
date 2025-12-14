@@ -1,6 +1,20 @@
 import type { KeyEvent } from "@btuin/terminal";
 import type { OutlineOptions } from "@btuin/renderer";
-import type { Rect, SizeValue } from "@btuin/layout-engine";
+import type { Rect, SizeValue, LayoutStyle } from "@btuin/layout-engine";
+
+export interface BaseElement extends Partial<LayoutStyle> {
+  width?: SizeValue;
+  height?: SizeValue;
+
+  outline?: OutlineOptions;
+  backgroundColor?: string | number;
+  foregroundColor?: string | number;
+
+  focusKey?: string;
+  onFocusKey?: FocusHandler<any>;
+
+  key?: string;
+}
 
 export interface FocusContext {
   focusables: FocusTarget[];

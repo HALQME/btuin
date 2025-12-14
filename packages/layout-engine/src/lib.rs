@@ -1,0 +1,276 @@
+use serde::{Deserialize, Serialize};
+use taffy::prelude::*;
+use wasm_bindgen::prelude::*;
+
+#[derive(Deserialize)]
+struct JsNode {
+    style: JsStyle,
+    children: Vec<usize>,
+    measure: Option<JsSize>,
+}
+
+#[derive(Deserialize)]
+struct JsSize {
+    width: f32,
+    height: f32,
+}
+
+#[derive(Deserialize, Default)]
+struct JsStyle {
+    display: Option<String>,
+    position: Option<String>,
+
+    width: Option<JsDimension>,
+    height: Option<JsDimension>,
+    min_width: Option<JsDimension>,
+    min_height: Option<JsDimension>,
+    max_width: Option<JsDimension>,
+    max_height: Option<JsDimension>,
+
+    padding: Option<Vec<f32>>, // [left, right, top, bottom]
+    margin: Option<Vec<f32>>,  // [left, right, top, bottom]
+
+    flex_direction: Option<String>,
+    flex_wrap: Option<String>,
+    flex_grow: Option<f32>,
+    flex_shrink: Option<f32>,
+    flex_basis: Option<JsDimension>,
+
+    justify_content: Option<String>,
+    align_items: Option<String>,
+    align_self: Option<String>,
+
+    gap: Option<JsSize>,
+}
+
+// JSからの入力値 ("auto", 100, "50%") を受け取るEnum
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum JsDimension {
+    Auto(String), // "auto"
+    Points(f32),  // 100
+    Str(String),  // "50%"
+}
+
+impl JsDimension {
+    // Dimension (width, height, flex_basis 等) への変換
+    fn to_dimension(&self) -> Dimension {
+        match self {
+            JsDimension::Points(v) => length(*v),
+            JsDimension::Auto(s) if s == "auto" => auto(),
+            JsDimension::Str(s) if s == "auto" => auto(),
+            JsDimension::Str(s) if s.ends_with("%") => {
+                let v = s.trim_end_matches('%').parse::<f32>().unwrap_or(0.0);
+                percent(v / 100.0)
+            }
+            _ => auto(),
+        }
+    }
+}
+
+#[derive(Serialize)]
+struct LayoutOutput {
+    x: f32,
+    y: f32,
+    width: f32,
+    height: f32,
+}
+
+impl From<&JsStyle> for Style {
+    fn from(js: &JsStyle) -> Self {
+        let mut style = Style::default();
+
+        // Display & Position
+        if let Some(d) = js.display.as_deref() {
+            style.display = match d {
+                "none" => Display::None,
+                _ => Display::Flex,
+            };
+        }
+        if let Some(p) = js.position.as_deref() {
+            style.position = match p {
+                "absolute" => Position::Absolute,
+                _ => Position::Relative,
+            };
+        }
+
+        // Size
+        if let Some(d) = &js.width {
+            style.size.width = d.to_dimension();
+        }
+        if let Some(d) = &js.height {
+            style.size.height = d.to_dimension();
+        }
+        if let Some(d) = &js.min_width {
+            style.min_size.width = d.to_dimension();
+        }
+        if let Some(d) = &js.min_height {
+            style.min_size.height = d.to_dimension();
+        }
+        if let Some(d) = &js.max_width {
+            style.max_size.width = d.to_dimension();
+        }
+        if let Some(d) = &js.max_height {
+            style.max_size.height = d.to_dimension();
+        }
+
+        // Spacing (Padding)
+        if let Some(p) = &js.padding {
+            if p.len() == 4 {
+                style.padding = Rect {
+                    left: length(p[0]),
+                    right: length(p[1]),
+                    top: length(p[2]),
+                    bottom: length(p[3]),
+                };
+            }
+        }
+
+        // Spacing (Margin)
+        if let Some(m) = &js.margin {
+            if m.len() == 4 {
+                style.margin = Rect {
+                    left: length(m[0]),
+                    right: length(m[1]),
+                    top: length(m[2]),
+                    bottom: length(m[3]),
+                };
+            }
+        }
+
+        // Flex
+        if let Some(dir) = js.flex_direction.as_deref() {
+            style.flex_direction = match dir {
+                "row" => FlexDirection::Row,
+                "column" => FlexDirection::Column,
+                "row-reverse" => FlexDirection::RowReverse,
+                "column-reverse" => FlexDirection::ColumnReverse,
+                _ => FlexDirection::Row,
+            };
+        }
+        if let Some(wrap) = js.flex_wrap.as_deref() {
+            style.flex_wrap = match wrap {
+                "nowrap" => FlexWrap::NoWrap,
+                "wrap" => FlexWrap::Wrap,
+                "wrap-reverse" => FlexWrap::WrapReverse,
+                _ => FlexWrap::NoWrap,
+            };
+        }
+        if let Some(g) = js.flex_grow {
+            style.flex_grow = g;
+        }
+        if let Some(s) = js.flex_shrink {
+            style.flex_shrink = s;
+        }
+        if let Some(b) = &js.flex_basis {
+            style.flex_basis = b.to_dimension();
+        }
+
+        // Alignment
+        if let Some(jc) = js.justify_content.as_deref() {
+            style.justify_content = match jc {
+                "flex-start" => Some(JustifyContent::FlexStart),
+                "flex-end" => Some(JustifyContent::FlexEnd),
+                "center" => Some(JustifyContent::Center),
+                "space-between" => Some(JustifyContent::SpaceBetween),
+                "space-around" => Some(JustifyContent::SpaceAround),
+                "space-evenly" => Some(JustifyContent::SpaceEvenly),
+                _ => None,
+            };
+        }
+        if let Some(ai) = js.align_items.as_deref() {
+            style.align_items = match ai {
+                "flex-start" => Some(AlignItems::FlexStart),
+                "flex-end" => Some(AlignItems::FlexEnd),
+                "center" => Some(AlignItems::Center),
+                "baseline" => Some(AlignItems::Baseline),
+                "stretch" => Some(AlignItems::Stretch),
+                _ => None,
+            };
+        }
+        if let Some(as_) = js.align_self.as_deref() {
+            style.align_self = match as_ {
+                "auto" => None,
+                "flex-start" => Some(AlignSelf::FlexStart),
+                "flex-end" => Some(AlignSelf::FlexEnd),
+                "center" => Some(AlignSelf::Center),
+                "baseline" => Some(AlignSelf::Baseline),
+                "stretch" => Some(AlignSelf::Stretch),
+                _ => None,
+            };
+        }
+
+        // Gap
+        if let Some(gap) = &js.gap {
+            style.gap.width = length(gap.width);
+            style.gap.height = length(gap.height);
+        }
+
+        style
+    }
+}
+
+#[wasm_bindgen]
+pub fn compute_layout(nodes_js: JsValue) -> Result<JsValue, JsValue> {
+    let nodes: Vec<JsNode> = serde_wasm_bindgen::from_value(nodes_js)?;
+
+    let mut taffy: TaffyTree<Size<f32>> = TaffyTree::new();
+    let mut node_ids = Vec::with_capacity(nodes.len());
+
+    for node in &nodes {
+        let style: Style = (&node.style).into();
+
+        let id = if let Some(size) = &node.measure {
+            // コンテキスト(固定サイズ)付きの葉ノードを作成
+            let context = Size {
+                width: size.width,
+                height: size.height,
+            };
+            taffy
+                .new_leaf_with_context(style, context)
+                .map_err(|e| e.to_string())?
+        } else {
+            taffy.new_leaf(style).map_err(|e| e.to_string())?
+        };
+
+        node_ids.push(id);
+    }
+
+    for (i, node) in nodes.iter().enumerate() {
+        if !node.children.is_empty() {
+            let parent = node_ids[i];
+            let children: Vec<NodeId> = node.children.iter().map(|&idx| node_ids[idx]).collect();
+            taffy
+                .set_children(parent, &children)
+                .map_err(|e| e.to_string())?;
+        }
+    }
+
+    if let Some(&root_id) = node_ids.first() {
+        // コンテキストを利用した計測関数を指定して計算
+        taffy
+            .compute_layout_with_measure(
+                root_id,
+                Size::MAX_CONTENT,
+                |_known_dimensions, _available_space, _node_id, node_context, _style| {
+                    let width = node_context.as_ref().map(|c| c.width).unwrap_or(0.0);
+                    let height = node_context.as_ref().map(|c| c.height).unwrap_or(0.0);
+                    Size { width, height }
+                },
+            )
+            .map_err(|e| e.to_string())?;
+    }
+
+    let mut outputs = Vec::with_capacity(nodes.len());
+    for &id in &node_ids {
+        let layout = taffy.layout(id).map_err(|e| e.to_string())?;
+        outputs.push(LayoutOutput {
+            x: layout.location.x,
+            y: layout.location.y,
+            width: layout.size.width,
+            height: layout.size.height,
+        });
+    }
+
+    Ok(serde_wasm_bindgen::to_value(&outputs)?)
+}

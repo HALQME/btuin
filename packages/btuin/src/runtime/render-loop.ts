@@ -81,14 +81,10 @@ export function createRenderer<State>(config: RenderLoopConfig<State>) {
 
       const buf = pool.acquire();
       const rootElement = config.view(config.getState());
-      const rootRect: Rect = {
-        x: 0,
-        y: 0,
-        width: state.currentSize.cols,
-        height: state.currentSize.rows,
-      };
-      const laidOut = layout(rootElement, rootRect);
-      renderElement(laidOut, buf, {});
+
+      const layoutResult = layout(rootElement)
+
+      renderElement(rootElement, buf, layoutResult, 0, 0)
       renderDiff(state.prevBuffer, buf);
 
       // Return old prev buffer to the pool and keep the new one

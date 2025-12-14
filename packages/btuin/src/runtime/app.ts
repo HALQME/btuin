@@ -6,6 +6,7 @@
 
 import type { KeyEvent } from "@btuin/terminal";
 import type { ViewElement } from "../view/types/elements";
+import { initLayoutEngine } from "../layout";
 import {
   setupRawMode,
   clearScreen,
@@ -71,9 +72,9 @@ export interface AppInstance {
    * Mounts the app to the terminal.
    *
    * @param options - Mount options
-   * @returns AppInstance for chaining
+   * @returns Promise<AppInstance> for chaining
    */
-  mount(options?: MountOptions): AppInstance;
+  mount(options?: MountOptions): Promise<AppInstance>;
 
   /**
    * Unmounts the app and cleans up resources.
@@ -144,11 +145,14 @@ export function createApp(config: AppConfig): AppInstance {
   });
 
   const appInstance: AppInstance = {
-    mount(options: MountOptions = {}) {
-      if (isMounted) {
-        console.warn("App is already mounted");
-        return appInstance;
-      }
+      async mount(options: MountOptions = {}) { // asyncに変更
+        if (isMounted) {
+          console.warn("App is already mounted");
+          return appInstance;
+        }
+
+        // Wasmレイアウトエンジンの初期化待機
+        await initLayoutEngine();
 
       const rows = options.rows ?? 0;
       const cols = options.cols ?? 0;

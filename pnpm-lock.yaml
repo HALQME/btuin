@@ -54,6 +54,12 @@ importers:
         specifier: workspace:*
         version: link:../terminal
 
+  packages/showcase:
+    dependencies:
+      btuin:
+        specifier: workspace:*
+        version: link:../btuin
+
   packages/terminal: {}
 
 packages:
