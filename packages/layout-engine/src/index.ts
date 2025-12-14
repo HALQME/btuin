@@ -1,14 +1,47 @@
-// @ts-ignore - ビルド前は存在しない可能性があるため
-import init, { compute_layout } from "../pkg/layout_engine.js";
 import type { LayoutElementShape, ComputedLayout } from "./types";
 
 export * from "./types";
 
 let wasmInitialized = false;
 
+type LayoutEngineWasmModule = {
+  default: (module_or_path?: unknown) => Promise<unknown>;
+  compute_layout: (nodes_js: unknown) => unknown;
+};
+
+let wasmModule: LayoutEngineWasmModule | null = null;
+let wasmImportPromise: Promise<LayoutEngineWasmModule> | null = null;
+
+async function loadWasmModule(): Promise<LayoutEngineWasmModule> {
+  if (wasmModule) return wasmModule;
+  if (wasmImportPromise) return wasmImportPromise;
+
+  wasmImportPromise = (async () => {
+    try {
+      const specifier = new URL("../pkg/layout_engine.js", import.meta.url).href;
+      const mod = (await import(specifier)) as LayoutEngineWasmModule;
+      wasmModule = mod;
+      return mod;
+    } catch (cause) {
+      wasmImportPromise = null;
+      throw new Error(
+        [
+          "Failed to load @btuin/layout-engine WASM module.",
+          "The generated files are missing.",
+          "Run: pnpm --filter @btuin/layout-engine build",
+        ].join(" "),
+        { cause },
+      );
+    }
+  })();
+
+  return wasmImportPromise;
+}
+
 export async function initLayoutEngine() {
   if (wasmInitialized) return;
-  await init();
+  const mod = await loadWasmModule();
+  await mod.default();
   wasmInitialized = true;
 }
 
@@ -94,6 +127,9 @@ export function computeLayout(root: LayoutInputNode): ComputedLayout {
   if (!wasmInitialized) {
     throw new Error("Layout engine not initialized. Call initLayoutEngine() first.");
   }
+  if (!wasmModule) {
+    throw new Error("Layout engine module not loaded. Call initLayoutEngine() first.");
+  }
 
   const nodes: BridgeNode[] = [];
   const elementMap = new Map<number, string>();
@@ -102,10 +138,9 @@ export function computeLayout(root: LayoutInputNode): ComputedLayout {
 
   let rawResults: any[];
   try {
-    rawResults = compute_layout(nodes);
-  } catch (error) {
-    console.error("Layout computation failed:", error);
-    return {};
+    rawResults = wasmModule.compute_layout(nodes) as any[];
+  } catch (cause) {
+    throw new Error("Layout computation failed.", { cause });
   }
 
   const computed: ComputedLayout = {};
