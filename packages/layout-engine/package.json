@@ -1,0 +1,12 @@
+{
+  "name": "@btuin/layout-engine",
+  "files": [
+    "pkg"
+  ],
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "wasm-pack build --target web --out-dir pkg"
+  }
+}

@@ -24,9 +24,18 @@ importers:
 
   packages/btuin:
     dependencies:
-      '@btuin/types':
+      '@btuin/layout-engine':
         specifier: workspace:*
-        version: link:../types
+        version: link:../layout-engine
+      '@btuin/reactivity':
+        specifier: workspace:*
+        version: link:../reactivity
+      '@btuin/renderer':
+        specifier: workspace:*
+        version: link:../renderer
+      '@btuin/terminal':
+        specifier: workspace:*
+        version: link:../terminal
       typescript:
         specifier: ^5
         version: 5.9.3
@@ -35,55 +44,17 @@ importers:
         specifier: latest
         version: 1.3.4
 
-  packages/element-kit:
-    dependencies:
-      '@btuin/types':
-        specifier: workspace:*
-        version: link:../types
-      btuin:
-        specifier: workspace:*
-        version: link:../btuin
+  packages/layout-engine: {}
 
-  packages/progress-bar:
-    dependencies:
-      '@btuin/element-kit':
-        specifier: workspace:*
-        version: link:../element-kit
+  packages/reactivity: {}
 
-  packages/selector:
+  packages/renderer:
     dependencies:
-      '@btuin/element-kit':
+      '@btuin/terminal':
         specifier: workspace:*
-        version: link:../element-kit
+        version: link:../terminal
 
-  packages/showcase:
-    dependencies:
-      '@btuin/table':
-        specifier: workspace:*
-        version: link:../table
-      btuin:
-        specifier: workspace:*
-        version: link:../btuin
-
-  packages/spinner:
-    dependencies:
-      '@btuin/element-kit':
-        specifier: workspace:*
-        version: link:../element-kit
-
-  packages/table:
-    dependencies:
-      '@btuin/element-kit':
-        specifier: workspace:*
-        version: link:../element-kit
-
-  packages/toast:
-    dependencies:
-      '@btuin/element-kit':
-        specifier: workspace:*
-        version: link:../element-kit
-
-  packages/types: {}
+  packages/terminal: {}
 
 packages:
 
@@ -170,8 +141,8 @@ packages:
   '@types/bun@1.3.4':
     resolution: {integrity: sha512-EEPTKXHP+zKGPkhRLv+HI0UEX8/o+65hqARxLy8Ov5rIxMBPNTjeZww00CIihrIQGEQBYg+0roO5qOnS/7boGA==}
 
-  '@types/node@25.0.1':
-    resolution: {integrity: sha512-czWPzKIAXucn9PtsttxmumiQ9N0ok9FrBwgRWrwmVLlp86BrMExzvXRLFYRJ+Ex3g6yqj+KuaxfX1JTgV2lpfg==}
+  '@types/node@25.0.2':
+    resolution: {integrity: sha512-gWEkeiyYE4vqjON/+Obqcoeffmk0NF15WSBwSs7zwVA2bAbTaE0SJ7P0WNGoJn8uE7fiaV5a7dKYIJriEqOrmA==}
 
   bun-types@1.3.4:
     resolution: {integrity: sha512-5ua817+BZPZOlNaRgGBpZJOSAQ9RQ17pkwPD0yR7CfJg+r8DgIILByFifDTa+IPDDxzf5VNhtNlcKqFzDgJvlQ==}
@@ -253,13 +224,13 @@ snapshots:
     dependencies:
       bun-types: 1.3.4
 
-  '@types/node@25.0.1':
+  '@types/node@25.0.2':
     dependencies:
       undici-types: 7.16.0
 
   bun-types@1.3.4:
     dependencies:
-      '@types/node': 25.0.1
+      '@types/node': 25.0.2
 
   oxfmt@0.17.0:
     optionalDependencies:

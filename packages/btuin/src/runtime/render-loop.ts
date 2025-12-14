@@ -4,10 +4,10 @@
  * Handles the rendering loop, including buffer management and diff rendering.
  */
 
-import { getGlobalBufferPool, renderDiff, type Buffer2D } from "../buffer";
+import { getGlobalBufferPool, renderDiff, type Buffer2D } from "@btuin/renderer";
 import { layout, renderElement } from "../layout";
-import type { ViewElement } from "@btuin/types/elements";
-import type { Rect } from "@btuin/types/geometry";
+import type { ViewElement } from "../view/types/elements";
+import type { Rect } from "@btuin/layout-engine";
 import { createErrorContext } from "./error-boundary";
 
 /**

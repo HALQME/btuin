@@ -5,4 +5,3 @@
  */
 
 export { type ErrorContext, type ErrorHandler } from "./error-boundary";
-export { patchConsole } from "../terminal";

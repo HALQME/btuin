@@ -4,8 +4,6 @@
  * Handles error contexts and provides error handling utilities for the runtime.
  */
 
-import { appendFile } from "node:fs/promises";
-
 /**
  * Error context information for error handlers
  */
@@ -44,10 +42,9 @@ export function createErrorHandler(
         (context.metadata ? `  Metadata: ${JSON.stringify(context.metadata)}\n` : "") +
         `  Stack: ${context.error.stack}\n\n`;
 
-      // Fire-and-forget write (non-blocking)
-      appendFile(errorLogPath, errorText).catch(() => {
-        // Silently ignore write errors to avoid recursion
-      });
+      const errorLogFile = Bun.file(errorLogPath).writer();
+      errorLogFile.write(errorText);
+      errorLogFile.end();
     }
 
     if (userHandler) {
@@ -62,7 +59,9 @@ export function createErrorHandler(
             `  Message: ${handlerError instanceof Error ? handlerError.message : String(handlerError)}\n` +
             `  Original error: ${context.error.message}\n\n`;
 
-          appendFile(errorLogPath, handlerErrorText).catch(() => {});
+          const errorLogFile = Bun.file(errorLogPath).writer();
+          errorLogFile.write(handlerErrorText);
+          errorLogFile.end();
         }
       }
     }

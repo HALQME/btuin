@@ -4,8 +4,8 @@
  * Vue-like app creation and mounting for btuin TUI framework.
  */
 
-import type { ViewElement } from "@btuin/types/elements";
-import type { KeyEvent } from "@btuin/types/key-event";
+import type { KeyEvent } from "@btuin/terminal";
+import type { ViewElement } from "../view/types/elements";
 import {
   setupRawMode,
   clearScreen,
@@ -14,8 +14,8 @@ import {
   startCapture,
   onKey as terminalOnKey,
   getTerminalSize,
-} from "../terminal";
-import { disposeSingletonCapture } from "../terminal/console-capture";
+  disposeSingletonCapture,
+} from "@btuin/terminal";
 import {
   defineComponent,
   mountComponent,
@@ -24,8 +24,8 @@ import {
   handleComponentKey,
   type Component,
   type MountedComponent,
-} from "../component";
-import { effect, stop, type ReactiveEffect } from "../reactivity";
+} from "../components";
+import { effect, stop, type ReactiveEffect } from "@btuin/reactivity";
 import { createRenderer } from "./render-loop";
 import { createErrorHandler, createErrorContext } from "./error-boundary";
 
