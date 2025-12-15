@@ -48,7 +48,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build Layout Engine (WASM)
-        run: pnpm --filter @btuin/layout-engine build
+        run: pnpm run build
 
       - name: Check Formatting
         run: pnpm run format --check

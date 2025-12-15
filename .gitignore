@@ -6,6 +6,7 @@ out
 out.*
 dist
 *.tgz
+pkg
 profiles/*.json
 
 # code coverage
