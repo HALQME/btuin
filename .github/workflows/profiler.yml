@@ -19,6 +19,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install wasm-pack
+        uses: jetli/wasm-pack-action@v4
+        with:
+          version: "latest"
+
       - name: Setup Bun
         uses: oven-sh/setup-bun@v1
         with:
@@ -27,7 +35,6 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v2
         with:
-          version: 8
           run_install: false
 
       - name: Get pnpm store directory
@@ -45,6 +52,9 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Build Layout Engine (WASM)
+        run: pnpm --filter @btuin/layout-engine build
 
       - name: Run Limit Test
         run: |
