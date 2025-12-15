@@ -1,3 +1,4 @@
+import type { KeyEventHook } from "./components/lifecycle";
 import type { KeyEvent } from "@btuin/terminal";
 import type { OutlineOptions } from "@btuin/renderer";
 import type { Dimension, LayoutStyle } from "@btuin/layout-engine";
@@ -24,6 +25,7 @@ export abstract class BaseView implements ViewProps {
   public style: NonNullable<ViewProps["style"]> = {};
   public key?: string;
   public focusKey?: string;
+  public keyHooks: KeyEventHook[] = [];
 
   constructor(props: ViewProps = {}) {
     this.style = { ...props.style };
@@ -90,6 +92,11 @@ export abstract class BaseView implements ViewProps {
 
   setKey(value: string): this {
     this.key = value;
+    return this;
+  }
+
+  onKey(hook: KeyEventHook): this {
+    this.keyHooks.push(hook);
     return this;
   }
 

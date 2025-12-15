@@ -2,7 +2,7 @@ import { describe, expect, test, beforeAll } from "bun:test";
 import { renderElement } from "../../src/layout/renderer";
 import { layout, initLayoutEngine } from "../../src/layout";
 import { Block, Text } from "../../src/view/primitives";
-import { createBuffer, fillRect, drawText } from "@btuin/renderer";
+import { createBuffer } from "@btuin/renderer";
 import type { Buffer2D } from "@btuin/renderer";
 import { resolveColor } from "@btuin/renderer";
 
@@ -11,7 +11,8 @@ function bufferToString(buf: Buffer2D): string {
   let out = "";
   for (let r = 0; r < buf.rows; r++) {
     for (let c = 0; c < buf.cols; c++) {
-      out += String.fromCodePoint(buf.get(r, c).char.codePointAt(0)!);
+      const char = buf.get(r, c).char || " ";
+      out += char;
     }
     out += "\n";
   }
@@ -41,7 +42,7 @@ describe("renderElement", () => {
     renderElement(root, buffer, layoutMap);
 
     // Check if the background was applied
-    for (let i = 0; i < buffer.cells.length; i++) {
+    for (let i = 0; i < buffer.codes.length; i++) {
       expect(buffer.bg[i]).toBe(resolveColor("blue", "bg"));
     }
   });

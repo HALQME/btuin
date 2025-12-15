@@ -2,22 +2,6 @@ import { type ViewElement, isBlock, isText } from "../view/types/elements";
 import type { ComputedLayout } from "@btuin/layout-engine";
 import { type Buffer2D, drawText, fillRect } from "@btuin/renderer";
 
-function resolvePadding(padding: unknown): { top: number; right: number; bottom: number; left: number } {
-  if (typeof padding === "number") {
-    return { top: padding, right: padding, bottom: padding, left: padding };
-  }
-  if (Array.isArray(padding) && padding.length === 4) {
-    const [top, right, bottom, left] = padding as number[];
-    return {
-      top: typeof top === "number" ? top : 0,
-      right: typeof right === "number" ? right : 0,
-      bottom: typeof bottom === "number" ? bottom : 0,
-      left: typeof left === "number" ? left : 0,
-    };
-  }
-  return { top: 0, right: 0, bottom: 0, left: 0 };
-}
-
 /**
  * Draw the element tree to the buffer.
  */
@@ -37,6 +21,16 @@ export function renderElement(
   const absX = layout.x + _parentX;
   const absY = layout.y + _parentY;
   const { width, height } = layout;
+  const MARGIN = 5;
+
+  if (
+    absY >= buffer.rows + MARGIN ||
+    absX >= buffer.cols + MARGIN ||
+    absY + height <= -MARGIN ||
+    absX + width <= -MARGIN
+  ) {
+    return;
+  }
 
   const bg = element.style?.background;
   if (bg !== undefined) {

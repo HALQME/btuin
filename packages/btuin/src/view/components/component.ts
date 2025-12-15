@@ -5,6 +5,7 @@
  * props, emits, and render function.
  */
 import type { ViewElement } from "../types/elements";
+import { isBlock } from "../types/elements";
 import type { KeyEvent } from "@btuin/terminal";
 import {
   createComponentInstance,
@@ -216,6 +217,25 @@ export function renderComponent(mounted: MountedComponent): ViewElement {
 
   return element;
 }
+function traverseKeyHandlers(
+  element: ViewElement,
+  visitor: (element: ViewElement) => boolean,
+): boolean {
+  if (isBlock(element)) {
+    for (let i = element.children.length - 1; i >= 0; i--) {
+      const child = element.children[i]!;
+      if (traverseKeyHandlers(child, visitor)) {
+        return true;
+      }
+    }
+  }
+
+  if (element.keyHooks.length > 0 && visitor(element)) {
+    return true;
+  }
+
+  return false;
+}
 /**
  * Handles key events for a component.
  * Returns true if the event was handled and should stop propagation.
@@ -226,6 +246,15 @@ export function renderComponent(mounted: MountedComponent): ViewElement {
  * @returns True if event was handled
  */
 export function handleComponentKey(mounted: MountedComponent, event: KeyEvent): boolean {
+  if (mounted.lastElement) {
+    const handled = traverseKeyHandlers(mounted.lastElement, (element) =>
+      invokeKeyHooks(element.keyHooks, event),
+    );
+    if (handled) {
+      return true;
+    }
+  }
+
   return invokeKeyHooks(mounted.instance.keyHooks, event);
 }
 

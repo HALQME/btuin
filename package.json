@@ -6,13 +6,18 @@
     "packages/*"
   ],
   "scripts": {
-    "start": "bun run --cwd packages/btuin src/app.ts",
-    "build": "bun run --cwd packages/btuin build.ts",
+    "start": "bun run",
+    "build": "pnpm --filter @btuin/layout-engine build",
     "lint": "oxlint packages/*",
     "lint:fix": "oxlint packages/* --fix",
     "format": "oxfmt packages/*",
+    "test": "bun test packages/btuin packages/layout-engine packages/reactivity packages/renderer packages/terminal packages/showcase",
+    "test:watch": "pnpm test --watch",
     "test:all": "bun test packages",
-    "test": "bun test packages/btuin packages/layout-engine packages/reactivity packages/renderer packages/terminal",
+    "profiler": "bun test scripts/profiler*.spec.ts",
+    "profiler:stress": "bun test scripts/profiler-stress.test.ts",
+    "profiler:layout": "bun test scripts/profiler-layout.test.ts",
+    "profiler:limit": "bun test scripts/profiler-limit.spec.ts",
     "check": "bunx tsc --noEmit"
   },
   "devDependencies": {

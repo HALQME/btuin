@@ -4,10 +4,19 @@
  * Handles the rendering loop, including buffer management and diff rendering.
  */
 
-import { getGlobalBufferPool, renderDiff, type Buffer2D } from "@btuin/renderer";
+import {
+  FlatBuffer,
+  getGlobalBufferPool,
+  renderDiff,
+  type Buffer2D,
+  type DiffStats,
+} from "@btuin/renderer";
 import { layout, renderElement } from "../layout";
 import type { ViewElement } from "../view/types/elements";
+import { isBlock } from "../view/types/elements";
 import { createErrorContext } from "./error-boundary";
+import type { Profiler } from "./profiler";
+import type { ComputedLayout } from "@btuin/layout-engine";
 
 /**
  * Terminal size configuration
@@ -31,6 +40,8 @@ export interface RenderLoopConfig<State> {
   getState: () => State;
   /** Error handler */
   handleError: (context: import("./error-boundary").ErrorContext) => void;
+  /** Optional profiler */
+  profiler?: Profiler;
 }
 
 /**
@@ -59,6 +70,10 @@ export function createRenderer<State>(config: RenderLoopConfig<State>) {
     prevBuffer: pool.acquire(),
   };
 
+  let prevRootElement: ViewElement | null = null;
+  let prevLayoutResult: ComputedLayout | null = null;
+  let prevLayoutSizeKey: string | null = null;
+
   /**
    * Performs a render cycle
    *
@@ -81,22 +96,94 @@ export function createRenderer<State>(config: RenderLoopConfig<State>) {
       }
 
       const rootElement = config.view(config.getState());
+      const layoutSizeKey = `${state.currentSize.cols}x${state.currentSize.rows}`;
 
-      const layoutResult = layout(rootElement, {
-        width: state.currentSize.cols,
-        height: state.currentSize.rows,
-      });
+      const nodeCount =
+        config.profiler?.isEnabled() && config.profiler.options.nodeCount
+          ? countElements(rootElement)
+          : undefined;
+      const frame = config.profiler?.beginFrame(state.currentSize, { nodeCount }) ?? null;
 
-      const buf = pool.acquire();
-      renderElement(rootElement, buf, layoutResult, 0, 0);
-      const output = renderDiff(state.prevBuffer, buf);
-      if (output) {
-        config.write(output);
+      const layoutResult =
+        rootElement === prevRootElement &&
+        prevLayoutResult &&
+        prevLayoutSizeKey === layoutSizeKey &&
+        !sizeChanged
+          ? prevLayoutResult
+          : (config.profiler?.measure(frame, "layoutMs", () =>
+              layout(rootElement, {
+                width: state.currentSize.cols,
+                height: state.currentSize.rows,
+              }),
+            ) ??
+            layout(rootElement, {
+              width: state.currentSize.cols,
+              height: state.currentSize.rows,
+            }));
+
+      prevRootElement = rootElement;
+      prevLayoutResult = layoutResult;
+      prevLayoutSizeKey = layoutSizeKey;
+
+      let buf = pool.acquire();
+      if (buf === state.prevBuffer) {
+        // Ensure prev/next buffers differ; diffing the same instance yields no output.
+        buf = pool.acquire();
+        if (buf === state.prevBuffer) {
+          buf = new FlatBuffer(state.currentSize.rows, state.currentSize.cols);
+        }
+      }
+      if (config.profiler && frame) {
+        config.profiler.measure(frame, "renderMs", () => {
+          renderElement(rootElement, buf, layoutResult, 0, 0);
+        });
+      } else {
+        renderElement(rootElement, buf, layoutResult, 0, 0);
+      }
+
+      config.profiler?.drawHud(buf);
+
+      const diffStats: DiffStats | undefined = frame
+        ? {
+            sizeChanged: false,
+            fullRedraw: false,
+            changedCells: 0,
+            cursorMoves: 0,
+            fgChanges: 0,
+            bgChanges: 0,
+            resets: 0,
+            ops: 0,
+          }
+        : undefined;
+
+      const prevForDiff = forceFullRedraw
+        ? new FlatBuffer(state.currentSize.rows, state.currentSize.cols)
+        : state.prevBuffer;
+
+      const output =
+        config.profiler?.measure(frame, "diffMs", () => renderDiff(prevForDiff, buf, diffStats)) ??
+        renderDiff(prevForDiff, buf);
+      const safeOutput =
+        output === ""
+          ? renderDiff(new FlatBuffer(state.currentSize.rows, state.currentSize.cols), buf)
+          : output;
+      if (frame && diffStats) {
+        config.profiler?.recordDiffStats(frame, diffStats);
+      }
+      if (safeOutput) {
+        config.profiler?.recordOutput(frame, safeOutput);
+        if (config.profiler && frame) {
+          config.profiler.measure(frame, "writeMs", () => config.write(safeOutput));
+        } else {
+          config.write(safeOutput);
+        }
       }
 
       // Return old prev buffer to the pool and keep the new one
       pool.release(state.prevBuffer);
       state.prevBuffer = buf;
+
+      config.profiler?.endFrame(frame);
     } catch (error) {
       config.handleError(createErrorContext("render", error));
     }
@@ -113,4 +200,12 @@ export function createRenderer<State>(config: RenderLoopConfig<State>) {
     render,
     getState,
   };
+}
+
+function countElements(root: ViewElement): number {
+  let count = 1;
+  if (isBlock(root)) {
+    for (const child of root.children) count += countElements(child);
+  }
+  return count;
 }

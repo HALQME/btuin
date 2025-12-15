@@ -2,6 +2,7 @@ import { resolveColor } from "./colors";
 import { FlatBuffer } from "./buffer";
 import { type Buffer2D } from "./types/buffer";
 import type { ColorValue } from "./types/color";
+import { measureGraphemeWidth, segmentGraphemes } from "./grapheme";
 
 /**
  * Internal helper to compute flat index into a Buffer2D (FlatBuffer).
@@ -34,15 +35,21 @@ export function createBuffer(rows: number, cols: number): Buffer2D {
  * 可能であれば利用箇所側での使用を見直してください。
  *
  * @param buf - The buffer to clone
- * @returns A new Buffer2D with copied cells
+ * @returns A new Buffer2D with copied glyphs and styles
  */
 export function cloneBuffer(buf: Buffer2D): Buffer2D {
   const copy = new FlatBuffer(buf.rows, buf.cols);
-  copy.cells.set(buf.cells);
-  for (let i = 0; i < buf.cells.length; i++) {
+  copy.codes.set(buf.codes);
+  copy.extras.clear();
+  for (const [idx, glyph] of buf.extras.entries()) {
+    copy.extras.set(idx, glyph);
+  }
+  copy.widths.set(buf.widths);
+  for (let i = 0; i < copy.fg.length; i++) {
     copy.fg[i] = buf.fg[i];
     copy.bg[i] = buf.bg[i];
   }
+  copy.copyAsciiStateFrom(buf);
   return copy;
 }
 
@@ -73,8 +80,7 @@ export function setCell(
   const idx = indexOf(buf, row, col);
 
   if (cell.ch !== undefined) {
-    const codePoint = cell.ch.codePointAt(0) ?? 32;
-    buf.cells[idx] = codePoint;
+    buf.set(row, col, cell.ch);
   }
 
   if (cell.fg !== undefined) {
@@ -124,16 +130,55 @@ export function drawText(
 
   const fg = style?.fg !== undefined ? resolveColor(style.fg, "fg") : undefined;
   const bg = style?.bg !== undefined ? resolveColor(style.bg, "bg") : undefined;
+  const resolvedStyle = hasFg || hasBg ? { fg, bg } : undefined;
 
+  // ASCII fast path:
+  // - Avoid Intl.Segmenter
+  // - Avoid per-grapheme width calculation
+  // - Write directly as width=1 code points
+  let isAscii = true;
   for (let i = 0; i < text.length; i++) {
-    const c = col + i;
-    if (c < 0 || c >= buf.cols) continue;
+    if (text.charCodeAt(i) > 0x7f) {
+      isAscii = false;
+      break;
+    }
+  }
+  if (isAscii) {
+    let currentCol = col;
+    for (let i = 0; i < text.length; i++) {
+      const code = text.charCodeAt(i);
+      if (currentCol >= buf.cols) break;
+      if (currentCol + 1 <= 0) {
+        currentCol += 1;
+        continue;
+      }
+      if (currentCol < 0) {
+        currentCol += 1;
+        continue;
+      }
+      buf.setCodePoint(row, currentCol, code, resolvedStyle);
+      currentCol += 1;
+    }
+    return;
+  }
 
-    const idx = indexOf(buf, row, c);
-    const ch = text[i] ?? " ";
-    buf.cells[idx] = ch.codePointAt(0) ?? 32;
-    if (hasFg) buf.fg[idx] = fg;
-    if (hasBg) buf.bg[idx] = bg;
+  const segments = segmentGraphemes(text);
+  let currentCol = col;
+
+  for (const segment of segments) {
+    const width = Math.max(measureGraphemeWidth(segment), 1);
+    if (currentCol >= buf.cols) break;
+    if (currentCol + width <= 0) {
+      currentCol += width;
+      continue;
+    }
+    if (currentCol < 0) {
+      currentCol += width;
+      continue;
+    }
+
+    buf.set(row, currentCol, segment, resolvedStyle);
+    currentCol += width;
   }
 }
 
@@ -179,8 +224,15 @@ export function fillRect(
 
   const fg = style?.fg !== undefined ? resolveColor(style.fg, "fg") : undefined;
   const bg = style?.bg !== undefined ? resolveColor(style.bg, "bg") : undefined;
+  const resolvedStyle = hasFg || hasBg ? { fg, bg } : undefined;
 
-  const chCode = char.codePointAt(0) ?? 32;
+  let fillGlyph = " ";
+  if (char.length === 1 && char.charCodeAt(0) <= 0x7f) {
+    fillGlyph = char;
+  } else {
+    const cluster = segmentGraphemes(char)[0] ?? char;
+    fillGlyph = measureGraphemeWidth(cluster) > 1 ? " " : cluster;
+  }
 
   const maxRow = Math.min(buf.rows, row + height);
   const maxCol = Math.min(buf.cols, col + width);
@@ -188,7 +240,7 @@ export function fillRect(
   for (let r = Math.max(0, row); r < maxRow; r++) {
     for (let c = Math.max(0, col); c < maxCol; c++) {
       const idx = indexOf(buf, r, c);
-      buf.cells[idx] = chCode;
+      buf.set(r, c, fillGlyph, resolvedStyle);
       if (hasFg) buf.fg[idx] = fg;
       if (hasBg) buf.bg[idx] = bg;
     }

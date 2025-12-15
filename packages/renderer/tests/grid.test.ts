@@ -6,14 +6,14 @@ describe("@btuin/renderer grid", () => {
     const buf = createBuffer(3, 3);
     fillRect(buf, 0.9, 0.9, 2.9, 1.9, "X");
 
-    expect(String.fromCodePoint(buf.cells[buf.index(0, 0)]!)).toBe("X");
-    expect(String.fromCodePoint(buf.cells[buf.index(0, 1)]!)).toBe("X");
-    expect(String.fromCodePoint(buf.cells[buf.index(0, 2)]!)).toBe(" ");
+    expect(buf.get(0, 0).char).toBe("X");
+    expect(buf.get(0, 1).char).toBe("X");
+    expect(buf.get(0, 2).char).toBe(" ");
   });
 
   test("drawText floors non-integer coordinates", () => {
     const buf = createBuffer(2, 4);
     drawText(buf, 0.2, 1.8, "A");
-    expect(String.fromCodePoint(buf.cells[buf.index(0, 1)]!)).toBe("A");
+    expect(buf.get(0, 1).char).toBe("A");
   });
 });

@@ -11,4 +11,3 @@ describe("Spacer Primitive", () => {
     expect(el.style.flexBasis).toBe(0);
   });
 });
-

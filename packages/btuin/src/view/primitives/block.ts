@@ -32,6 +32,11 @@ export class BlockElement extends BaseView implements BlockView {
     this.style.alignItems = value;
     return this;
   }
+
+  boundary(): this {
+    this.style.layoutBoundary = true;
+    return this;
+  }
 }
 
 // ファクトリ関数

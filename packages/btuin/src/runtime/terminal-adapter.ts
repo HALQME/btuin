@@ -26,4 +26,3 @@ export function createDefaultTerminalAdapter(): TerminalAdapter {
     write: terminal.write,
   };
 }
-

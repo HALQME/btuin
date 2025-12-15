@@ -40,7 +40,9 @@ function titleBar(title: string, right?: string) {
 }
 
 function card(lines: string[], accent: string) {
-  return VStack(lines.map((l) => Text(l))).gap(0).outline({ style: "single", color: accent });
+  return VStack(lines.map((l) => Text(l)))
+    .gap(0)
+    .outline({ style: "single", color: accent });
 }
 
 const app = createApp({
@@ -221,7 +223,9 @@ const app = createApp({
         titleBar("Overlay", "z to close"),
         Text("Floating window via ZStack").foreground("gray"),
         Text("This clears its own area (bg).").foreground("gray"),
-        ...(modalHeight >= 9 ? [Block().height(1), Text("Resize and toggle.").foreground("gray")] : []),
+        ...(modalHeight >= 9
+          ? [Block().height(1), Text("Resize and toggle.").foreground("gray")]
+          : []),
       ])
         .width(modalWidth)
         .height(modalHeight)
@@ -234,23 +238,21 @@ const app = createApp({
     };
 
     const baseApp = () =>
-      VStack([
-        header(),
-        HStack([sidebar(), main()]).gap(1).align("stretch").grow(1),
-        footer(),
-      ])
+      VStack([header(), HStack([sidebar(), main()]).gap(1).align("stretch").grow(1), footer()])
         .width("100%")
         .justify("flex-start")
         .align("stretch");
 
     return () =>
-      ZStack([
-        baseApp(),
-        ...(showOverlay.value ? [floatingOverlay()] : []),
-      ])
+      ZStack([baseApp(), ...(showOverlay.value ? [floatingOverlay()] : [])])
         .width("100%")
         .height("100%");
   },
 });
 
 await app.mount();
+
+const exitAfterMs = Number(process.env.BTUIN_EXIT_AFTER_MS ?? "");
+if (Number.isFinite(exitAfterMs) && exitAfterMs > 0) {
+  setTimeout(() => process.exit(0), exitAfterMs);
+}

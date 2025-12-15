@@ -10,19 +10,26 @@ mock.module("../../../src/layout", () => ({
   renderElement: () => {},
 }));
 
-const mockBuffer: Buffer2D = new FlatBuffer(24, 80);
+const mockBufferA: Buffer2D = new FlatBuffer(24, 80);
+const mockBufferB: Buffer2D = new FlatBuffer(24, 80);
+let acquireCount = 0;
 
 const mockPool = {
-  acquire: () => mockBuffer,
+  acquire: () => {
+    acquireCount++;
+    return acquireCount % 2 === 1 ? mockBufferA : mockBufferB;
+  },
   release: () => {},
 };
 mock.module("@btuin/renderer", () => ({
+  FlatBuffer,
   getGlobalBufferPool: () => mockPool,
-  renderDiff: () => "",
+  renderDiff: () => "x",
 }));
 
 describe("createRenderer", () => {
   it("should create a renderer and perform a render cycle", () => {
+    acquireCount = 0;
     let size = { rows: 24, cols: 80 };
     const renderer = createRenderer({
       getSize: () => size,
@@ -39,7 +46,7 @@ describe("createRenderer", () => {
     // Render once
     renderer.render();
     state = renderer.getState();
-    expect(state.prevBuffer).toBe(mockBuffer);
+    expect(state.prevBuffer === mockBufferA || state.prevBuffer === mockBufferB).toBe(true);
 
     // Change size and re-render
     size = { rows: 30, cols: 100 };

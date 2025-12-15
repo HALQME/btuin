@@ -11,4 +11,3 @@ export function Spacer(grow = 1): BlockElement {
   el.style.flexBasis = 0;
   return el;
 }
-

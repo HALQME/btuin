@@ -34,3 +34,8 @@ const app = createApp({
 });
 
 await app.mount();
+
+const exitAfterMs = Number(process.env.BTUIN_EXIT_AFTER_MS ?? "");
+if (Number.isFinite(exitAfterMs) && exitAfterMs > 0) {
+  setTimeout(() => process.exit(0), exitAfterMs);
+}

@@ -1,11 +1,5 @@
 import { describe, it, expect, mock, beforeEach, afterEach } from "bun:test";
-import {
-  setupRawMode,
-  onKey,
-  cleanup,
-  cleanupWithoutClear,
-  resetKeyHandlers,
-} from "../src/raw";
+import { setupRawMode, onKey, cleanup, cleanupWithoutClear, resetKeyHandlers } from "../src/raw";
 import type { KeyHandler, KeyEvent } from "../src/types";
 
 // Mock the 'io' module

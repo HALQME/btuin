@@ -1,6 +1,7 @@
 import { describe, it, expect } from "bun:test";
 import { createLayout } from "../../src/layout";
 import { Block, Text } from "../../src/view/primitives";
+import { LayoutBoundary } from "../../src/view/layout";
 import type { LayoutInputNode, ComputedLayout } from "@btuin/layout-engine";
 
 // Mock the layout engine
@@ -94,5 +95,25 @@ describe("layout", () => {
     const childNode = receivedLayoutNode?.children?.[0];
     expect(childNode?.width).toBe(40);
     expect(childNode?.height).toBe(10);
+  });
+
+  it("should trim children that exceed the layout boundary", () => {
+    receivedLayoutNode = null;
+    const { layout } = createLayout({
+      initLayoutEngine: async () => {},
+      computeLayout: (node: LayoutInputNode): ComputedLayout => {
+        receivedLayoutNode = node;
+        expect(receivedLayoutNode?.children?.length).toBe(2);
+        return mockComputedLayout;
+      },
+    });
+
+    const root = LayoutBoundary([
+      Text({ value: "one" }),
+      Text({ value: "two" }),
+      Text({ value: "three" }),
+    ]).height(2);
+
+    layout(root, { width: 10, height: 2 });
   });
 });

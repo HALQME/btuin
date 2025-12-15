@@ -20,3 +20,7 @@ export function ZStack(children: ViewElement[] = []): BlockElement {
   el.style.stack = "z";
   return el;
 }
+
+export function LayoutBoundary(children: ViewElement[] = []): BlockElement {
+  return Block(...children).boundary();
+}
