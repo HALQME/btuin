@@ -1,12 +1,15 @@
 use serde::{Deserialize, Serialize};
+use std::cell::RefCell;
+use std::collections::{HashMap, HashSet, hash_map::Entry};
 use taffy::prelude::*;
 use wasm_bindgen::prelude::*;
 
 #[derive(Deserialize)]
-struct JsNode {
+struct JsNodeUpdate {
+    key: String,
     style: JsStyle,
-    children: Vec<usize>,
-    measure: Option<JsSize>,
+    #[serde(default)]
+    children: Vec<String>,
 }
 
 #[derive(Deserialize)]
@@ -218,58 +221,135 @@ impl From<&JsStyle> for Style {
     }
 }
 
-#[wasm_bindgen]
-pub fn compute_layout(nodes_js: JsValue) -> Result<JsValue, JsValue> {
-    let nodes: Vec<JsNode> = serde_wasm_bindgen::from_value(nodes_js)?;
+struct LayoutEngineState {
+    taffy: TaffyTree<Size<f32>>,
+    nodes: HashMap<String, NodeInfo>,
+}
 
-    let mut taffy: TaffyTree<Size<f32>> = TaffyTree::new();
-    let mut node_ids = Vec::with_capacity(nodes.len());
+struct NodeInfo {
+    id: NodeId,
+}
 
-    for node in &nodes {
-        let style: Style = (&node.style).into();
-
-        let id = if let Some(size) = &node.measure {
-            // コンテキスト(固定サイズ)付きの葉ノードを作成
-            let context = Size {
-                width: size.width,
-                height: size.height,
-            };
-            taffy
-                .new_leaf_with_context(style, context)
-                .map_err(|e| e.to_string())?
-        } else {
-            taffy.new_leaf(style).map_err(|e| e.to_string())?
-        };
-
-        node_ids.push(id);
-    }
-
-    for (i, node) in nodes.iter().enumerate() {
-        if !node.children.is_empty() {
-            let parent = node_ids[i];
-            let children: Vec<NodeId> = node.children.iter().map(|&idx| node_ids[idx]).collect();
-            taffy
-                .set_children(parent, &children)
-                .map_err(|e| e.to_string())?;
+impl LayoutEngineState {
+    fn new() -> Self {
+        Self {
+            taffy: TaffyTree::new(),
+            nodes: HashMap::new(),
         }
     }
 
-    if let Some(&root_id) = node_ids.first() {
-        taffy
-            .compute_layout(root_id, Size::MAX_CONTENT)
+    fn update_nodes(&mut self, nodes: Vec<JsNodeUpdate>) -> Result<(), String> {
+        for node in &nodes {
+            let style: Style = (&node.style).into();
+            match self.nodes.entry(node.key.clone()) {
+                Entry::Occupied(entry) => {
+                    self.taffy
+                        .set_style(entry.get().id, style)
+                        .map_err(|e| e.to_string())?;
+                }
+                Entry::Vacant(entry) => {
+                    let id = self.taffy.new_leaf(style).map_err(|e| e.to_string())?;
+                    entry.insert(NodeInfo { id });
+                }
+            }
+        }
+
+        for node in &nodes {
+            if let Some(info) = self.nodes.get(&node.key) {
+                let child_ids: Vec<NodeId> = node
+                    .children
+                    .iter()
+                    .filter_map(|child_key| {
+                        self.nodes.get(child_key).map(|child_info| child_info.id)
+                    })
+                    .collect();
+                self.taffy
+                    .set_children(info.id, &child_ids)
+                    .map_err(|e| e.to_string())?;
+            }
+        }
+
+        Ok(())
+    }
+
+    fn remove_nodes(&mut self, keys: Vec<String>) -> Result<(), String> {
+        let key_set: HashSet<String> = keys.into_iter().collect();
+        for key in &key_set {
+            if let Some(info) = self.nodes.remove(key) {
+                self.taffy.remove(info.id).map_err(|e| e.to_string())?;
+            }
+        }
+        Ok(())
+    }
+
+    fn compute_layout(&mut self, root_key: &str) -> Result<HashMap<String, LayoutOutput>, String> {
+        let root = self
+            .nodes
+            .get(root_key)
+            .ok_or_else(|| format!("root node not found: {}", root_key))?;
+
+        self.taffy
+            .compute_layout(root.id, Size::MAX_CONTENT)
             .map_err(|e| e.to_string())?;
-    }
 
-    let mut outputs = Vec::with_capacity(nodes.len());
-    for &id in &node_ids {
-        let layout = taffy.layout(id).map_err(|e| e.to_string())?;
-        outputs.push(LayoutOutput {
-            x: layout.location.x,
-            y: layout.location.y,
-            width: layout.size.width,
-            height: layout.size.height,
-        });
-    }
+        let mut outputs = HashMap::with_capacity(self.nodes.len());
+        for (key, info) in &self.nodes {
+            let layout = self.taffy.layout(info.id).map_err(|e| e.to_string())?;
+            outputs.insert(
+                key.clone(),
+                LayoutOutput {
+                    x: layout.location.x,
+                    y: layout.location.y,
+                    width: layout.size.width,
+                    height: layout.size.height,
+                },
+            );
+        }
 
-    Ok(serde_wasm_bindgen::to_value(&outputs)?)
+        Ok(outputs)
+    }
+}
+
+thread_local! {
+    static ENGINE_STATE: RefCell<Option<LayoutEngineState>> = RefCell::new(None);
+}
+
+fn with_state<R>(
+    f: impl FnOnce(&mut LayoutEngineState) -> Result<R, String>,
+) -> Result<R, JsValue> {
+    ENGINE_STATE.with(|cell| {
+        let mut guard = cell.borrow_mut();
+        let state = guard
+            .as_mut()
+            .ok_or_else(|| JsValue::from_str("Layout engine not initialized"))?;
+        f(state).map_err(|e| JsValue::from_str(&e))
+    })
+}
+
+#[wasm_bindgen]
+pub fn init_layout_engine() -> Result<(), JsValue> {
+    ENGINE_STATE.with(|cell| {
+        let mut guard = cell.borrow_mut();
+        *guard = Some(LayoutEngineState::new());
+        Ok(())
+    })
+}
+
+#[wasm_bindgen]
+pub fn update_nodes(nodes_js: JsValue) -> Result<(), JsValue> {
+    let nodes: Vec<JsNodeUpdate> = serde_wasm_bindgen::from_value(nodes_js)?;
+    with_state(|state| state.update_nodes(nodes))
+}
+
+#[wasm_bindgen]
+pub fn remove_nodes(keys_js: JsValue) -> Result<(), JsValue> {
+    let keys: Vec<String> = serde_wasm_bindgen::from_value(keys_js)?;
+    with_state(|state| state.remove_nodes(keys))
+}
+
+#[wasm_bindgen]
+pub fn compute_layout(root_key: &str) -> Result<JsValue, JsValue> {
+    with_state(|state| state.compute_layout(root_key)).and_then(|outputs| {
+        serde_wasm_bindgen::to_value(&outputs).map_err(|e| JsValue::from_str(&e.to_string()))
+    })
 }

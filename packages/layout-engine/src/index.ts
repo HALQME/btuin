@@ -6,22 +6,14 @@ let wasmInitialized = false;
 
 type LayoutEngineWasmModule = {
   default: (module_or_path?: unknown) => Promise<unknown>;
-  compute_layout: (nodes_js: unknown) => unknown;
+  init_layout_engine: () => void;
+  update_nodes: (nodes: unknown) => void;
+  remove_nodes: (keys: unknown) => void;
+  compute_layout: (root_key: string) => unknown;
 };
 
 let wasmModule: LayoutEngineWasmModule | null = null;
 let wasmImportPromise: Promise<LayoutEngineWasmModule> | null = null;
-
-function nowMs(): number {
-  const p = (globalThis as any).performance;
-  if (p && typeof p.now === "function") return p.now();
-  return Date.now();
-}
-
-function isPerfEnabled(): boolean {
-  const env = (globalThis as any).process?.env;
-  return env?.BTUIN_LAYOUT_ENGINE_PROFILE === "1" || env?.BTUIN_LAYOUT_ENGINE_PROFILE === "true";
-}
 
 async function loadWasmModule(): Promise<LayoutEngineWasmModule> {
   if (wasmModule) return wasmModule;
@@ -49,11 +41,16 @@ async function loadWasmModule(): Promise<LayoutEngineWasmModule> {
   return wasmImportPromise;
 }
 
+const layoutState = createLayoutState();
+
 export async function initLayoutEngine() {
-  if (wasmInitialized) return;
   const mod = await loadWasmModule();
-  await mod.default();
-  wasmInitialized = true;
+  if (!wasmInitialized) {
+    await mod.default();
+    wasmInitialized = true;
+  }
+  mod.init_layout_engine();
+  layoutState.reset();
 }
 
 // ----------------------------------------------------------------------------
@@ -102,12 +99,6 @@ export interface LayoutInputNode extends LayoutElementShape, LayoutStyle {
   children?: LayoutInputNode[];
 }
 
-interface BridgeNode {
-  style: BridgeStyle;
-  children: number[];
-  measure?: { width: number; height: number };
-}
-
 interface BridgeStyle {
   display?: string;
   position?: string;
@@ -135,79 +126,132 @@ interface BridgeStyle {
 // ----------------------------------------------------------------------------
 
 export function computeLayout(root: LayoutInputNode): ComputedLayout {
+  if (!wasmInitialized || !wasmModule) {
+    throw new Error("Layout engine not initialized. Call initLayoutEngine() first.");
+  }
+  try {
+    return layoutState.compute(root);
+  } catch (cause) {
+    if (cause instanceof Error && /not initialized/i.test(cause.message)) {
+      throw cause;
+    }
+    throw new Error("failed to compute layout", { cause });
+  }
+}
+
+interface BridgeNodePayload {
+  key: string;
+  style: BridgeStyle;
+  children: string[];
+  measure?: { width: number; height: number };
+}
+
+function createLayoutState() {
+  let signatures = new Map<string, string>();
+
+  function reset() {
+    signatures = new Map();
+  }
+
+  function compute(root: LayoutInputNode): ComputedLayout {
+    const module = getReadyModule();
+    const nodes: BridgeNodePayload[] = [];
+    flattenBridgeNodes(root, nodes);
+
+    if (nodes.length === 0 || !nodes[0]) {
+      throw new Error("Layout tree must contain at least one node.");
+    }
+
+    const newSignatures = new Map<string, string>();
+    const currentKeys = new Set<string>();
+    const changedNodes: BridgeNodePayload[] = [];
+
+    for (const node of nodes) {
+      const signature = createSignature(node);
+      newSignatures.set(node.key, signature);
+      currentKeys.add(node.key);
+      if (signatures.get(node.key) !== signature) {
+        changedNodes.push(node);
+      }
+    }
+
+    const removedKeys = [...signatures.keys()].filter((key) => !currentKeys.has(key));
+    signatures = newSignatures;
+
+    if (removedKeys.length > 0) {
+      module.remove_nodes(removedKeys);
+    }
+
+    if (changedNodes.length > 0) {
+      module.update_nodes(changedNodes);
+    }
+
+    const rootKey = nodes[0].key;
+    const result = module.compute_layout(rootKey);
+    return normalizeComputedLayout(result);
+  }
+
+  return {
+    reset,
+    compute,
+  };
+}
+
+function normalizeComputedLayout(value: unknown): ComputedLayout {
+  if (!value) return {};
+  const maybeMap = value as { entries?: unknown; get?: unknown };
+  const isMapLike =
+    value instanceof Map ||
+    (typeof maybeMap === "object" &&
+      maybeMap !== null &&
+      typeof maybeMap.entries === "function" &&
+      typeof maybeMap.get === "function");
+
+  if (isMapLike) {
+    const out: ComputedLayout = {};
+    for (const [key, rect] of (value as Map<unknown, unknown>).entries()) {
+      if (typeof key === "string") {
+        out[key] = rect as ComputedLayout[string];
+      }
+    }
+    return out;
+  }
+  return value as ComputedLayout;
+}
+
+function flattenBridgeNodes(node: LayoutInputNode, nodes: BridgeNodePayload[]): string {
+  const key = node.key ?? `node-${nodes.length}`;
+  const index = nodes.length;
+  nodes.push({
+    key,
+    style: extractStyle(node),
+    children: [],
+    measure: node.measuredSize,
+  });
+
+  if (node.children && node.children.length > 0) {
+    const childKeys = node.children.map((child) => flattenBridgeNodes(child, nodes));
+    nodes[index]!.children = childKeys;
+  }
+
+  return key;
+}
+
+function createSignature(node: BridgeNodePayload): string {
+  const styleJson = JSON.stringify(node.style);
+  const childrenKey = node.children.join(",");
+  const measureKey = node.measure ? `${node.measure.width}:${node.measure.height}` : "";
+  return `${styleJson}|${childrenKey}|${measureKey}`;
+}
+
+function getReadyModule(): LayoutEngineWasmModule {
   if (!wasmInitialized) {
     throw new Error("Layout engine not initialized. Call initLayoutEngine() first.");
   }
   if (!wasmModule) {
     throw new Error("Layout engine module not loaded. Call initLayoutEngine() first.");
   }
-
-  const perfEnabled = isPerfEnabled();
-  const t0 = perfEnabled ? nowMs() : 0;
-
-  const nodes: BridgeNode[] = [];
-  const elementMap = new Map<number, string>();
-
-  flattenTree(root, nodes, elementMap);
-
-  const t1 = perfEnabled ? nowMs() : 0;
-
-  let rawResults: any[];
-  try {
-    rawResults = wasmModule.compute_layout(nodes) as any[];
-  } catch (cause) {
-    throw new Error("Layout computation failed.", { cause });
-  }
-
-  const t2 = perfEnabled ? nowMs() : 0;
-
-  const computed: ComputedLayout = {};
-  rawResults.forEach((res: any, index: number) => {
-    const key = elementMap.get(index);
-    if (key) {
-      computed[key] = {
-        x: res.x,
-        y: res.y,
-        width: res.width,
-        height: res.height,
-      };
-    }
-  });
-
-  const t3 = perfEnabled ? nowMs() : 0;
-  if (perfEnabled) {
-    // eslint-disable-next-line no-console
-    console.log(
-      `[layout-engine] nodes=${nodes.length} flattenTree=${(t1 - t0).toFixed(3)}ms wasm.compute_layout=${(t2 - t1).toFixed(3)}ms decode=${(t3 - t2).toFixed(3)}ms total=${(t3 - t0).toFixed(3)}ms`,
-    );
-  }
-
-  return computed;
-}
-
-function flattenTree(
-  node: LayoutInputNode,
-  nodes: BridgeNode[],
-  elementMap: Map<number, string>,
-): number {
-  const index = nodes.length;
-
-  const key = node.key ?? `node-${index}`;
-  elementMap.set(index, key);
-
-  const bridgeNode: BridgeNode = {
-    style: extractStyle(node),
-    children: [],
-    measure: node.measuredSize,
-  };
-  nodes.push(bridgeNode);
-
-  if (node.children && node.children.length > 0) {
-    const childIndices = node.children.map((child) => flattenTree(child, nodes, elementMap));
-    nodes[index]!.children = childIndices;
-  }
-
-  return index;
+  return wasmModule;
 }
 
 function extractStyle(node: LayoutInputNode): BridgeStyle {

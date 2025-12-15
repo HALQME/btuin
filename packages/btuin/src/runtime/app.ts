@@ -235,6 +235,10 @@ export function createApp(config: AppConfig): AppInstance {
           }
         });
 
+        // Ensure at least one frame is rendered during mount, even if no reactive
+        // dependencies change afterward.
+        renderer.render(true);
+
         // Flush any key events received during mount.
         if (pendingKeyEvents.length && mounted) {
           for (const event of pendingKeyEvents.splice(0)) {

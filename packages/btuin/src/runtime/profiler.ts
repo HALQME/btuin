@@ -337,7 +337,7 @@ export class Profiler {
     const dir = path.dirname(this.options.outputFile);
     if (dir && dir !== ".") {
       try {
-        Bun.$`mkdir -p ${dir}`;
+        const _ = Bun.$`mkdir -p ${dir}`;
       } catch {}
     }
     await Bun.write(this.options.outputFile, output);
@@ -350,7 +350,7 @@ export class Profiler {
     const dir = path.dirname(this.options.outputFile);
     if (dir && dir !== ".") {
       try {
-        Bun.$`mkdir -p ${dir}`;
+        const _ = Bun.$`mkdir -p ${dir}`;
       } catch {}
     }
     Bun.write(this.options.outputFile, output).then();

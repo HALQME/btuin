@@ -20,6 +20,7 @@ export class FlatBuffer {
   readonly widths: Uint8Array;
   readonly fg: (string | undefined)[];
   readonly bg: (string | undefined)[];
+  private asciiOnly = true;
 
   constructor(rows: number, cols: number) {
     this.rows = rows;
@@ -42,6 +43,7 @@ export class FlatBuffer {
     this.widths.fill(1);
     this.fg.fill(undefined);
     this.bg.fill(undefined);
+    this.asciiOnly = true;
   }
 
   /**
@@ -80,6 +82,14 @@ export class FlatBuffer {
     const extra = this.extras.get(idx);
     if (extra !== undefined) return extra;
     return this.codes[idx] ?? 32;
+  }
+
+  isAsciiOnly(): boolean {
+    return this.asciiOnly;
+  }
+
+  copyAsciiStateFrom(other: FlatBuffer): void {
+    this.asciiOnly = other.asciiOnly;
   }
 
   /**
@@ -132,6 +142,9 @@ export class FlatBuffer {
     }
     this.clearFollowingContinuations(row, col);
     const normalized = glyph || " ";
+    const firstCode = normalized.codePointAt(0) ?? 0;
+    const glyphIsAscii = width === 1 && normalized.length === 1 && firstCode <= 0x7f;
+    this.asciiOnly = this.asciiOnly && glyphIsAscii;
     if ([...normalized].length > 1) {
       this.extras.set(idx, normalized);
       const first = normalized.codePointAt(0) ?? 32;

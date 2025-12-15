@@ -11,7 +11,7 @@
     "lint": "oxlint packages/*",
     "lint:fix": "oxlint packages/* --fix",
     "format": "oxfmt packages/*",
-    "test": "bun test packages/btuin packages/layout-engine packages/reactivity packages/renderer packages/terminal",
+    "test": "bun test packages/btuin packages/layout-engine packages/reactivity packages/renderer packages/terminal packages/showcase",
     "test:watch": "pnpm test --watch",
     "test:all": "bun test packages",
     "profiler": "bun test scripts/profiler*.spec.ts",

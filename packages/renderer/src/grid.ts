@@ -49,6 +49,7 @@ export function cloneBuffer(buf: Buffer2D): Buffer2D {
     copy.fg[i] = buf.fg[i];
     copy.bg[i] = buf.bg[i];
   }
+  copy.copyAsciiStateFrom(buf);
   return copy;
 }
 

@@ -2,5 +2,9 @@
   "name": "showcase",
   "dependencies": {
     "btuin": "workspace:*"
+  },
+  "scripts": {
+    "counter": "BTUIN_EXIT_AFTER_MS=0 bun run counter.ts",
+    "dashboard": "BTUIN_EXIT_AFTER_MS=0 bun run dashboard.ts"
   }
 }

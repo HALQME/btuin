@@ -4,7 +4,13 @@
  * Handles the rendering loop, including buffer management and diff rendering.
  */
 
-import { getGlobalBufferPool, renderDiff, type Buffer2D, type DiffStats } from "@btuin/renderer";
+import {
+  FlatBuffer,
+  getGlobalBufferPool,
+  renderDiff,
+  type Buffer2D,
+  type DiffStats,
+} from "@btuin/renderer";
 import { layout, renderElement } from "../layout";
 import type { ViewElement } from "../view/types/elements";
 import { isBlock } from "../view/types/elements";
@@ -104,7 +110,7 @@ export function createRenderer<State>(config: RenderLoopConfig<State>) {
         prevLayoutSizeKey === layoutSizeKey &&
         !sizeChanged
           ? prevLayoutResult
-          : config.profiler?.measure(frame, "layoutMs", () =>
+          : (config.profiler?.measure(frame, "layoutMs", () =>
               layout(rootElement, {
                 width: state.currentSize.cols,
                 height: state.currentSize.rows,
@@ -113,16 +119,27 @@ export function createRenderer<State>(config: RenderLoopConfig<State>) {
             layout(rootElement, {
               width: state.currentSize.cols,
               height: state.currentSize.rows,
-            });
+            }));
 
       prevRootElement = rootElement;
       prevLayoutResult = layoutResult;
       prevLayoutSizeKey = layoutSizeKey;
 
-      const buf = pool.acquire();
-      config.profiler?.measure(frame, "renderMs", () => {
+      let buf = pool.acquire();
+      if (buf === state.prevBuffer) {
+        // Ensure prev/next buffers differ; diffing the same instance yields no output.
+        buf = pool.acquire();
+        if (buf === state.prevBuffer) {
+          buf = new FlatBuffer(state.currentSize.rows, state.currentSize.cols);
+        }
+      }
+      if (config.profiler && frame) {
+        config.profiler.measure(frame, "renderMs", () => {
+          renderElement(rootElement, buf, layoutResult, 0, 0);
+        });
+      } else {
         renderElement(rootElement, buf, layoutResult, 0, 0);
-      });
+      }
 
       config.profiler?.drawHud(buf);
 
@@ -139,16 +156,27 @@ export function createRenderer<State>(config: RenderLoopConfig<State>) {
           }
         : undefined;
 
+      const prevForDiff = forceFullRedraw
+        ? new FlatBuffer(state.currentSize.rows, state.currentSize.cols)
+        : state.prevBuffer;
+
       const output =
-        config.profiler?.measure(frame, "diffMs", () =>
-          renderDiff(state.prevBuffer, buf, diffStats),
-        ) ?? renderDiff(state.prevBuffer, buf);
+        config.profiler?.measure(frame, "diffMs", () => renderDiff(prevForDiff, buf, diffStats)) ??
+        renderDiff(prevForDiff, buf);
+      const safeOutput =
+        output === ""
+          ? renderDiff(new FlatBuffer(state.currentSize.rows, state.currentSize.cols), buf)
+          : output;
       if (frame && diffStats) {
         config.profiler?.recordDiffStats(frame, diffStats);
       }
-      if (output) {
-        config.profiler?.recordOutput(frame, output);
-        config.profiler?.measure(frame, "writeMs", () => config.write(output));
+      if (safeOutput) {
+        config.profiler?.recordOutput(frame, safeOutput);
+        if (config.profiler && frame) {
+          config.profiler.measure(frame, "writeMs", () => config.write(safeOutput));
+        } else {
+          config.write(safeOutput);
+        }
       }
 
       // Return old prev buffer to the pool and keep the new one

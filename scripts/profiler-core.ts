@@ -128,9 +128,7 @@ export function printSummary(log: ProfilerLog) {
 
   const renderPeaks = summarizeFrames(frames, "renderMs", 3);
   console.log("  render bottlenecks:");
-  renderPeaks.forEach((frame) =>
-    console.log(`   - ${describeFrame(frame)} (render-heavy)`),
-  );
+  renderPeaks.forEach((frame) => console.log(`   - ${describeFrame(frame)} (render-heavy)`));
 
   const layoutPeak = summarizeFrames(frames, "layoutMs", 1)[0];
   if (layoutPeak) {
@@ -154,7 +152,11 @@ export function printSummary(log: ProfilerLog) {
   }
 
   console.log("  takeaways:");
-  console.log("   - Render is responsible for the biggest time slices; look into partial rendering or memoization.");
-  console.log("   - Layout, diff, and write stay low, so efforts should focus on taming render-heavy spikes.");
+  console.log(
+    "   - Render is responsible for the biggest time slices; look into partial rendering or memoization.",
+  );
+  console.log(
+    "   - Layout, diff, and write stay low, so efforts should focus on taming render-heavy spikes.",
+  );
   console.log("-".repeat(60));
 }

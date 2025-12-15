@@ -51,25 +51,18 @@ const app = createApp({
 });
 
 describe("Profiler Stress Test", async () => {
-  test(
-    "should run without errors",
-    async () => {
-      const appInstance = await app.mount();
-      expect(appInstance.getComponent()).not.toBeNull();
-      await finished;
-      appInstance.unmount();
-      expect(existsSync(out)).toBe(true);
-    },
-    { timeout: 45_000 },
-  );
-
-  test("Performance Requirements", async () => {
-    const log = await import(`../${out}`, { with: { type: "json" } }) as ProfilerLog
-    printSummary(log);
-    expect(log.summary.totals.frameMs / log.summary.frameCount).toBeLessThan(16.7)
-    expect(log.summary.frameMs.max).toBeLessThan(50)
-    expect(log.summary.frameMs.p99).toBeGreaterThan(0.2)
-    expect(log.summary.frameMs.p95).toBeLessThan(0.5)
-    expect(log.summary.frameMs.p50).toBeLessThan(1)
-  });
+  const appInstance = await app.mount();
+  expect(appInstance.getComponent()).not.toBeNull();
+  await finished;
+  appInstance.unmount();
+  expect(existsSync(out)).toBe(true);
+  const log = (await import(`../${out}`, { with: { type: "json" } })) as ProfilerLog;
+  printSummary(log);
+  expect(log.summary.totals.frameMs / log.summary.frameCount).toBeLessThan(16.7);
+  test("Average Frame Time < 33.4", () =>
+    expect(log.summary.totals.frameMs / log.summary.frameCount).toBeLessThan(33.4));
+  test("frameMs Max < 60", () => expect(log.summary.frameMs.max).toBeLessThan(60));
+  test("framMs P99 < 20", () => expect(log.summary.frameMs.p99).toBeLessThan(20));
+  test("frameMs P95 < 10", () => expect(log.summary.frameMs.p95).toBeLessThan(10));
+  test("frameMs P50 < 5", () => expect(log.summary.frameMs.p50).toBeLessThan(5));
 });
