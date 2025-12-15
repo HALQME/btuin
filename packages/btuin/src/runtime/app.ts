@@ -1,5 +1,6 @@
 import type { KeyEvent } from "@btuin/terminal";
 import { Block } from "../view/primitives";
+import type { ViewElement } from "../view/types/elements";
 import { initLayoutEngine } from "../layout";
 import {
   defineComponent,
@@ -10,32 +11,47 @@ import {
   type Component,
   type MountedComponent,
 } from "../view/components";
+import {
+  onBeforeUpdate,
+  onKey,
+  onMounted,
+  onTick,
+  onUpdated,
+  onUnmounted,
+} from "../view/components/lifecycle";
 import { effect, stop, type ReactiveEffect } from "@btuin/reactivity";
 import { createRenderer } from "./render-loop";
 import { createErrorHandler, createErrorContext } from "./error-boundary";
-import { createDefaultTerminalAdapter, type TerminalAdapter } from "./terminal-adapter";
-import { createDefaultPlatformAdapter, type PlatformAdapter } from "./platform-adapter";
+import {
+  createDefaultTerminalAdapter,
+  type TerminalAdapter,
+} from "./terminal-adapter";
+import {
+  createDefaultPlatformAdapter,
+  type PlatformAdapter,
+} from "./platform-adapter";
 import { Profiler, type ProfileOptions } from "./profiler";
 
-export interface AppConfig {
+export interface AppConfig<State = AppState> {
   /**
-   * Setup function where component logic is defined.
-   * Returns a render function that produces the view.
-   *
-   * @example
-   * ```typescript
-   * setup() {
-   *   const count = ref(0);
-   *
-   *   onKey((key) => {
-   *     if (key.name === 'up') count.value++;
-   *   });
-   *
-   *   return () => Paragraph({ text: `Count: ${count.value}` });
-   * }
-   * ```
+   * Initialization step for application logic such as refs, subscriptions,
+   * key/tick handlers, and DI wiring. It should return the explicit state that
+   * is later passed to `render`.
    */
-  setup: Component["options"]["setup"];
+  init?: (ctx: AppInitContext) => State;
+
+  /**
+   * Pure rendering function that describes what the UI looks like for a given
+   * application state.
+   */
+  render?: (state: State) => ViewElement;
+
+  /**
+   * Legacy setup entry point that combines init + render into a single function.
+   * This is still supported for backwards compatibility, but `init/render` is
+   * preferred for future-proof apps.
+   */
+  setup?: Component["options"]["setup"];
 
   /**
    * Optional error handler for the app.
@@ -68,6 +84,17 @@ export interface AppConfig {
    */
   profile?: ProfileOptions;
 }
+
+export interface AppInitContext {
+  onKey: typeof onKey;
+  onTick: typeof onTick;
+  onMounted: typeof onMounted;
+  onUnmounted: typeof onUnmounted;
+  onBeforeUpdate: typeof onBeforeUpdate;
+  onUpdated: typeof onUpdated;
+}
+
+export type AppState = Record<string, any>;
 
 export interface AppInstance {
   /**
@@ -110,10 +137,10 @@ export interface MountOptions {
  *
  * @example
  * ```typescript
- * import { createApp, ref, onKey, Paragraph } from 'btuin';
+ * import { createApp, ref, Paragraph } from 'btuin';
  *
  * const app = createApp({
- *   setup() {
+ *   init({ onKey }) {
  *     const count = ref(0);
  *
  *     onKey((key) => {
@@ -121,8 +148,12 @@ export interface MountOptions {
  *       if (key.name === 'q') process.exit(0);
  *     });
  *
- *     return () => Paragraph({
- *       text: `Count: ${count.value}`,
+ *     return { count };
+ *   },
+ *
+ *   render(state) {
+ *     return Paragraph({
+ *       text: `Count: ${state.count.value}`,
  *       align: 'center'
  *     });
  *   }
@@ -134,7 +165,9 @@ export interface MountOptions {
  * @param config - Application configuration
  * @returns App instance
  */
-export function createApp(config: AppConfig): AppInstance {
+export function createApp<State = AppState>(
+  config: AppConfig<State>
+): AppInstance {
   let mounted: MountedComponent | null = null;
   let renderEffect: ReactiveEffect | null = null;
   let isMounted = false;
@@ -143,10 +176,38 @@ export function createApp(config: AppConfig): AppInstance {
   const platform = config.platform ?? createDefaultPlatformAdapter();
   const profiler = new Profiler(config.profile ?? {});
 
+  const appInitContext: AppInitContext = {
+    onKey,
+    onTick,
+    onMounted,
+    onUnmounted,
+    onBeforeUpdate,
+    onUpdated,
+  };
+
   // Convert config to component definition
   const rootComponent = defineComponent({
     name: "App",
-    setup: config.setup,
+    setup(props, context) {
+      const usesNewApi = Boolean(config.init || config.render);
+
+      if (usesNewApi) {
+        if (!config.init || !config.render) {
+          throw new Error(
+            "Both init() and render() must be provided when using the app's new lifecycle."
+          );
+        }
+
+        const state = config.init(appInitContext);
+        return () => config.render!(state);
+      }
+
+      if (config.setup) {
+        return config.setup(props, context);
+      }
+
+      return () => Block();
+    },
   });
 
   const appInstance: AppInstance = {
@@ -187,7 +248,7 @@ export function createApp(config: AppConfig): AppInstance {
               config.onError!(context.error, context.phase);
             }
           : undefined,
-        config.errorLog,
+        config.errorLog
       );
 
       // Buffer key events that may arrive before the app finishes mounting.
@@ -245,7 +306,9 @@ export function createApp(config: AppConfig): AppInstance {
             try {
               handleComponentKey(mounted, event);
             } catch (error) {
-              handleError(createErrorContext("key", error, { keyEvent: event }));
+              handleError(
+                createErrorContext("key", error, { keyEvent: event })
+              );
             }
           }
           // Ensure a render after applying buffered events.

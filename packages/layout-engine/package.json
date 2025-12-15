@@ -1,7 +1,9 @@
 {
   "name": "@btuin/layout-engine",
+  "version": "0.1.0",
   "files": [
-    "pkg"
+    "pkg",
+    "src"
   ],
   "exports": {
     ".": "./src/index.ts"

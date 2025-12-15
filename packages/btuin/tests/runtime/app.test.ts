@@ -53,9 +53,10 @@ describe("createApp", () => {
   it("should create an app instance", () => {
     app = createApp({
       platform,
-      setup() {
-        return () => Block(Text("test"));
+      init() {
+        return {};
       },
+      render: () => Block(Text("test")),
     });
     expect(app).toBeDefined();
     expect(app.mount).toBeInstanceOf(Function);
@@ -64,17 +65,20 @@ describe("createApp", () => {
   });
 
   it("should mount and unmount the app", async () => {
-    let setupCalled = false;
+    let initCalled = false;
     app = createApp({
       platform,
-      setup() {
-        setupCalled = true;
-        return () => Block(Text("test"));
+      init() {
+        initCalled = true;
+        return { ready: true };
+      },
+      render({ ready }) {
+        return Block(Text(String(ready)));
       },
     });
 
     await app.mount();
-    expect(setupCalled).toBe(true);
+    expect(initCalled).toBe(true);
     expect(app.getComponent()).toBeDefined();
 
     app.unmount();
@@ -85,13 +89,16 @@ describe("createApp", () => {
     let keyValue = "";
     app = createApp({
       platform,
-      setup() {
+      init({ onKey }) {
         const key = ref("");
-        terminal.onKey((k) => {
+        onKey((k) => {
           key.value = k.name;
           keyValue = k.name;
         });
-        return () => Block(Text(key.value));
+        return { key };
+      },
+      render({ key }) {
+        return Block(Text(key.value));
       },
     });
 

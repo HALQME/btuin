@@ -1,9 +1,10 @@
-import { createApp, HStack, onKey, ref, Text, VStack, type KeyEvent } from "btuin";
+import { createApp, HStack, ref, Text, VStack } from "btuin";
 
 const app = createApp({
-  setup() {
+  init({ onKey }) {
     const count = ref(0);
-    onKey((key: KeyEvent) => {
+
+    onKey((key) => {
       switch (key.name) {
         case "up":
           count.value++;
@@ -19,17 +20,20 @@ const app = createApp({
       }
     });
 
-    return () =>
-      VStack([
-        Text("Counter"),
-        HStack([Text("Count: "), Text(`${count.value}`).foreground("red")]),
-        Text(count.value.toString()),
-      ])
-        .outline({ color: "blue" })
-        .width("100%")
-        .height("100%")
-        .justify("center")
-        .align("center");
+    return { count };
+  },
+
+  render({ count }) {
+    return VStack([
+      Text("Counter"),
+      HStack([Text("Count: "), Text(`${count.value}`).foreground("red")]),
+      Text(count.value.toString()),
+    ])
+      .outline({ color: "blue" })
+      .width("100%")
+      .height("100%")
+      .justify("center")
+      .align("center");
   },
 });
 

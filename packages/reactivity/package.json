@@ -1,7 +1,15 @@
 {
   "name": "@btuin/reactivity",
+  "version": "0.1.0",
   "type": "module",
   "exports": {
     "default": "./src/index.ts"
-  }
+  },
+  "types": "src/index.ts",
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "src"
+  ]
 }

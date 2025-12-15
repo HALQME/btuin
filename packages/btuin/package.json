@@ -10,10 +10,14 @@
     ".": "./src/index.ts",
     "./types": "./src/types/index.ts"
   },
+  "repository": {
+    "url": "https://github.com/HALQME/btuin"
+  },
+  "license": "Apache-2.0",
   "files": [
     "src",
     "README.md",
-    "LICENSE"
+    "tsconfig.json"
   ],
   "keywords": [
     "tui",

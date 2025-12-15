@@ -7,10 +7,7 @@ import {
   Text,
   createApp,
   computed,
-  onKey,
-  onTick,
   ref,
-  type KeyEvent,
 } from "btuin";
 
 type Page = "Overview" | "Activity" | "Help";
@@ -22,7 +19,9 @@ function pad2(n: number) {
 }
 
 function formatClock(d: Date) {
-  return `${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
+  return `${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(
+    d.getSeconds()
+  )}`;
 }
 
 function clamp(n: number, min: number, max: number) {
@@ -46,7 +45,7 @@ function card(lines: string[], accent: string) {
 }
 
 const app = createApp({
-  setup() {
+  init({ onKey, onTick }) {
     const now = ref(new Date());
     const pageIndex = ref(0);
     const paused = ref(false);
@@ -55,7 +54,9 @@ const app = createApp({
     const termRows = ref<number>(process.stdout.rows ?? 24);
     const termCols = ref<number>(process.stdout.columns ?? 80);
 
-    const page = computed(() => PAGES[clamp(pageIndex.value, 0, PAGES.length - 1)]!);
+    const page = computed(
+      () => PAGES[clamp(pageIndex.value, 0, PAGES.length - 1)]!
+    );
     const clock = computed(() => formatClock(now.value));
     const compact = computed(() => termRows.value < 24 || termCols.value < 80);
 
@@ -89,7 +90,7 @@ const app = createApp({
       }
     }, 50);
 
-    onKey((key: KeyEvent) => {
+    onKey((key) => {
       switch (key.name) {
         case "q":
           process.exit(0);
@@ -102,7 +103,9 @@ const app = createApp({
         case " ":
         case "space":
           paused.value = !paused.value;
-          pushActivity(paused.value ? "Paused activity stream" : "Resumed activity stream");
+          pushActivity(
+            paused.value ? "Paused activity stream" : "Resumed activity stream"
+          );
           return true;
         case "r":
           activity.value = [];
@@ -110,14 +113,43 @@ const app = createApp({
           pushActivity("Reset activity stream");
           return true;
         case "z":
-          // Ensure overlay size uses up-to-date terminal dimensions even before the first tick.
           termRows.value = process.stdout.rows ?? termRows.value;
           termCols.value = process.stdout.columns ?? termCols.value;
           showOverlay.value = !showOverlay.value;
-          pushActivity(showOverlay.value ? "Opened floating overlay" : "Closed floating overlay");
+          pushActivity(
+            showOverlay.value
+              ? "Opened floating overlay"
+              : "Closed floating overlay"
+          );
           return true;
       }
     });
+
+    return {
+      activity,
+      clock,
+      compact,
+      page,
+      pageIndex,
+      paused,
+      showOverlay,
+      termCols,
+      termRows,
+    };
+  },
+
+  render(state) {
+    const {
+      activity,
+      clock,
+      compact,
+      page,
+      pageIndex,
+      paused,
+      showOverlay,
+      termCols,
+      termRows,
+    } = state;
 
     const sidebar = () =>
       VStack([
@@ -151,13 +183,15 @@ const app = createApp({
               `Page: ${page.value}`,
               `Paused: ${paused.value ? "yes" : "no"}`,
             ],
-            "magenta",
+            "magenta"
           ).grow(1),
         ]).gap(2),
         titleBar("Highlights"),
         Text("• Vue-like reactivity (ref/computed/effect)").foreground("gray"),
         Text("• Flexbox-ish layout engine (WASM)").foreground("gray"),
-        ...(compact.value ? [] : [Text("• Floating overlay via ZStack").foreground("gray")]),
+        ...(compact.value
+          ? []
+          : [Text("• Floating overlay via ZStack").foreground("gray")]),
       ])
         .gap(compact.value ? 0 : 1)
         .outline({ style: "single", color: "green" })
@@ -176,7 +210,9 @@ const app = createApp({
       VStack([
         titleBar("Help", clock.value),
         Text("This is a small showcase app for btuin.").foreground("gray"),
-        Text("Try resizing your terminal, then toggle overlay with z.").foreground("gray"),
+        Text(
+          "Try resizing your terminal, then toggle overlay with z."
+        ).foreground("gray"),
       ])
         .gap(1)
         .outline({ style: "single", color: "green" })
@@ -207,7 +243,9 @@ const app = createApp({
       const status = paused.value ? "PAUSED" : "LIVE";
       return HStack([
         Text(`[${status}]`).foreground(paused.value ? "yellow" : "green"),
-        Text("↑/↓ pages  z overlay  space pause  r reset  q quit").foreground("gray"),
+        Text("↑/↓ pages  z overlay  space pause  r reset  q quit").foreground(
+          "gray"
+        ),
       ])
         .gap(1)
         .outline({ style: "single", color: "blue" });
@@ -234,19 +272,29 @@ const app = createApp({
         .justify("flex-start")
         .align("stretch");
 
-      return Block(modal).width("100%").height("100%").justify("center").align("center");
+      return Block(modal)
+        .width("100%")
+        .height("100%")
+        .justify("center")
+        .align("center");
     };
 
     const baseApp = () =>
-      VStack([header(), HStack([sidebar(), main()]).gap(1).align("stretch").grow(1), footer()])
+      VStack([
+        header(),
+        HStack([sidebar(), main()]).gap(1).align("stretch").grow(1),
+        footer(),
+      ])
         .width("100%")
         .justify("flex-start")
         .align("stretch");
 
-    return () =>
-      ZStack([baseApp(), ...(showOverlay.value ? [floatingOverlay()] : [])])
-        .width("100%")
-        .height("100%");
+    return ZStack([
+      baseApp(),
+      ...(showOverlay.value ? [floatingOverlay()] : []),
+    ])
+      .width("100%")
+      .height("100%");
   },
 });
 
