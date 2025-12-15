@@ -74,13 +74,18 @@ function estimateChildLength(
   parentSize?: LayoutContainerSize,
 ): number {
   const style = child.style ?? {};
-  const base = direction === "column" || direction === "column-reverse" ? parentSize?.height ?? 0 : parentSize?.width ?? 0;
-  const dimension = direction === "column" || direction === "column-reverse" ? style.height : style.width;
+  const base =
+    direction === "column" || direction === "column-reverse"
+      ? (parentSize?.height ?? 0)
+      : (parentSize?.width ?? 0);
+  const dimension =
+    direction === "column" || direction === "column-reverse" ? style.height : style.width;
   const resolved = resolveDimension(dimension, base);
   if (typeof resolved === "number") {
     return Math.max(0, resolved);
   }
-  const minDimension = direction === "column" || direction === "column-reverse" ? style.minHeight : style.minWidth;
+  const minDimension =
+    direction === "column" || direction === "column-reverse" ? style.minHeight : style.minWidth;
   const resolvedMin = resolveDimension(minDimension, base);
   if (typeof resolvedMin === "number") {
     return Math.max(0, resolvedMin);
@@ -172,7 +177,12 @@ function viewElementToLayoutNode(
         : parentSize;
 
     const stack = element.style?.stack;
-    const childrenForLayout = applyLayoutBoundaryToBlock(element, element.children, contentSize, stack);
+    const childrenForLayout = applyLayoutBoundaryToBlock(
+      element,
+      element.children,
+      contentSize,
+      stack,
+    );
     if (stack === "z") {
       if (node.position === undefined) node.position = "relative";
       node.children = childrenForLayout.map((child) => {

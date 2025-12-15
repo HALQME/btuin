@@ -115,6 +115,5 @@ describe("layout", () => {
     ]).height(2);
 
     layout(root, { width: 10, height: 2 });
-
   });
 });

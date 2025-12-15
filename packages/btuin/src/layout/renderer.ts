@@ -21,6 +21,16 @@ export function renderElement(
   const absX = layout.x + _parentX;
   const absY = layout.y + _parentY;
   const { width, height } = layout;
+  const MARGIN = 5;
+
+  if (
+    absY >= buffer.rows + MARGIN ||
+    absX >= buffer.cols + MARGIN ||
+    absY + height <= -MARGIN ||
+    absX + width <= -MARGIN
+  ) {
+    return;
+  }
 
   const bg = element.style?.background;
   if (bg !== undefined) {

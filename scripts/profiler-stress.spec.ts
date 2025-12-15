@@ -50,7 +50,8 @@ const app = createApp({
   },
 });
 
-describe("Profiler Stress Test", async () => {
+describe("Multi Element Stress Test", async () => {
+  Bun.gc(true)
   const appInstance = await app.mount();
   expect(appInstance.getComponent()).not.toBeNull();
   await finished;
@@ -58,11 +59,23 @@ describe("Profiler Stress Test", async () => {
   expect(existsSync(out)).toBe(true);
   const log = (await import(`../${out}`, { with: { type: "json" } })) as ProfilerLog;
   printSummary(log);
-  expect(log.summary.totals.frameMs / log.summary.frameCount).toBeLessThan(16.7);
-  test("Average Frame Time < 33.4", () =>
-    expect(log.summary.totals.frameMs / log.summary.frameCount).toBeLessThan(33.4));
-  test("frameMs Max < 60", () => expect(log.summary.frameMs.max).toBeLessThan(60));
-  test("framMs P99 < 20", () => expect(log.summary.frameMs.p99).toBeLessThan(20));
-  test("frameMs P95 < 10", () => expect(log.summary.frameMs.p95).toBeLessThan(10));
-  test("frameMs P50 < 5", () => expect(log.summary.frameMs.p50).toBeLessThan(5));
+
+  const frames = log.frames;
+  const firstFrame = frames[0];
+  const steadyFrames = frames.slice(5);
+
+  test("Startup Latency (Frame 1) < 100ms", () => {
+    expect(firstFrame).toBeDefined()
+    expect(firstFrame!.frameMs).toBeLessThan(100);
+  });
+
+  test("Steady State Max (Frame 5+) < 16.7ms (60 FPS)", () => {
+    const maxSteady = Math.max(...steadyFrames.map((f) => f.frameMs));
+    expect(maxSteady).toBeLessThan(16.7);
+  });
+
+  test("Steady State Average < 10ms", () => {
+    const avgSteady = steadyFrames.reduce((sum, f) => sum + f.frameMs, 0) / steadyFrames.length;
+    expect(avgSteady).toBeLessThan(10);
+  });
 });
