@@ -19,13 +19,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
 
       - name: Install wasm-pack
-        uses: jetli/wasm-pack-action@v4
-        with:
-          version: "latest"
+        run: cargo install wasm-pack
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v1
