@@ -1,7 +1,5 @@
 import type { TerminalAdapter } from "../packages/btuin/src/runtime";
 
-const WARMUP_FRAMES = 5;
-
 type FrameMetrics = {
   id: number;
   time: number;

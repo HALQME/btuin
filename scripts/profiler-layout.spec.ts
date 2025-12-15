@@ -11,11 +11,11 @@ import { createNullTerminalAdapter, printSummary, type ProfilerLog } from "./pro
 //
 // It uses the same harness style as profiler-stress.test.ts (createApp + Profiler JSON output).
 
-const n = 4_000;
-const frames = 120;
-const intervalMs = 16;
-const hud = false;
-const out = `profiles/layout-${Date.now()}.json`;
+const N = 4_000;
+const FRAMES = 120;
+const INTERVAL_MS = 16;
+const HUD = false;
+const OUTPUT_FILE = `${import.meta.dirname}/profiles/layout-${Date.now()}.json`;
 
 const tick = ref(0);
 let resolveFinished: (() => void) | null = null;
@@ -24,7 +24,7 @@ const finished = new Promise<void>((resolve) => {
 });
 
 // Reuse leaf Text nodes to avoid making this purely an allocation benchmark.
-const leaves = Array.from({ length: n }, (_, i) => Text(`item ${i}`).foreground("gray"));
+const leaves = Array.from({ length: N }, (_, i) => Text(`item ${i}`).foreground("gray"));
 
 function buildTree(t: number) {
   const root = Block()
@@ -32,7 +32,7 @@ function buildTree(t: number) {
     .gap(t % 4)
     .padding((t % 3) as 0 | 1 | 2);
 
-  root.add(Text(`layout-change-stress n=${n} tick=${t}`).foreground("cyan"));
+  root.add(Text(`layout-change-stress n=${N} tick=${t}`).foreground("cyan"));
 
   for (let i = 0; i < leaves.length; i++) {
     const leaf = leaves[i]!;
@@ -67,32 +67,32 @@ const app = createApp({
     const timer = setInterval(() => {
       tick.value++;
       produced++;
-      if (produced >= frames) {
+      if (produced >= FRAMES) {
         clearInterval(timer);
         resolveFinished?.();
       }
-    }, intervalMs);
+    }, INTERVAL_MS);
 
     return () => buildTree(tick.value);
   },
   terminal: createNullTerminalAdapter({ rows: 40, cols: 120 }),
   profile: {
     enabled: true,
-    hud,
-    outputFile: out,
-    maxFrames: frames,
+    hud: HUD,
+    outputFile: OUTPUT_FILE,
+    maxFrames: FRAMES,
     nodeCount: true,
   },
 });
 
 describe("Many Layout Change Test", async () => {
-  Bun.gc(true)
+  Bun.gc(true);
   const appInstance = await app.mount();
   expect(appInstance.getComponent()).not.toBeNull();
   await finished;
   appInstance.unmount();
-  expect(existsSync(out)).toBe(true);
-  const log = (await import(`../${out}`, { with: { type: "json" } })) as ProfilerLog;
+  expect(existsSync(OUTPUT_FILE)).toBe(true);
+  const log = (await import(OUTPUT_FILE, { with: { type: "json" } })) as ProfilerLog;
   printSummary(log);
 
   const frames = log.frames;
@@ -100,7 +100,7 @@ describe("Many Layout Change Test", async () => {
   const steadyFrames = frames.slice(5);
 
   test("Startup Latency (Frame 1) < 100ms", () => {
-    expect(firstFrame).toBeDefined()
+    expect(firstFrame).toBeDefined();
     expect(firstFrame!.frameMs).toBeLessThan(100);
   });
 

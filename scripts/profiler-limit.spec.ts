@@ -12,7 +12,7 @@ const STEP_NODES = 100; // Nodes added per frame
 const INTERVAL_MS = 2; // Update interval
 const ITERATIONS = 5; // Number of times to repeat the test
 
-const OUTPUT_FILE = `profiles/limit-${Date.now()}.json`;
+const OUTPUT_FILE = `${import.meta.dirname}/profiles/limit-${Date.now()}.json`;
 
 async function runSingleIteration(iterationIndex: number): Promise<ProfilerLog> {
   const tick = ref(0);
@@ -78,7 +78,7 @@ function calculateStats(values: number[]) {
   const min = Math.min(...values);
   const max = Math.max(...values);
 
-  const squaredDiffs = values.map(v => Math.pow(v - avg, 2));
+  const squaredDiffs = values.map((v) => Math.pow(v - avg, 2));
   const avgSquaredDiff = squaredDiffs.reduce((a, b) => a + b, 0) / values.length;
   const stdDev = Math.sqrt(avgSquaredDiff);
 
@@ -96,12 +96,12 @@ describe("Scalability Limit Test (Statistical)", async () => {
   ];
 
   const results: Record<number, number[]> = {};
-  thresholds.forEach(t => results[t.fps] = []);
+  thresholds.forEach((t) => (results[t.fps] = []));
 
   for (let i = 0; i < ITERATIONS; i++) {
     Bun.stdout.write(`  Run ${i + 1}/${ITERATIONS}... `);
 
-    Bun.gc(true)
+    Bun.gc(true);
 
     const log = await runSingleIteration(i);
 
@@ -116,9 +116,9 @@ describe("Scalability Limit Test (Statistical)", async () => {
     const validFrames = smoothedFrames.slice(5);
 
     for (const t of thresholds) {
-      expect(results[t.fps]).toBeDefined()
+      expect(results[t.fps]).toBeDefined();
       const limitFrame = validFrames.find((f) => f.avgMs > t.ms);
-      const limitNodeCount = limitFrame ? limitFrame.nodeCount : (START_NODES + FRAMES * STEP_NODES);
+      const limitNodeCount = limitFrame ? limitFrame.nodeCount : START_NODES + FRAMES * STEP_NODES;
 
       results[t.fps]!.push(limitNodeCount);
     }
@@ -126,23 +126,24 @@ describe("Scalability Limit Test (Statistical)", async () => {
   }
 
   console.log("\n" + "=".repeat(52));
-  console.log(`      Performance Limits Report ${ITERATIONS} runs`);
+  console.log(`${" ".repeat(10)}Performance Limits Report ${ITERATIONS} runs`);
   console.log("=".repeat(52));
   console.log(`| FPS Target | Avg Nodes |  Min  |  Max  | Std Dev |`);
-  console.log(`|${"-".repeat(12)}|${"-".repeat(11)}|${"-".repeat(7)}|${"-".repeat(7)}|${"-".repeat(9)}|`);
+  console.log(
+    `|${"-".repeat(12)}|${"-".repeat(11)}|${"-".repeat(7)}|${"-".repeat(7)}|${"-".repeat(9)}|`,
+  );
 
   for (const t of thresholds) {
-    expect(results[t.fps]).toBeDefined()
+    expect(results[t.fps]).toBeDefined();
     const stats = calculateStats(results[t.fps]!);
-    // If stats.avg is the max possible nodes, it implies we never hit the limit
-    const note = stats.avg >= (START_NODES + FRAMES * STEP_NODES) ? "+" : "";
+    const note = stats.avg >= START_NODES + FRAMES * STEP_NODES ? "+" : "";
 
     console.log(
       `| ${t.fps.toString().padStart(3)} FPS    | ` +
-      `${(Math.round(stats.avg) + note).toString().padEnd(9)} | ` +
-      `${Math.round(stats.min).toString().padEnd(5)} | ` +
-      `${Math.round(stats.max).toString().padEnd(5)} | ` +
-      `±${Math.round(stats.stdDev).toString().padEnd(6)} |`
+        `${(Math.round(stats.avg) + note).toString().padEnd(9)} | ` +
+        `${Math.round(stats.min).toString().padEnd(5)} | ` +
+        `${Math.round(stats.max).toString().padEnd(5)} | ` +
+        `±${Math.round(stats.stdDev).toString().padEnd(6)} |`,
     );
   }
   console.log("=".repeat(52));
