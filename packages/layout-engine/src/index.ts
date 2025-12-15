@@ -69,6 +69,7 @@ export interface LayoutStyle {
   minHeight?: Dimension;
   maxWidth?: Dimension;
   maxHeight?: Dimension;
+  layoutBoundary?: boolean;
 
   padding?: number | [number, number, number, number];
   margin?: number | [number, number, number, number];

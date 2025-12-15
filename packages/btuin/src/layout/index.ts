@@ -5,7 +5,7 @@ import {
   type ComputedLayout,
   type Dimension,
 } from "@btuin/layout-engine";
-import { isBlock, isText, type ViewElement } from "../view/types/elements";
+import { isBlock, isText, type ViewElement, type BlockView } from "../view/types/elements";
 
 export { renderElement } from "./renderer";
 
@@ -68,6 +68,65 @@ function resolveDimension(dim: unknown, base: number): Dimension | undefined {
   return percentToNumber(dim, base);
 }
 
+function estimateChildLength(
+  child: ViewElement,
+  direction: "row" | "column" | "row-reverse" | "column-reverse",
+  parentSize?: LayoutContainerSize,
+): number {
+  const style = child.style ?? {};
+  const base = direction === "column" || direction === "column-reverse" ? parentSize?.height ?? 0 : parentSize?.width ?? 0;
+  const dimension = direction === "column" || direction === "column-reverse" ? style.height : style.width;
+  const resolved = resolveDimension(dimension, base);
+  if (typeof resolved === "number") {
+    return Math.max(0, resolved);
+  }
+  const minDimension = direction === "column" || direction === "column-reverse" ? style.minHeight : style.minWidth;
+  const resolvedMin = resolveDimension(minDimension, base);
+  if (typeof resolvedMin === "number") {
+    return Math.max(0, resolvedMin);
+  }
+  if (isText(child)) {
+    return direction === "column" || direction === "column-reverse" ? 1 : child.content.length;
+  }
+  return 1;
+}
+
+function applyLayoutBoundaryToBlock(
+  block: BlockView,
+  children: ViewElement[],
+  contentSize?: LayoutContainerSize,
+  stack?: string,
+): ViewElement[] {
+  if (!block.style?.layoutBoundary || stack === "z" || !contentSize) {
+    return children;
+  }
+  const direction = block.style.flexDirection ?? "column";
+  const limit = direction === "column" ? contentSize.height : contentSize.width;
+  if (typeof limit !== "number" || limit <= 0) {
+    return children;
+  }
+
+  const filtered: ViewElement[] = [];
+  let consumed = 0;
+
+  for (const child of children) {
+    const childLength = estimateChildLength(child, direction, contentSize);
+    if (childLength > limit) {
+      break;
+    }
+    if (consumed + childLength > limit) {
+      break;
+    }
+    consumed += childLength;
+    filtered.push(child);
+    if (consumed >= limit) {
+      break;
+    }
+  }
+
+  return filtered;
+}
+
 function viewElementToLayoutNode(
   element: ViewElement,
   parentSize?: LayoutContainerSize,
@@ -113,9 +172,10 @@ function viewElementToLayoutNode(
         : parentSize;
 
     const stack = element.style?.stack;
+    const childrenForLayout = applyLayoutBoundaryToBlock(element, element.children, contentSize, stack);
     if (stack === "z") {
       if (node.position === undefined) node.position = "relative";
-      node.children = element.children.map((child) => {
+      node.children = childrenForLayout.map((child) => {
         const childNode = viewElementToLayoutNode(child, contentSize);
         if (childNode.position === undefined) childNode.position = "absolute";
         if (childNode.type === "block") {
@@ -129,7 +189,7 @@ function viewElementToLayoutNode(
         return childNode;
       });
     } else {
-      node.children = element.children.map((child) => viewElementToLayoutNode(child, contentSize));
+      node.children = childrenForLayout.map((child) => viewElementToLayoutNode(child, contentSize));
     }
   } else if (isText(element)) {
     const textWidth = element.content.length;
