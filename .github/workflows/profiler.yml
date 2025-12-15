@@ -27,12 +27,12 @@ jobs:
       - uses: jetli/wasm-pack-action@v0.4.0
 
       - name: Setup Bun
-        uses: oven-sh/setup-bun@v1
+        uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v2
+        uses: pnpm/action-setup@v4
         with:
           run_install: false
 
@@ -53,7 +53,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build Layout Engine (WASM)
-        run: pnpm --filter @btuin/layout-engine build
+        run: pnpm run build
 
       - name: Run Limit Test
         run: |

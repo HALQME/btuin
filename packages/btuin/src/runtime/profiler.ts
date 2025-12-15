@@ -1,5 +1,6 @@
 import type { Buffer2D } from "@btuin/renderer";
 import path from "node:path";
+import { mkdirSync, writeFileSync } from "node:fs";
 
 export interface ProfileOptions {
   /**
@@ -337,7 +338,7 @@ export class Profiler {
     const dir = path.dirname(this.options.outputFile);
     if (dir && dir !== ".") {
       try {
-        const _ = Bun.$`mkdir -p ${dir}`;
+        mkdirSync(dir, { recursive: true });
       } catch {}
     }
     await Bun.write(this.options.outputFile, output);
@@ -350,9 +351,13 @@ export class Profiler {
     const dir = path.dirname(this.options.outputFile);
     if (dir && dir !== ".") {
       try {
-        const _ = Bun.$`mkdir -p ${dir}`;
+        mkdirSync(dir, { recursive: true });
       } catch {}
     }
-    Bun.write(this.options.outputFile, output).then();
+    try {
+      writeFileSync(this.options.outputFile, output);
+    } catch (error) {
+      console.error("Failed to flush profiler results synchronously:", error);
+    }
   }
 }
