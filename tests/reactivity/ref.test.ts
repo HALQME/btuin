@@ -1,5 +1,15 @@
 import { describe, it, expect } from "bun:test";
-import { customRef, effect, isRef, reactive, ref, shallowRef, toRef, toRefs, unref } from "@/reactivity";
+import {
+  customRef,
+  effect,
+  isRef,
+  reactive,
+  ref,
+  shallowRef,
+  toRef,
+  toRefs,
+  unref,
+} from "@/reactivity";
 
 describe("ref", () => {
   it("should hold a value", () => {

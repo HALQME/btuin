@@ -58,10 +58,9 @@ function normalizeProps(options: PropsOptions | undefined, raw: unknown): Record
 
   for (const [name, defRaw] of Object.entries(options)) {
     const def =
-      typeof defRaw === "function" ? ({ type: defRaw } as const) : (defRaw as Exclude<
-          PropDefinition,
-          Function
-        >);
+      typeof defRaw === "function"
+        ? ({ type: defRaw } as const)
+        : (defRaw as Exclude<PropDefinition, Function>);
 
     const hasValue = Object.prototype.hasOwnProperty.call(rawProps, name);
     let value = hasValue ? rawProps[name] : undefined;
@@ -72,11 +71,23 @@ function normalizeProps(options: PropsOptions | undefined, raw: unknown): Record
       }
     }
 
-    if (def && typeof def === "object" && "required" in def && def.required && value === undefined) {
+    if (
+      def &&
+      typeof def === "object" &&
+      "required" in def &&
+      def.required &&
+      value === undefined
+    ) {
       throw new Error(`Missing required prop: ${name}`);
     }
 
-    if (def && typeof def === "object" && "validator" in def && def.validator && value !== undefined) {
+    if (
+      def &&
+      typeof def === "object" &&
+      "validator" in def &&
+      def.validator &&
+      value !== undefined
+    ) {
       if (!def.validator(value)) {
         throw new Error(`Invalid prop: ${name}`);
       }
@@ -140,7 +151,7 @@ export function mountComponent<State>(
   const maybeOptions = (component as any).options as DefineComponentOptions | undefined;
   const treatSecondArgAsProps =
     runtime === undefined && !!maybeOptions?.props && isPlainRecord(keyOrProps);
-  const mountKey = treatSecondArgAsProps ? Symbol() : keyOrProps ?? Symbol();
+  const mountKey = treatSecondArgAsProps ? Symbol() : (keyOrProps ?? Symbol());
   const rawProps = treatSecondArgAsProps ? keyOrProps : undefined;
 
   const store = getInstanceStore(component);

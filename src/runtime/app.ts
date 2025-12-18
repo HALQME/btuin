@@ -326,7 +326,9 @@ export type AppConfig<State> = {
   render: (state: State) => ViewElement;
 };
 
-function normalizePlatformAdapter(platform?: Partial<PlatformAdapter>): PlatformAdapter | undefined {
+function normalizePlatformAdapter(
+  platform?: Partial<PlatformAdapter>,
+): PlatformAdapter | undefined {
   if (!platform) return undefined;
   return {
     onStdoutResize: (handler) => {

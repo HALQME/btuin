@@ -46,9 +46,8 @@ describe("Raw Mode and Key Handling", () => {
   let resetKeyHandlers: typeof import("@/terminal/raw").resetKeyHandlers;
 
   beforeAll(async () => {
-    ({ setupRawMode, onKey, cleanup, cleanupWithoutClear, resetKeyHandlers } = await import(
-      "@/terminal/raw"
-    ));
+    ({ setupRawMode, onKey, cleanup, cleanupWithoutClear, resetKeyHandlers } =
+      await import("@/terminal/raw"));
   });
 
   beforeEach(() => {

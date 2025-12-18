@@ -6,21 +6,6 @@
   "workspaces": [
     "packages/*"
   ],
-  "scripts": {
-    "start": "bun run",
-    "build": "pnpm --filter @btuin/layout-engine build",
-    "lint": "oxlint",
-    "lint:fix": "oxlint --fix",
-    "format": "oxfmt",
-    "test": "bun test test",
-    "test:watch": "pnpm test --watch",
-    "test:all": "bun test",
-    "profiler": "bun test scripts/profiler*.spec.ts",
-    "profiler:stress": "bun test scripts/profiler-stress.test.ts",
-    "profiler:layout": "bun test scripts/profiler-layout.test.ts",
-    "profiler:limit": "bun test scripts/profiler-limit.spec.ts",
-    "check": "bunx tsc --noEmit"
-  },
   "devDependencies": {
     "@types/bun": "latest",
     "oxfmt": "^0.17.0",
