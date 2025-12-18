@@ -49,11 +49,8 @@ pnpm test
 ### すぐ動くサンプル（showcase）
 
 ```bash
-# 矢印キーでカウント / q で終了
-bun packages/showcase/counter.ts
-
-# ダッシュボード（↑/↓でページ移動 / space で一時停止 / q で終了）
-bun packages/showcase/dashboard.ts
+# ネオン風ダッシュボード（↑/↓で選択 / space でテーマ切替 / a でログ追加 / q で終了）
+bun examples/neon-dashboard.ts
 ```
 
 ### Profiling / Perf Regression
@@ -75,23 +72,24 @@ CI=1 bun run test:perf
 ## 使い方（最小例）
 
 ```ts
-import { createApp, VStack, Text, ref, onKey } from "btuin";
+import { createApp, VStack, Text, ref } from "btuin";
 
 const app = createApp({
-  setup() {
+  init({ onKey }) {
     const count = ref(0);
     onKey((k) => {
       if (k.name === "up") count.value++;
       if (k.name === "down") count.value--;
       if (k.name === "q") process.exit(0);
     });
-
-    return () =>
-      VStack([Text("Counter"), Text(String(count.value))])
-        .width("100%")
-        .height("100%")
-        .justify("center")
-        .align("center");
+    return { count };
+  },
+  render({ count }) {
+    return VStack([Text("Counter"), Text(String(count.value))])
+      .width("100%")
+      .height("100%")
+      .justify("center")
+      .align("center");
   },
 });
 

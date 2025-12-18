@@ -1,7 +1,7 @@
 import { test, describe, expect } from "bun:test";
 import { existsSync } from "node:fs";
 
-import { createApp, ref, Block, Text } from "../packages/btuin";
+import { createApp, ref, Block, Text } from "@/index";
 import { createNullTerminalAdapter, printSummary, type ProfilerLog } from "./profiler-core";
 
 // This test intentionally mutates layout-relevant props every frame to stress:
@@ -62,7 +62,7 @@ function buildTree(t: number) {
 }
 
 const app = createApp({
-  setup() {
+  init() {
     let produced = 0;
     const timer = setInterval(() => {
       tick.value++;
@@ -72,8 +72,10 @@ const app = createApp({
         resolveFinished?.();
       }
     }, INTERVAL_MS);
-
-    return () => buildTree(tick.value);
+    return {};
+  },
+  render() {
+    return buildTree(tick.value);
   },
   terminal: createNullTerminalAdapter({ rows: 40, cols: 120 }),
   profile: {
@@ -87,10 +89,10 @@ const app = createApp({
 
 describe("Many Layout Change Test", async () => {
   Bun.gc(true);
-  const appInstance = await app.mount();
-  expect(appInstance.getComponent()).not.toBeNull();
+  await app.mount();
+  expect(app.getComponent()).not.toBeNull();
   await finished;
-  appInstance.unmount();
+  app.unmount();
   expect(existsSync(OUTPUT_FILE)).toBe(true);
   const log = (await import(OUTPUT_FILE, { with: { type: "json" } })) as ProfilerLog;
   printSummary(log);

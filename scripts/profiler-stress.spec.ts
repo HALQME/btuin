@@ -1,7 +1,7 @@
 import { test, describe, expect } from "bun:test";
 import { existsSync } from "node:fs";
 
-import { createApp, ref, Block, Text, type TerminalAdapter } from "../packages/btuin";
+import { createApp, ref, Block, Text } from "@/index";
 import { createNullTerminalAdapter, printSummary, type ProfilerLog } from "./profiler-core";
 
 const N = 10_000;
@@ -24,7 +24,7 @@ root.add(header);
 for (const item of items) root.add(item);
 
 const app = createApp({
-  setup() {
+  init() {
     let produced = 0;
     const timer = setInterval(() => {
       tick.value++;
@@ -34,11 +34,11 @@ const app = createApp({
         resolveFinished?.();
       }
     }, INTERVAL_MS);
-
-    return () => {
-      header.content = `stress n=${N} tick=${tick.value}`;
-      return root;
-    };
+    return {};
+  },
+  render() {
+    header.content = `stress n=${N} tick=${tick.value}`;
+    return root;
   },
   terminal: createNullTerminalAdapter({ rows: 40, cols: 120 }),
   profile: {
@@ -52,10 +52,10 @@ const app = createApp({
 
 describe("Multi Element Stress Test", async () => {
   Bun.gc(true);
-  const appInstance = await app.mount();
-  expect(appInstance.getComponent()).not.toBeNull();
+  await app.mount();
+  expect(app.getComponent()).not.toBeNull();
   await finished;
-  appInstance.unmount();
+  app.unmount();
   expect(existsSync(OUTPUT_FILE)).toBe(true);
   const log = (await import(OUTPUT_FILE, { with: { type: "json" } })) as ProfilerLog;
   printSummary(log);

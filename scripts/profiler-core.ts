@@ -1,4 +1,4 @@
-import type { TerminalAdapter } from "../packages/btuin/src/runtime";
+import type { TerminalAdapter } from "@/runtime/terminal-adapter";
 
 type FrameMetrics = {
   id: number;
@@ -48,9 +48,13 @@ export function createNullTerminalAdapter(size: { rows: number; cols: number }):
   return {
     setupRawMode() {},
     clearScreen() {},
+    moveCursor() {},
     cleanupWithoutClear() {},
-    patchConsole() {},
+    patchConsole() {
+      return () => {};
+    },
     startCapture() {},
+    stopCapture() {},
     onKey() {},
     getTerminalSize() {
       return size;
