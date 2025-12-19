@@ -195,6 +195,12 @@ class LayoutEngineJS {
     const computedLayout: ComputedLayout = {};
     const resultStride = 5; // js_id, x, y, width, height
 
+    const snap = (value: number): number => {
+      if (!Number.isFinite(value)) return value;
+      const rounded = Math.round(value);
+      return Math.abs(value - rounded) < 1e-4 ? rounded : value;
+    };
+
     for (let i = 0; i < resultsLen; i += resultStride) {
       const jsId = resultsBuffer[i]!;
       const node = flatNodes[jsId];
@@ -203,10 +209,10 @@ class LayoutEngineJS {
       const key = node.key ?? node.identifier;
       if (key) {
         computedLayout[key] = {
-          x: resultsBuffer[i + 1]!,
-          y: resultsBuffer[i + 2]!,
-          width: resultsBuffer[i + 3]!,
-          height: resultsBuffer[i + 4]!,
+          x: snap(resultsBuffer[i + 1]!),
+          y: snap(resultsBuffer[i + 2]!),
+          width: snap(resultsBuffer[i + 3]!),
+          height: snap(resultsBuffer[i + 4]!),
         };
       }
     }
