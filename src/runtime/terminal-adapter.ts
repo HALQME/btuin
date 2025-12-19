@@ -1,5 +1,6 @@
 import type { KeyEvent } from "@/terminal";
 import * as terminal from "@/terminal";
+import type { InputParser } from "@/terminal/parser/types";
 
 export interface TerminalAdapter {
   setupRawMode(): void;
@@ -15,7 +16,17 @@ export interface TerminalAdapter {
   write(output: string): void;
 }
 
-export function createDefaultTerminalAdapter(): TerminalAdapter {
+export interface CreateTerminalAdapterOptions {
+  parser?: InputParser;
+}
+
+export function createDefaultTerminalAdapter(
+  options: CreateTerminalAdapterOptions = {},
+): TerminalAdapter {
+  if (options.parser) {
+    terminal.setInputParser(options.parser);
+  }
+
   return {
     setupRawMode: terminal.setupRawMode,
     clearScreen: terminal.clearScreen,

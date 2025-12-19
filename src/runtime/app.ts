@@ -15,6 +15,7 @@ import { createErrorContext, createErrorHandler } from "./error-boundary";
 import { createDefaultTerminalAdapter, type TerminalAdapter } from "./terminal-adapter";
 import { createDefaultPlatformAdapter, type PlatformAdapter } from "./platform-adapter";
 import { Profiler, type ProfileOptions } from "./profiler";
+import type { InputParser } from "../terminal/parser/types";
 
 export interface App {
   mount(options?: MountOptions): Promise<void>;
@@ -40,6 +41,7 @@ export type CreateAppOptions = {
   terminal?: TerminalAdapter;
   platform?: PlatformAdapter;
   profile?: ProfileOptions;
+  inputParser?: InputParser;
 };
 
 let processHasActiveMount = false;
@@ -319,6 +321,7 @@ export type AppConfig<State> = {
   errorLog?: string;
   onExit?: () => void;
   profile?: ProfileOptions;
+  inputParser?: InputParser;
   init: (ctx: ComponentInitContext) => State;
   render: (state: State) => ViewElement;
 };
@@ -362,6 +365,7 @@ export function app<Init extends (ctx: ComponentInitContext) => any>(
     errorLog: config.errorLog,
     onExit: config.onExit,
     profile: config.profile,
+    inputParser: config.inputParser,
   });
 }
 
