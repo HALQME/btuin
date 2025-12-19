@@ -24,7 +24,7 @@ describe("runtime terminal size propagation", () => {
 
     const computed = layout(root, { width: cols, height: rows });
 
-    expect(computed["root"]?.width).toBe(80);
-    expect(computed["root"]?.height).toBe(24);
+    expect(computed["root"]?.width).toBe(cols);
+    expect(computed["root"]?.height).toBe(rows);
   });
 });

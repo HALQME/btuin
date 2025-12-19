@@ -18,6 +18,33 @@ import { createErrorContext } from "./error-boundary";
 import type { Profiler } from "./profiler";
 import type { ComputedLayout } from "@/layout-engine";
 
+export interface BufferPoolLike {
+  acquire(): Buffer2D;
+  release(buffer: Buffer2D): void;
+}
+
+export interface RenderLoopDeps {
+  FlatBuffer: typeof FlatBuffer;
+  getGlobalBufferPool: (rows: number, cols: number) => BufferPoolLike;
+  renderDiff: (prev: Buffer2D, next: Buffer2D, stats?: DiffStats) => string;
+  layout: (root: ViewElement, containerSize?: { width: number; height: number }) => ComputedLayout;
+  renderElement: (
+    element: ViewElement,
+    buffer: Buffer2D,
+    layoutMap: ComputedLayout,
+    parentX?: number,
+    parentY?: number,
+  ) => void;
+}
+
+const defaultDeps: RenderLoopDeps = {
+  FlatBuffer,
+  getGlobalBufferPool,
+  renderDiff,
+  layout,
+  renderElement,
+};
+
 /**
  * Terminal size configuration
  */
@@ -42,6 +69,8 @@ export interface RenderLoopConfig<State> {
   handleError: (context: import("./error-boundary").ErrorContext) => void;
   /** Optional profiler */
   profiler?: Profiler;
+  /** Optional dependency overrides (avoid `mock.module()` leakage between tests) */
+  deps?: Partial<RenderLoopDeps>;
 }
 
 /**
@@ -59,11 +88,13 @@ interface RenderLoopState {
  * @returns Object containing render function and state getter
  */
 export function createRenderer<State>(config: RenderLoopConfig<State>) {
+  const deps: RenderLoopDeps = { ...defaultDeps, ...(config.deps ?? {}) };
+
   // Initialize with current size
   const initialSize = config.getSize();
 
   // Buffer pool tied to current terminal size
-  let pool = getGlobalBufferPool(initialSize.rows, initialSize.cols);
+  let pool = deps.getGlobalBufferPool(initialSize.rows, initialSize.cols);
 
   let state: RenderLoopState = {
     currentSize: initialSize,
@@ -88,7 +119,7 @@ export function createRenderer<State>(config: RenderLoopConfig<State>) {
       if (sizeChanged || forceFullRedraw) {
         // When size changes, re-create a pool bound to the new dimensions
         state.currentSize = newSize;
-        pool = getGlobalBufferPool(state.currentSize.rows, state.currentSize.cols);
+        pool = deps.getGlobalBufferPool(state.currentSize.rows, state.currentSize.cols);
 
         // Return previous buffer to the old pool (if any) and acquire a fresh one
         pool.release(state.prevBuffer);
@@ -111,12 +142,12 @@ export function createRenderer<State>(config: RenderLoopConfig<State>) {
         !sizeChanged
           ? prevLayoutResult
           : (config.profiler?.measure(frame, "layoutMs", () =>
-              layout(rootElement, {
+              deps.layout(rootElement, {
                 width: state.currentSize.cols,
                 height: state.currentSize.rows,
               }),
             ) ??
-            layout(rootElement, {
+            deps.layout(rootElement, {
               width: state.currentSize.cols,
               height: state.currentSize.rows,
             }));
@@ -130,15 +161,15 @@ export function createRenderer<State>(config: RenderLoopConfig<State>) {
         // Ensure prev/next buffers differ; diffing the same instance yields no output.
         buf = pool.acquire();
         if (buf === state.prevBuffer) {
-          buf = new FlatBuffer(state.currentSize.rows, state.currentSize.cols);
+          buf = new deps.FlatBuffer(state.currentSize.rows, state.currentSize.cols);
         }
       }
       if (config.profiler && frame) {
         config.profiler.measure(frame, "renderMs", () => {
-          renderElement(rootElement, buf, layoutResult, 0, 0);
+          deps.renderElement(rootElement, buf, layoutResult, 0, 0);
         });
       } else {
-        renderElement(rootElement, buf, layoutResult, 0, 0);
+        deps.renderElement(rootElement, buf, layoutResult, 0, 0);
       }
 
       config.profiler?.drawHud(buf);
@@ -157,15 +188,15 @@ export function createRenderer<State>(config: RenderLoopConfig<State>) {
         : undefined;
 
       const prevForDiff = forceFullRedraw
-        ? new FlatBuffer(state.currentSize.rows, state.currentSize.cols)
+        ? new deps.FlatBuffer(state.currentSize.rows, state.currentSize.cols)
         : state.prevBuffer;
 
       const output =
-        config.profiler?.measure(frame, "diffMs", () => renderDiff(prevForDiff, buf, diffStats)) ??
-        renderDiff(prevForDiff, buf);
+        config.profiler?.measure(frame, "diffMs", () => deps.renderDiff(prevForDiff, buf, diffStats)) ??
+        deps.renderDiff(prevForDiff, buf);
       const safeOutput =
         output === ""
-          ? renderDiff(new FlatBuffer(state.currentSize.rows, state.currentSize.cols), buf)
+          ? deps.renderDiff(new deps.FlatBuffer(state.currentSize.rows, state.currentSize.cols), buf)
           : output;
       if (frame && diffStats) {
         config.profiler?.recordDiffStats(frame, diffStats);

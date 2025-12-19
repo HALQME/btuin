@@ -1,14 +1,9 @@
-import { describe, it, expect, mock } from "bun:test";
+import { describe, it, expect } from "bun:test";
 import { createRenderer } from "@/runtime/render-loop";
 import { Block } from "@/view/primitives";
 import { FlatBuffer, type Buffer2D } from "@/renderer";
 
-// Mocks
 const mockLayoutResult = { root: { x: 0, y: 0, width: 80, height: 24 } };
-mock.module("@/layout", () => ({
-  layout: () => mockLayoutResult,
-  renderElement: () => {},
-}));
 
 const mockBufferA: Buffer2D = new FlatBuffer(24, 80);
 const mockBufferB: Buffer2D = new FlatBuffer(24, 80);
@@ -21,11 +16,6 @@ const mockPool = {
   },
   release: () => {},
 };
-mock.module("@/renderer", () => ({
-  FlatBuffer,
-  getGlobalBufferPool: () => mockPool,
-  renderDiff: () => "x",
-}));
 
 describe("createRenderer", () => {
   it("should create a renderer and perform a render cycle", () => {
@@ -37,6 +27,13 @@ describe("createRenderer", () => {
       view: () => Block(),
       getState: () => ({}),
       handleError: (e) => console.error(e),
+      deps: {
+        FlatBuffer,
+        getGlobalBufferPool: () => mockPool,
+        renderDiff: () => "x",
+        layout: () => mockLayoutResult,
+        renderElement: () => {},
+      },
     });
 
     // Initial state
@@ -68,6 +65,13 @@ describe("createRenderer", () => {
       getState: () => ({}),
       handleError: (ctx) => {
         errorCaught = ctx.error as Error;
+      },
+      deps: {
+        FlatBuffer,
+        getGlobalBufferPool: () => mockPool,
+        renderDiff: () => "x",
+        layout: () => mockLayoutResult,
+        renderElement: () => {},
       },
     });
 
