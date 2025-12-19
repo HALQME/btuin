@@ -1,264 +1,247 @@
-import type { LayoutElementShape, ComputedLayout } from "./types";
-import init, {
-  compute_layout,
-  init_layout_engine as wasm_init_layout_engine,
-  remove_nodes,
-  update_nodes,
-} from "./pkg/layout_engine.js";
-import wasm from "./pkg/layout_engine_bg.wasm";
-void wasm;
+import { dlopen, FFIType, suffix, ptr, toArrayBuffer } from "bun:ffi";
+import path from "node:path";
+import type { LayoutInputNode, ComputedLayout, Dimension, LayoutStyle } from "./types";
 
 export * from "./types";
 
-let wasmInitialized = false;
+// --- Data Layout Constants (must match Rust) ---
+// prettier-ignore
+enum StyleProp {
+  Display, PositionType, FlexDirection, FlexWrap,
+  JustifyContent, AlignItems, AlignSelf,
+  FlexGrow, FlexShrink, FlexBasis,
+  Width, Height, MinWidth, MinHeight, MaxWidth, MaxHeight,
+  MarginLeft, MarginRight, MarginTop, MarginBottom,
+  PaddingLeft, PaddingRight, PaddingTop, PaddingBottom,
+  GapRow, GapColumn,
+  ChildrenCount, ChildrenOffset,
+  TotalProps,
+}
+const STYLE_STRIDE = StyleProp.TotalProps;
 
-const layoutState = createLayoutState();
+// --- Helper Functions for Serialization ---
 
-export async function initLayoutEngine() {
-  if (!wasmInitialized) {
-    await init();
-    wasmInitialized = true;
+function dimToFloat(dim: Dimension | undefined): number {
+  if (typeof dim === "number") return dim;
+  return NaN; // Represents 'auto'
+}
+
+function serializeTree(root: LayoutInputNode): {
+  flatNodes: LayoutInputNode[];
+  nodesBuffer: Float32Array;
+  childrenBuffer: Uint32Array;
+} {
+  const flatNodes: LayoutInputNode[] = [];
+  const nodeMap = new Map<LayoutInputNode, number>();
+
+  function traverse(node: LayoutInputNode, idCounter = { count: 0 }) {
+    if (nodeMap.has(node)) return;
+    const id = idCounter.count++;
+    nodeMap.set(node, id);
+    flatNodes[id] = node; // Ensure order by ID
+    if (node.children) {
+      for (const child of node.children) {
+        traverse(child, idCounter);
+      }
+    }
   }
-  wasm_init_layout_engine();
-  layoutState.reset();
+  traverse(root);
+
+  const nodeCount = flatNodes.length;
+  const nodesBuffer = new Float32Array(nodeCount * STYLE_STRIDE);
+  const childrenBufferData: number[] = [];
+
+  for (let i = 0; i < nodeCount; i++) {
+    const node = flatNodes[i];
+    if (!node) continue;
+    const style: LayoutStyle = node;
+    const offset = i * STYLE_STRIDE;
+
+    nodesBuffer[offset + StyleProp.FlexGrow] = style.flexGrow ?? 0;
+    nodesBuffer[offset + StyleProp.FlexShrink] = style.flexShrink ?? 1;
+
+    const flexDirectionMap: Record<string, number> = {
+      row: 0,
+      column: 1,
+      "row-reverse": 2,
+      "column-reverse": 3,
+    };
+    nodesBuffer[offset + StyleProp.FlexDirection] =
+      flexDirectionMap[style.flexDirection ?? "row"] ?? 0;
+
+    const gap = style.gap ?? 0;
+    const gapArr = Array.isArray(gap) ? gap : [gap, gap];
+    nodesBuffer[offset + StyleProp.GapRow] = gapArr[0];
+    nodesBuffer[offset + StyleProp.GapColumn] = gapArr[1];
+
+    const justifyContentMap: Record<string, number> = {
+      "flex-start": 0,
+      "flex-end": 1,
+      center: 2,
+      "space-between": 3,
+      "space-around": 4,
+      "space-evenly": 5,
+    };
+    nodesBuffer[offset + StyleProp.JustifyContent] =
+      justifyContentMap[style.justifyContent ?? "flex-start"] ?? 0;
+
+    const alignItemsMap: Record<string, number> = {
+      "flex-start": 0,
+      "flex-end": 1,
+      center: 2,
+      baseline: 3,
+      stretch: 4,
+    };
+    nodesBuffer[offset + StyleProp.AlignItems] =
+      alignItemsMap[style.alignItems ?? "stretch"] ?? 4;
+
+    const positionTypeMap: Record<string, number> = {
+      relative: 0,
+      absolute: 1,
+    };
+    nodesBuffer[offset + StyleProp.PositionType] =
+      positionTypeMap[style.position ?? "relative"] ?? 0;
+
+    nodesBuffer[offset + StyleProp.Width] = dimToFloat(style.width);
+    nodesBuffer[offset + StyleProp.Height] = dimToFloat(style.height);
+
+    const margin = style.margin ?? 0;
+    const marginArr = Array.isArray(margin) ? margin : [margin, margin, margin, margin];
+    nodesBuffer.set(marginArr, offset + StyleProp.MarginLeft);
+
+    const padding = style.padding ?? 0;
+    const paddingArr = Array.isArray(padding) ? padding : [padding, padding, padding, padding];
+    nodesBuffer.set(paddingArr, offset + StyleProp.PaddingLeft);
+
+    const children = node.children ?? [];
+    nodesBuffer[offset + StyleProp.ChildrenOffset] = childrenBufferData.length;
+    nodesBuffer[offset + StyleProp.ChildrenCount] = children.length;
+    for (const child of children) {
+      const childId = nodeMap.get(child);
+      if (childId === undefined) throw new Error("Child node not found in map.");
+      childrenBufferData.push(childId);
+    }
+  }
+
+  const childrenBuffer = new Uint32Array(childrenBufferData);
+  return { flatNodes, nodesBuffer, childrenBuffer };
 }
 
-// ----------------------------------------------------------------------------
-// Type Definitions
-// ----------------------------------------------------------------------------
+// --- FFI setup ---
 
-export type Dimension = number | string | "auto";
+const libName = "liblayout_engine";
+const libPath = path.join(import.meta.dir, "target", "release", `${libName}.${suffix}`);
 
-export interface LayoutStyle {
-  display?: "flex" | "none";
-  position?: "relative" | "absolute";
+const { symbols } = dlopen(libPath, {
+  create_engine: { args: [], returns: FFIType.ptr },
+  destroy_engine: { args: [FFIType.ptr], returns: FFIType.void },
+  compute_layout_from_buffers: {
+    args: [FFIType.ptr, FFIType.ptr, FFIType.u64, FFIType.ptr, FFIType.u64],
+    returns: FFIType.i32,
+  },
+  get_results_ptr: { args: [FFIType.ptr], returns: FFIType.ptr },
+  get_results_len: { args: [FFIType.ptr], returns: FFIType.u64 },
+});
 
-  width?: Dimension;
-  height?: Dimension;
-  minWidth?: Dimension;
-  minHeight?: Dimension;
-  maxWidth?: Dimension;
-  maxHeight?: Dimension;
-  layoutBoundary?: boolean;
+// --- Memory Management ---
 
-  padding?: number | [number, number, number, number];
-  margin?: number | [number, number, number, number];
+const registry = new FinalizationRegistry((enginePtr: import("bun:ffi").Pointer) => {
+  console.log(`[FFI] Finalizing engine at ${enginePtr}`);
+  symbols.destroy_engine(enginePtr);
+});
 
-  flexDirection?: "row" | "column" | "row-reverse" | "column-reverse";
-  flexWrap?: "nowrap" | "wrap" | "wrap-reverse";
-  flexGrow?: number;
-  flexShrink?: number;
-  flexBasis?: Dimension;
+// --- FFI Wrapper Class ---
 
-  justifyContent?:
-    | "flex-start"
-    | "flex-end"
-    | "center"
-    | "space-between"
-    | "space-around"
-    | "space-evenly";
-  alignItems?: "flex-start" | "flex-end" | "center" | "baseline" | "stretch";
-  alignSelf?: "auto" | "flex-start" | "flex-end" | "center" | "baseline" | "stretch";
+class LayoutEngineJS {
+  private enginePtr: import("bun:ffi").Pointer | null;
 
-  gap?: number | { width?: number; height?: number };
+  constructor() {
+    this.enginePtr = symbols.create_engine();
+    if (!this.enginePtr) throw new Error("Failed to create layout engine.");
+    registry.register(this, this.enginePtr, this);
+  }
+
+  compute(root: LayoutInputNode): ComputedLayout {
+    if (!this.enginePtr) throw new Error("Layout engine has been destroyed.");
+    const { flatNodes, nodesBuffer, childrenBuffer } = serializeTree(root);
+
+    const status = symbols.compute_layout_from_buffers(
+      this.enginePtr,
+      nodesBuffer.length > 0 ? ptr(nodesBuffer) : null,
+      nodesBuffer.length,
+      childrenBuffer.length > 0 ? ptr(childrenBuffer) : null,
+      childrenBuffer.length,
+    );
+
+    if (status !== 0) {
+      throw new Error(`Layout computation failed with status: ${status}`);
+    }
+
+    const resultsPtr = symbols.get_results_ptr(this.enginePtr);
+    const resultsLenU64 = symbols.get_results_len(this.enginePtr);
+    const resultsLen = Number(resultsLenU64);
+    if (!Number.isSafeInteger(resultsLen)) {
+      throw new Error(`Unexpected results length (u64): ${resultsLenU64.toString()}`);
+    }
+
+    if (!resultsPtr || resultsLen === 0) return {};
+
+    const resultsArrayBuffer = toArrayBuffer(
+      resultsPtr,
+      0,
+      resultsLen * Float32Array.BYTES_PER_ELEMENT,
+    );
+    const resultsBuffer = new Float32Array(resultsArrayBuffer);
+
+    const computedLayout: ComputedLayout = {};
+    const resultStride = 5; // js_id, x, y, width, height
+
+    for (let i = 0; i < resultsLen; i += resultStride) {
+      const jsId = resultsBuffer[i]!;
+      const node = flatNodes[jsId];
+      if (!node) continue;
+
+      const key = node.key ?? node.identifier;
+      if (key) {
+        computedLayout[key] = {
+          x: resultsBuffer[i + 1]!,
+          y: resultsBuffer[i + 2]!,
+          width: resultsBuffer[i + 3]!,
+          height: resultsBuffer[i + 4]!,
+        };
+      }
+    }
+
+    return computedLayout;
+  }
+
+  destroy() {
+    if (this.enginePtr) {
+      symbols.destroy_engine(this.enginePtr);
+      registry.unregister(this);
+      this.enginePtr = null;
+    }
+  }
 }
 
-export interface LayoutInputNode extends LayoutElementShape, LayoutStyle {
-  /**
-   * Back-compat alias for `identifier`.
-   * Some callers/tests use `key` as the stable node id.
-   */
-  key?: string;
-  identifier?: string;
-  type: string;
-  measuredSize?: { width: number; height: number };
-  children?: LayoutInputNode[];
-}
+// --- Public API ---
 
-interface BridgeStyle {
-  display?: string;
-  position?: string;
-  width?: Dimension;
-  height?: Dimension;
-  min_width?: Dimension;
-  min_height?: Dimension;
-  max_width?: Dimension;
-  max_height?: Dimension;
-  padding?: number[];
-  margin?: number[];
-  flex_direction?: string;
-  flex_wrap?: string;
-  flex_grow?: number;
-  flex_shrink?: number;
-  flex_basis?: Dimension;
-  justify_content?: string;
-  align_items?: string;
-  align_self?: string;
-  gap?: { width: number; height: number };
-}
+let engineInstance: LayoutEngineJS | null = null;
 
-// ----------------------------------------------------------------------------
-// Implementation
-// ----------------------------------------------------------------------------
+function getEngine(): LayoutEngineJS {
+  if (!engineInstance) {
+    engineInstance = new LayoutEngineJS();
+  }
+  return engineInstance;
+}
 
 export function computeLayout(root: LayoutInputNode): ComputedLayout {
-  if (!wasmInitialized) {
-    throw new Error("Layout engine not initialized. Call initLayoutEngine() first.");
-  }
-  try {
-    return layoutState.compute(root);
-  } catch (cause) {
-    if (cause instanceof Error && /not initialized/i.test(cause.message)) {
-      throw cause;
-    }
-    throw new Error("failed to compute layout", { cause });
-  }
+  return getEngine().compute(root);
 }
 
-interface BridgeNodePayload {
-  key: string;
-  style: BridgeStyle;
-  children: string[];
-  measure?: { width: number; height: number };
-}
-
-function createLayoutState() {
-  let signatures = new Map<string, string>();
-
-  function reset() {
-    signatures = new Map();
+export function cleanupLayoutEngine() {
+  if (engineInstance) {
+    engineInstance.destroy();
+    engineInstance = null;
   }
-
-  function compute(root: LayoutInputNode): ComputedLayout {
-    const nodes: BridgeNodePayload[] = [];
-    flattenBridgeNodes(root, nodes);
-
-    if (nodes.length === 0 || !nodes[0]) {
-      throw new Error("Layout tree must contain at least one node.");
-    }
-
-    const newSignatures = new Map<string, string>();
-    const currentKeys = new Set<string>();
-    const changedNodes: BridgeNodePayload[] = [];
-
-    for (const node of nodes) {
-      const signature = createSignature(node);
-      newSignatures.set(node.key, signature);
-      currentKeys.add(node.key);
-      if (signatures.get(node.key) !== signature) {
-        changedNodes.push(node);
-      }
-    }
-
-    const removedKeys = [...signatures.keys()].filter((key) => !currentKeys.has(key));
-    signatures = newSignatures;
-
-    if (removedKeys.length > 0) {
-      remove_nodes(removedKeys);
-    }
-
-    if (changedNodes.length > 0) {
-      update_nodes(changedNodes);
-    }
-
-    const rootKey = nodes[0].key;
-    const result = compute_layout(rootKey);
-    return normalizeComputedLayout(result);
-  }
-
-  return {
-    reset,
-    compute,
-  };
-}
-
-function normalizeComputedLayout(value: unknown): ComputedLayout {
-  if (!value) return {};
-  const maybeMap = value as { entries?: unknown; get?: unknown };
-  const isMapLike =
-    value instanceof Map ||
-    (typeof maybeMap === "object" &&
-      maybeMap !== null &&
-      typeof maybeMap.entries === "function" &&
-      typeof maybeMap.get === "function");
-
-  if (isMapLike) {
-    const out: ComputedLayout = {};
-    for (const [key, rect] of (value as Map<unknown, unknown>).entries()) {
-      if (typeof key === "string") {
-        out[key] = rect as ComputedLayout[string];
-      }
-    }
-    return out;
-  }
-  return value as ComputedLayout;
-}
-
-function flattenBridgeNodes(node: LayoutInputNode, nodes: BridgeNodePayload[]): string {
-  const key = node.key ?? node.identifier ?? `node-${nodes.length}`;
-  const index = nodes.length;
-  nodes.push({
-    key,
-    style: extractStyle(node),
-    children: [],
-    measure: node.measuredSize,
-  });
-
-  if (node.children && node.children.length > 0) {
-    const childKeys = node.children.map((child) => flattenBridgeNodes(child, nodes));
-    nodes[index]!.children = childKeys;
-  }
-
-  return key;
-}
-
-function createSignature(node: BridgeNodePayload): string {
-  const styleJson = JSON.stringify(node.style);
-  const childrenKey = node.children.join(",");
-  const measureKey = node.measure ? `${node.measure.width}:${node.measure.height}` : "";
-  return `${styleJson}|${childrenKey}|${measureKey}`;
-}
-
-function extractStyle(node: LayoutInputNode): BridgeStyle {
-  const s: BridgeStyle = {};
-
-  if (node.width !== undefined) s.width = node.width;
-  if (node.height !== undefined) s.height = node.height;
-  if (node.minWidth !== undefined) s.min_width = node.minWidth;
-  if (node.minHeight !== undefined) s.min_height = node.minHeight;
-  if (node.maxWidth !== undefined) s.max_width = node.maxWidth;
-  if (node.maxHeight !== undefined) s.max_height = node.maxHeight;
-
-  if (node.display) s.display = node.display;
-  if (node.position) s.position = node.position;
-
-  if (node.padding !== undefined) {
-    s.padding = Array.isArray(node.padding)
-      ? node.padding
-      : [node.padding, node.padding, node.padding, node.padding];
-  }
-  if (node.margin !== undefined) {
-    s.margin = Array.isArray(node.margin)
-      ? node.margin
-      : [node.margin, node.margin, node.margin, node.margin];
-  }
-
-  if (node.flexDirection) s.flex_direction = node.flexDirection;
-  if (node.flexWrap) s.flex_wrap = node.flexWrap;
-  if (node.flexGrow !== undefined) s.flex_grow = node.flexGrow;
-  if (node.flexShrink !== undefined) s.flex_shrink = node.flexShrink;
-  if (node.flexBasis !== undefined) s.flex_basis = node.flexBasis;
-
-  if (node.justifyContent) s.justify_content = node.justifyContent;
-  if (node.alignItems) s.align_items = node.alignItems;
-  if (node.alignSelf) s.align_self = node.alignSelf;
-
-  if (node.gap !== undefined) {
-    s.gap =
-      typeof node.gap === "number"
-        ? { width: node.gap, height: node.gap }
-        : { width: node.gap.width ?? 0, height: node.gap.height ?? 0 };
-  }
-
-  return s;
 }

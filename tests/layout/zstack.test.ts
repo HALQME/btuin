@@ -1,5 +1,5 @@
 import { describe, expect, test, beforeAll } from "bun:test";
-import { layout, initLayoutEngine, renderElement } from "../../src/layout";
+import { layout, renderElement } from "../../src/layout";
 import { ZStack, Text } from "../../src";
 import { createBuffer } from "@/renderer";
 
@@ -15,9 +15,7 @@ function bufferToString(buf: ReturnType<typeof createBuffer>): string {
 }
 
 describe("ZStack", () => {
-  beforeAll(async () => {
-    await initLayoutEngine();
-  });
+  beforeAll(async () => {});
 
   test("should overlay children at the same origin", () => {
     const root = ZStack([Text("Hello"), Text("X")])

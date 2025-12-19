@@ -1,5 +1,4 @@
 import {
-  initLayoutEngine as initWasm,
   computeLayout as computeLayoutWasm,
   type LayoutInputNode,
   type ComputedLayout,
@@ -10,7 +9,6 @@ import { isBlock, isText, type ViewElement, type BlockView } from "../view/types
 export { renderElement } from "./renderer";
 
 export interface LayoutEngine {
-  initLayoutEngine(): Promise<void>;
   computeLayout(root: LayoutInputNode): ComputedLayout;
 }
 
@@ -232,7 +230,6 @@ function viewElementToLayoutNode(
 
 export function createLayout(engine: LayoutEngine = wasmLayoutEngine()) {
   return {
-    initLayoutEngine: () => engine.initLayoutEngine(),
     layout: (root: ViewElement, containerSize?: LayoutContainerSize): ComputedLayout => {
       ensureKeys(root, "root");
       const layoutNode = viewElementToLayoutNode(root, containerSize, true);
@@ -243,9 +240,8 @@ export function createLayout(engine: LayoutEngine = wasmLayoutEngine()) {
 
 function wasmLayoutEngine(): LayoutEngine {
   return {
-    initLayoutEngine: () => initWasm(),
     computeLayout: (root: LayoutInputNode) => computeLayoutWasm(root),
   };
 }
 
-export const { initLayoutEngine, layout } = createLayout();
+export const { layout } = createLayout();

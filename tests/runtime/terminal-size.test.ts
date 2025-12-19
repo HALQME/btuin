@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { getTerminalSize } from "@/terminal";
 import { VStack } from "../../src/view/layout";
 import { Text } from "../../src/view/primitives";
-import { initLayoutEngine, layout } from "../../src/layout";
+import { layout } from "../../src/layout";
 
 describe("runtime terminal size propagation", () => {
   test("getTerminalSize returns usable cols/rows in tests", () => {
@@ -14,7 +14,6 @@ describe("runtime terminal size propagation", () => {
   });
 
   test("layout root 100% resolves to terminal cols/rows", async () => {
-    await initLayoutEngine();
     const { cols, rows } = getTerminalSize();
 
     const root = VStack([Text("Counter"), Text("Count: 0")])

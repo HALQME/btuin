@@ -1,7 +1,6 @@
 import type { KeyEvent } from "../terminal";
 import { effect, stop, type ReactiveEffect } from "../reactivity";
 import type { Component, ComponentInitContext, ExitReason } from "../component";
-import { initLayoutEngine } from "@/layout";
 import { Block } from "@/view/primitives";
 import type { ViewElement } from "@/view/types/elements";
 import {
@@ -78,8 +77,6 @@ export function App<State>(root: Component<State>, options: CreateAppOptions = {
         options.onError ? (context) => options.onError?.(context.error, context.phase) : undefined,
         options.errorLog,
       );
-
-      await initLayoutEngine();
 
       const rows = mountOptions.rows ?? 0;
       const cols = mountOptions.cols ?? 0;

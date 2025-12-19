@@ -1,12 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import { HStack, VStack } from "../../src/view/layout";
 import { Text } from "../../src/view/primitives";
-import { initLayoutEngine, layout } from "../../src/layout/index";
+import { layout } from "../../src/layout/index";
 
 describe("btuin layout centering", () => {
   test("justify:center centers children vertically in a column", async () => {
-    await initLayoutEngine();
-
     const root = VStack([Text("Counter"), Text("Count: 0")])
       .width("100%")
       .height("100%")
@@ -27,8 +25,6 @@ describe("btuin layout centering", () => {
   });
 
   test("blocks shrink to their content when not sized explicitly", async () => {
-    await initLayoutEngine();
-
     const root = VStack([HStack([Text("A"), Text("B")]).gap(1)])
       .width("100%")
       .height(5)

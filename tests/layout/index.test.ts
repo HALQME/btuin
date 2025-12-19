@@ -15,7 +15,6 @@ const mockComputedLayout: ComputedLayout = {
 describe("layout", () => {
   it("should convert ViewElement tree to LayoutInputNode tree and compute layout", () => {
     const { layout } = createLayout({
-      initLayoutEngine: async () => {},
       computeLayout: (node: LayoutInputNode): ComputedLayout => {
         receivedLayoutNode = node;
         return mockComputedLayout;
@@ -46,7 +45,6 @@ describe("layout", () => {
 
   it("should assign keys to elements without them", () => {
     const { layout } = createLayout({
-      initLayoutEngine: async () => {},
       computeLayout: (node: LayoutInputNode): ComputedLayout => {
         receivedLayoutNode = node;
         return mockComputedLayout;
@@ -65,7 +63,6 @@ describe("layout", () => {
 
   it("should resolve root size", () => {
     const { layout } = createLayout({
-      initLayoutEngine: async () => {},
       computeLayout: (node: LayoutInputNode): ComputedLayout => {
         receivedLayoutNode = node;
         return mockComputedLayout;
@@ -81,7 +78,6 @@ describe("layout", () => {
 
   it("should resolve nested percent dimensions", () => {
     const { layout } = createLayout({
-      initLayoutEngine: async () => {},
       computeLayout: (node: LayoutInputNode): ComputedLayout => {
         receivedLayoutNode = node;
         return mockComputedLayout;
@@ -100,7 +96,6 @@ describe("layout", () => {
   it("should trim children that exceed the layout boundary", () => {
     receivedLayoutNode = null;
     const { layout } = createLayout({
-      initLayoutEngine: async () => {},
       computeLayout: (node: LayoutInputNode): ComputedLayout => {
         receivedLayoutNode = node;
         expect(receivedLayoutNode?.children?.length).toBe(2);

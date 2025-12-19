@@ -1,6 +1,6 @@
 import { describe, expect, test, beforeAll } from "bun:test";
 import { renderElement } from "../../src/layout/renderer";
-import { layout, initLayoutEngine } from "../../src/layout";
+import { layout } from "../../src/layout";
 import { Block, Text } from "../../src/view/primitives";
 import { createBuffer, resolveColor, type Buffer2D } from "@/renderer";
 
@@ -18,9 +18,7 @@ function bufferToString(buf: Buffer2D): string {
 }
 
 describe("renderElement", () => {
-  beforeAll(async () => {
-    await initLayoutEngine();
-  });
+  beforeAll(async () => {});
 
   test("should render a simple text element", () => {
     const root = Text({ value: "Hello" }).setKey("root").build();

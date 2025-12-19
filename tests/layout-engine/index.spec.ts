@@ -1,11 +1,7 @@
-import { describe, it, expect, beforeAll } from "bun:test";
-import { initLayoutEngine, computeLayout, type LayoutInputNode } from "@/layout-engine";
+import { describe, it, expect } from "bun:test";
+import { computeLayout, type LayoutInputNode } from "@/layout-engine";
 
 describe("Layout Engine", () => {
-  beforeAll(async () => {
-    await initLayoutEngine();
-  });
-
   it("should compute a simple layout", () => {
     const root: LayoutInputNode = {
       identifier: "root",

@@ -1,4 +1,5 @@
 import type { Rect } from "./geometry";
+export type { Rect };
 
 export interface LayoutElementShape {
   type: string;

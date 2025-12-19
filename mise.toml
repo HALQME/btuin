@@ -1,12 +1,11 @@
 [tools]
 bun="latest"
 pnpm="latest"
-"rust"="latest"
-"cargo:wasm-pack"="latest"
+rust="latest"
 
 [tasks]
 "start"="bun run"
-"build:wasm"="cd ./src/layout-engine && wasm-pack build --target web --out-dir pkg"
+"build:ffi" = "cd src/layout-engine && mise exec -- cargo build --release"
 "lint"="pnpm exec oxlint"
 "lint:fix"="pnpm exec oxlint --fix"
 "format"="pnpm exec oxfmt"
