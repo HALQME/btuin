@@ -41,15 +41,16 @@ describe("createRenderer", () => {
     expect(state.currentSize).toEqual({ rows: 24, cols: 80 });
 
     // Render once
-    renderer.render();
+    renderer.renderOnce();
     state = renderer.getState();
     expect(state.prevBuffer === mockBufferA || state.prevBuffer === mockBufferB).toBe(true);
 
     // Change size and re-render
     size = { rows: 30, cols: 100 };
-    renderer.render(true); // force redraw
+    renderer.renderOnce(true); // force redraw
     state = renderer.getState();
     expect(state.currentSize).toEqual({ rows: 30, cols: 100 });
+    renderer.dispose();
   });
 
   it("should call the error handler on render error", () => {
@@ -75,9 +76,10 @@ describe("createRenderer", () => {
       },
     });
 
-    renderer.render();
+    renderer.renderOnce();
 
     expect(errorCaught).not.toBeNull();
     expect(errorCaught!).toBe(testError);
+    renderer.dispose();
   });
 });

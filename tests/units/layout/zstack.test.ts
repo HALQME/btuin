@@ -1,6 +1,6 @@
 import { describe, expect, test, beforeAll } from "bun:test";
 import { layout, renderElement } from "@/layout";
-import { ZStack, Text } from "../../src";
+import { ZStack, Text } from "@/index";
 import { createBuffer } from "@/renderer";
 
 function bufferToString(buf: ReturnType<typeof createBuffer>): string {

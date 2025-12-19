@@ -1,5 +1,5 @@
 import type { KeyEvent } from "@/terminal";
-import { effect, stop } from "@/reactivity";
+import { stop } from "@/reactivity";
 import { Block } from "@/view/primitives";
 import { handleComponentKey, renderComponent } from "@/view/components";
 import { createRenderer } from "./render-loop";
@@ -58,18 +58,8 @@ export class LoopManager implements ILoopManager {
       profiler: profiler.isEnabled() ? profiler : undefined,
     });
 
-    updaters.renderEffect(
-      effect(() => {
-        if (!state.mounted) return;
-        try {
-          renderer.render();
-        } catch (error) {
-          this.handleError(createErrorContext("render", error));
-        }
-      }),
-    );
-
-    renderer.render(true);
+    renderer.renderOnce(true);
+    updaters.renderEffect(renderer.render());
 
     if (pendingKeyEvents.length && state.mounted) {
       for (const event of pendingKeyEvents.splice(0)) {
@@ -79,7 +69,6 @@ export class LoopManager implements ILoopManager {
           this.handleError(createErrorContext("key", error, { keyEvent: event }));
         }
       }
-      state.renderEffect?.run();
     }
 
     if (rows === 0 || cols === 0) {
@@ -87,7 +76,7 @@ export class LoopManager implements ILoopManager {
         platform.onStdoutResize(() => {
           try {
             terminal.clearScreen();
-            state.renderEffect?.run();
+            renderer.renderOnce(true);
           } catch (error) {
             this.handleError(createErrorContext("resize", error));
           }

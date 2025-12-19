@@ -1,9 +1,4 @@
-/**
- * Render Loop Module
- *
- * Handles the rendering loop, including buffer management and diff rendering.
- */
-
+import { effect, stop, type ReactiveEffect } from "@/reactivity";
 import {
   FlatBuffer,
   getGlobalBufferPool,
@@ -104,13 +99,14 @@ export function createRenderer<State>(config: RenderLoopConfig<State>) {
   let prevRootElement: ViewElement | null = null;
   let prevLayoutResult: ComputedLayout | null = null;
   let prevLayoutSizeKey: string | null = null;
+  let renderEffect: ReactiveEffect | null = null;
 
   /**
    * Performs a render cycle
    *
    * @param forceFullRedraw - Force a full redraw (useful for resize)
    */
-  function render(forceFullRedraw = false): void {
+  function renderOnce(forceFullRedraw = false): void {
     try {
       const newSize = config.getSize();
       const sizeChanged =
@@ -224,6 +220,14 @@ export function createRenderer<State>(config: RenderLoopConfig<State>) {
     }
   }
 
+  function render(): ReactiveEffect {
+    if (renderEffect) {
+      stop(renderEffect);
+    }
+    renderEffect = effect(() => renderOnce(false));
+    return renderEffect;
+  }
+
   /**
    * Gets the current render loop state
    */
@@ -231,8 +235,16 @@ export function createRenderer<State>(config: RenderLoopConfig<State>) {
     return state;
   }
 
+  function dispose() {
+    if (renderEffect) {
+      stop(renderEffect);
+    }
+  }
+
   return {
     render,
+    renderOnce,
+    dispose,
     getState,
   };
 }

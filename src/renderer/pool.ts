@@ -114,13 +114,21 @@ export class BufferPool {
  * Global buffer pool instance for convenience
  */
 let globalPool: BufferPool | null = null;
+let globalPoolIsCustom = false;
 
 /**
  * Gets or creates the global buffer pool with default settings
  */
 export function getGlobalBufferPool(rows: number = 24, cols: number = 80): BufferPool {
+  if (globalPool && !globalPoolIsCustom) {
+    const config = globalPool.getConfig();
+    if (config.rows !== rows || config.cols !== cols) {
+      globalPool = null;
+    }
+  }
   if (!globalPool) {
     globalPool = new BufferPool({ rows, cols });
+    globalPoolIsCustom = false;
   }
   return globalPool;
 }
@@ -130,6 +138,7 @@ export function getGlobalBufferPool(rows: number = 24, cols: number = 80): Buffe
  */
 export function setGlobalBufferPool(pool: BufferPool): void {
   globalPool = pool;
+  globalPoolIsCustom = true;
 }
 
 /**
@@ -137,4 +146,5 @@ export function setGlobalBufferPool(pool: BufferPool): void {
  */
 export function resetGlobalBufferPool(): void {
   globalPool = null;
+  globalPoolIsCustom = false;
 }
