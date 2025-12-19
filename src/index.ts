@@ -2,7 +2,16 @@
  * btuin core entry point
  */
 
-export * from "./component";
+export type {
+  Component,
+  ComponentDefinition,
+  ComponentInitContext,
+  ExitReason,
+  KeyHandler,
+  RuntimeContext,
+  TickHandler,
+} from "./component";
+export { defineComponent } from "./view/components/component";
 export * from "./runtime";
 
 export * from "./view/base";

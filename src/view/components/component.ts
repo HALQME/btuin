@@ -104,7 +104,7 @@ function normalizeProps(options: PropsOptions | undefined, raw: unknown): Record
  * This returns a core `Component` that can be mounted by the runtime,
  * while keeping the original options available for inspection/testing.
  */
-export function btuin<Props extends Record<string, any> = Record<string, any>>(
+export function defineComponent<Props extends Record<string, any> = Record<string, any>>(
   options: DefineComponentOptions<Props>,
 ): Component<{ render: RenderFunction }> & { options: DefineComponentOptions<Props> } {
   return {

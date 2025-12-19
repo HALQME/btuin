@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "bun:test";
 import {
-  btuin,
+  defineComponent,
   isComponent,
   mountComponent,
   unmountComponent,
@@ -14,7 +14,7 @@ import { Block, Text } from "../../../src/view/primitives";
 
 describe("defineComponent", () => {
   it("should define a component", () => {
-    const component = btuin({
+    const component = defineComponent({
       name: "TestComponent",
       setup() {
         return () => Text("Hello");
@@ -26,7 +26,7 @@ describe("defineComponent", () => {
   });
 
   it("should return a render function from setup", () => {
-    const component = btuin({
+    const component = defineComponent({
       setup() {
         return () => Text("Hello");
       },
@@ -44,7 +44,7 @@ describe("defineComponent", () => {
 
 describe("mountComponent", () => {
   it("should mount and unmount a component", () => {
-    const component = btuin({
+    const component = defineComponent({
       setup() {
         return () => Text("Hello");
       },
@@ -62,7 +62,7 @@ describe("mountComponent", () => {
 describe("handleComponentKey", () => {
   it("should handle key events", () => {
     let keyPressed = "";
-    const component = btuin({
+    const component = defineComponent({
       setup() {
         onKey((key) => {
           keyPressed = key.name;
@@ -86,7 +86,7 @@ describe("handleComponentKey", () => {
   it("should traverse view hierarchy and honor stopPropagation", () => {
     const order: string[] = [];
 
-    const component = btuin({
+    const component = defineComponent({
       setup() {
         onKey(() => {
           order.push("component");
@@ -124,7 +124,7 @@ describe("handleComponentKey", () => {
 
 describe("normalizeProps", () => {
   it("should normalize props", () => {
-    const component = btuin({
+    const component = defineComponent({
       props: {
         name: { type: String, required: true },
         age: { type: Number, default: 20 },
