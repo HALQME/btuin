@@ -2,10 +2,10 @@
   "name": "btuin-monorepo",
   "version": "0.1.0",
   "private": true,
-  "type": "module",
   "workspaces": [
     "packages/*"
   ],
+  "type": "module",
   "devDependencies": {
     "@types/bun": "latest"
   },
