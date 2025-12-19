@@ -1,14 +1,6 @@
-import type { KeyEvent } from "@/terminal";
-import { effect } from "@/reactivity";
 import type { Component, ComponentInitContext } from "@/component";
-import { Block } from "@/view/primitives";
 import type { ViewElement } from "@/view/types/elements";
-import {
-  handleComponentKey,
-  mountComponent,
-  renderComponent,
-} from "@/view/components";
-import { createRenderer } from "./render-loop";
+import { mountComponent } from "@/view/components";
 import { createErrorContext, createErrorHandler } from "./error-boundary";
 import { createDefaultTerminalAdapter } from "./terminal-adapter";
 import { createDefaultPlatformAdapter, type PlatformAdapter } from "./platform-adapter";
