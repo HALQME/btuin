@@ -61,6 +61,22 @@ describe("layout", () => {
     expect(child2?.key).toBe("root/block-0/text-0");
   });
 
+  it("should measure text width by display width (CJK)", () => {
+    const { layout } = createLayout({
+      computeLayout: (node: LayoutInputNode): ComputedLayout => {
+        receivedLayoutNode = node;
+        return mockComputedLayout;
+      },
+    });
+
+    const root = Block(Text({ value: "饅饅" }));
+    layout(root, { width: 80, height: 24 });
+
+    const textNode = receivedLayoutNode?.children?.[0];
+    expect(textNode?.type).toBe("text");
+    expect(textNode?.measuredSize).toEqual({ width: 4, height: 1 });
+  });
+
   it("should resolve root size", () => {
     const { layout } = createLayout({
       computeLayout: (node: LayoutInputNode): ComputedLayout => {

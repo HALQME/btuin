@@ -5,6 +5,7 @@ import {
   type Dimension,
 } from "@/layout-engine";
 import { isBlock, isText, type ViewElement, type BlockView } from "@/view/types/elements";
+import { measureTextWidth } from "@/renderer/grapheme";
 
 export { renderElement } from "./renderer";
 
@@ -208,7 +209,7 @@ function viewElementToLayoutNode(
       node.children = childrenForLayout.map((child) => viewElementToLayoutNode(child, contentSize));
     }
   } else if (isText(element)) {
-    const textWidth = element.content.length;
+    const textWidth = measureTextWidth(element.content);
     node.measuredSize = { width: textWidth, height: 1 };
     if (node.width === undefined) node.width = textWidth;
     if (node.height === undefined) node.height = 1;
