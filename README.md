@@ -32,78 +32,67 @@ Bunのパフォーマンスを最大限に活かし、快適な開発体験を�
 
 ## クイックスタート
 
-> **前提**: Bun（`bun` コマンド）がインストール済みであること。
+> **前提**: `mise` がインストール済みであること（このリポジトリは `mise.toml` でツールを管理します）。
 
 ### セットアップ
 
 ```bash
-pnpm install
+mise install
+mise exec -- pnpm install --frozen-lockfile
+
+# Layout Engine (FFI) をビルド（初回/更新時）
+mise run build:ffi
 ```
 
 ### テスト
 
 ```bash
-pnpm test
-```
-
-### すぐ動くサンプル（showcase）
-
-```bash
-# 矢印キーでカウント / q で終了
-bun packages/showcase/counter.ts
-
-# ダッシュボード（↑/↓でページ移動 / space で一時停止 / q で終了）
-bun packages/showcase/dashboard.ts
+mise run test
 ```
 
 ### Profiling / Perf Regression
 
 ```bash
-# 大量要素のストレス（JSON出力、--io=off で stdout を捨てて純粋な計算寄りに）
-bun run profile:stress --n=10000 --frames=120 --io=off --out=profiles/stress.json
+# 大量要素のストレス
+mise run profiler:stress -- --n=10000 --frames=120 --io=off --out=profiles/stress.json
 
-# パフォーマンス予算テスト（将来的にCIで回帰検知に使う想定）
-# 例: まずは計測してから budget を詰めるのがおすすめ
-bun run perf:budget --task=frame --n=10000 --iterations=30 --out=profiles/budget.json
-bun run perf:budget --task=diff --rows=200 --cols=400 --iterations=20 --out=profiles/budget-diff.json
-
-# bun test に載せる場合（CI or BTUIN_PERF=1 のときのみ実行）
-CI=1 bun run test:perf
-# 予算/サイズは env で上書き可能（例: BTUIN_BUDGET_FRAME_P95=120 など）
+# パフォーマンス上限テスト
+mise run profiler:limit
 ```
 
-## 使い方（最小例）
+## 使い方
 
 ```ts
-import { createApp, VStack, Text, ref, onKey } from "btuin";
+import { createApp, VStack, Text, ref } from "btuin";
 
 const app = createApp({
-  setup() {
+  init({ onKey, runtime }) {
     const count = ref(0);
     onKey((k) => {
       if (k.name === "up") count.value++;
       if (k.name === "down") count.value--;
-      if (k.name === "q") process.exit(0);
+      if (k.name === "q") runtime.exit(0);
     });
-
-    return () =>
-      VStack([Text("Counter"), Text(String(count.value))])
-        .width("100%")
-        .height("100%")
-        .justify("center")
-        .align("center");
+    return { count };
+  },
+  render({ count }) {
+    return VStack([Text("Counter"), Text(String(count.value))])
+      .width("100%")
+      .height("100%")
+      .justify("center")
+      .align("center");
   },
 });
 
 await app.mount();
 ```
 
-## 設計メモ（ざっくり）
+## 責務
 
-- `@btuin/reactivity`: `ref/computed/effect/watch` による状態管理
-- `@btuin/layout-engine`: Flexbox ライクなレイアウト（WASM）
-- `@btuin/renderer`: バッファ描画 + 差分レンダリング（`renderDiff` は文字列を返す純粋関数）
-- `@btuin/terminal`: raw mode / 入力 / stdout 書き込み
+- `reactivity`: `ref/computed/effect/watch` による状態管理
+- `layout-engine`: Flexbox ライクなレイアウト（Rust FFI）
+- `renderer`: バッファ描画 + 差分レンダリング（`renderDiff` は文字列を返す純粋関数）
+- `terminal`: raw mode / 入力 / stdout 書き込み
 - `btuin`: それらを束ねる “アプリ実行” と View API
 
 ## アダプタ（テスト/差し替え用）

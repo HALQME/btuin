@@ -1,0 +1,18 @@
+[tools]
+bun="1.3.5"
+pnpm="10.26.0"
+rust="stable"
+
+[tasks]
+"start"="bun run"
+"build:ffi" = "cd src/layout-engine && cargo build --release"
+"lint"="pnpm exec oxlint"
+"lint:fix"="pnpm exec oxlint --fix"
+"format"="pnpm exec oxfmt"
+"check"="bunx tsc --noEmit"
+"test"="bun test"
+"test:watch"="bun test --watch"
+"profiler"="bun test ./scripts/profiler*.spec.ts"
+"profiler:stress"="bun test ./scripts/profiler-stress.spec.ts"
+"profiler:layout"="bun test ./scripts/profiler-layout.spec.ts"
+"profiler:limit"="bun test ./scripts/profiler-limit.spec.ts"

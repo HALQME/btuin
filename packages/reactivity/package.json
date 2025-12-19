@@ -1,7 +1,0 @@
-{
-  "name": "@btuin/reactivity",
-  "type": "module",
-  "exports": {
-    "default": "./src/index.ts"
-  }
-}

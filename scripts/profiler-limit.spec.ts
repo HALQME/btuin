@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
-import { Block, Text, createApp, ref } from "../packages/btuin";
+import { Block, Text, createApp, ref } from "@/index";
 import { createNullTerminalAdapter, type ProfilerLog } from "./profiler-core";
 
 // ----------------------------------------------------------------------------
@@ -22,7 +22,7 @@ async function runSingleIteration(iterationIndex: number): Promise<ProfilerLog> 
   });
 
   const app = createApp({
-    setup() {
+    init() {
       let produced = 0;
       const timer = setInterval(() => {
         tick.value++;
@@ -32,22 +32,23 @@ async function runSingleIteration(iterationIndex: number): Promise<ProfilerLog> 
           resolveFinished?.();
         }
       }, INTERVAL_MS);
+      return {};
+    },
+    render() {
+      const count = START_NODES + tick.value * STEP_NODES;
+      const root = Block().direction("column");
 
-      return () => {
-        const count = START_NODES + tick.value * STEP_NODES;
-        const root = Block().direction("column");
+      const children: ReturnType<typeof Text>[] = [];
+      children.length = count;
+      for (let i = 0; i < count; i++) {
+        children[i] = Text(`item ${i}`).foreground(i % 2 === 0 ? "white" : "gray");
+      }
+      root.children = children;
 
-        const children = new Array(count);
-        for (let i = 0; i < count; i++) {
-          children[i] = Text(`item ${i}`).foreground(i % 2 === 0 ? "white" : "gray");
-        }
-        root.children = children;
-
-        root.children.unshift(
-          Text(`Iter: ${iterationIndex} Frame: ${tick.value} | Nodes: ${count}`).foreground("cyan"),
-        );
-        return root;
-      };
+      root.children.unshift(
+        Text(`Iter: ${iterationIndex} Frame: ${tick.value} | Nodes: ${count}`).foreground("cyan"),
+      );
+      return root;
     },
     terminal: createNullTerminalAdapter({ rows: 40, cols: 120 }),
     profile: {
@@ -58,9 +59,9 @@ async function runSingleIteration(iterationIndex: number): Promise<ProfilerLog> 
     },
   });
 
-  const appInstance = await app.mount();
+  await app.mount();
   await finished;
-  appInstance.unmount();
+  app.unmount();
 
   if (!existsSync(OUTPUT_FILE)) {
     throw new Error(`Profile output file not found: ${OUTPUT_FILE}`);
