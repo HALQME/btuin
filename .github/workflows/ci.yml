@@ -14,50 +14,28 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+      - name: Setup mise
+        uses: jdx/mise-action@v2
         with:
-          toolchain: stable
+          cache: true
 
-      - uses: jetli/wasm-pack-action@v0.4.0
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          run_install: false
-
-      - name: Get pnpm store directory
-        shell: bash
-        run: |
-          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
-
-      - uses: actions/cache@v3
-        name: Setup pnpm cache
-        with:
-          path: ${{ env.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-store-
+      - name: Install toolchains
+        run: mise install
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Build Layout Engine (WASM)
-        run: pnpm run build
+        run: mise exec -- pnpm install --frozen-lockfile
 
       - name: Check Formatting
-        run: pnpm run format --check
+        run: mise run format -- --check .
 
       - name: Lint
-        run: pnpm run lint
+        run: mise run lint -- .
 
       - name: Type Check
-        run: pnpm run check
+        run: mise run check
+
+      - name: Build Layout Engine (FFI)
+        run: mise run build:ffi
 
       - name: Run Tests
-        run: pnpm run test
+        run: mise run test

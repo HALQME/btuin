@@ -1,11 +1,11 @@
 [tools]
 bun="latest"
 pnpm="latest"
-rust="latest"
+rust="stable"
 
 [tasks]
 "start"="bun run"
-"build:ffi" = "cd src/layout-engine && mise exec -- cargo build --release"
+"build:ffi" = "cd src/layout-engine && cargo build --release"
 "lint"="pnpm exec oxlint"
 "lint:fix"="pnpm exec oxlint --fix"
 "format"="pnpm exec oxfmt"
