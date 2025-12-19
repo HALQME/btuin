@@ -92,8 +92,7 @@ function serializeTree(root: LayoutInputNode): {
       baseline: 3,
       stretch: 4,
     };
-    nodesBuffer[offset + StyleProp.AlignItems] =
-      alignItemsMap[style.alignItems ?? "stretch"] ?? 4;
+    nodesBuffer[offset + StyleProp.AlignItems] = alignItemsMap[style.alignItems ?? "stretch"] ?? 4;
 
     const positionTypeMap: Record<string, number> = {
       relative: 0,
