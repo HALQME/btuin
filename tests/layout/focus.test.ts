@@ -1,7 +1,7 @@
 import { describe, it, expect } from "bun:test";
-import { collectFocusTargets } from "../../src/layout/focus";
-import { Block, Text } from "../../src/view/primitives";
-import type { ViewElement } from "../../src/view/types/elements";
+import { collectFocusTargets } from "@/layout/focus";
+import { Block, Text } from "@/view/primitives";
+import type { ViewElement } from "@/view/types/elements";
 import type { ComputedLayout } from "@/layout-engine";
 
 describe("collectFocusTargets", () => {

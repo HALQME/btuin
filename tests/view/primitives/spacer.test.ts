@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { Spacer } from "../../../src/view/primitives";
+import { Spacer } from "@/view/primitives";
 
 describe("Spacer Primitive", () => {
   test("should create an empty BlockElement that grows", () => {

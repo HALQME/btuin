@@ -1,5 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import { BaseView } from "../../src/view/base";
+import { BaseView } from "@/view/base";
 import type { OutlineOptions } from "@/renderer/types";
 
 // A concrete class for testing the abstract BaseView

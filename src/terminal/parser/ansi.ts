@@ -1,4 +1,4 @@
-import type { KeyEvent } from "../types/key-event";
+import type { KeyEvent } from "../types";
 import type { InputParser } from "./types";
 
 /**
@@ -63,18 +63,44 @@ const ESCAPE_SEQUENCES: Record<string, Omit<KeyEvent, "sequence">> = {
  * Control character codes (0x00-0x1F)
  */
 const CTRL_KEY_MAP: Record<number, string> = {
-  0x01: "a", 0x02: "b", 0x03: "c", 0x04: "d", 0x05: "e", 0x06: "f", 0x07: "g",
-  0x08: "h", 0x09: "i", 0x0a: "j", 0x0b: "k", 0x0c: "l", 0x0d: "m", 0x0e: "n",
-  0x0f: "o", 0x10: "p", 0x11: "q", 0x12: "r", 0x13: "s", 0x14: "t", 0x15: "u",
-  0x16: "v", 0x17: "w", 0x18: "x", 0x19: "y", 0x1a: "z",
+  0x01: "a",
+  0x02: "b",
+  0x03: "c",
+  0x04: "d",
+  0x05: "e",
+  0x06: "f",
+  0x07: "g",
+  0x08: "h",
+  0x09: "i",
+  0x0a: "j",
+  0x0b: "k",
+  0x0c: "l",
+  0x0d: "m",
+  0x0e: "n",
+  0x0f: "o",
+  0x10: "p",
+  0x11: "q",
+  0x12: "r",
+  0x13: "s",
+  0x14: "t",
+  0x15: "u",
+  0x16: "v",
+  0x17: "w",
+  0x18: "x",
+  0x19: "y",
+  0x1a: "z",
 };
 
 /**
  * Special single-byte character map
  */
 const SPECIAL_CHARS: Record<string, string> = {
-  " ": "space", "\r": "enter", "\n": "return", "\t": "tab",
-  "\x7f": "backspace", "\x1b": "escape",
+  " ": "space",
+  "\r": "enter",
+  "\n": "return",
+  "\t": "tab",
+  "\x7f": "backspace",
+  "\x1b": "escape",
 };
 
 /**
@@ -112,7 +138,8 @@ export class AnsiInputParser implements InputParser {
       if (char.length === 1) {
         const isUpperLetter = char >= "A" && char <= "Z";
         const isLowerLetter = char >= "a" && char <= "z";
-        const isShiftedSymbol = '!@#$%^&*()_+{}|:"<>?'.includes(char) || (char >= "A" && char <= "Z");
+        const isShiftedSymbol =
+          '!@#$%^&*()_+{}|:"<>?'.includes(char) || (char >= "A" && char <= "Z");
         if (isUpperLetter || (isShiftedSymbol && !isLowerLetter)) {
           shift = true;
         }

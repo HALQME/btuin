@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { getTerminalSize } from "@/terminal";
-import { VStack } from "../../src/view/layout";
-import { Text } from "../../src/view/primitives";
-import { layout } from "../../src/layout";
+import { VStack } from "@/view/layout";
+import { Text } from "@/view/primitives";
+import { layout } from "@/layout";
 
 describe("runtime terminal size propagation", () => {
   test("getTerminalSize returns usable cols/rows in tests", () => {

@@ -3,8 +3,8 @@ import {
   type LayoutInputNode,
   type ComputedLayout,
   type Dimension,
-} from "../layout-engine";
-import { isBlock, isText, type ViewElement, type BlockView } from "../view/types/elements";
+} from "@/layout-engine";
+import { isBlock, isText, type ViewElement, type BlockView } from "@/view/types/elements";
 
 export { renderElement } from "./renderer";
 

@@ -29,7 +29,7 @@ export type ErrorHandler = (context: ErrorContext) => void;
  * @returns Error handling function
  */
 import { createWriteStream } from "fs";
-import { getOriginalStderr } from "../terminal";
+import { getOriginalStderr } from "@/terminal";
 
 // ...
 

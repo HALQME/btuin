@@ -1,6 +1,6 @@
 import { describe, it, expect } from "bun:test";
 import { VStack, HStack } from "../../src/view/layout";
-import { Text } from "../../src/view/primitives";
+import { Text } from "@/view/primitives";
 
 describe("Layout Components", () => {
   describe("VStack", () => {

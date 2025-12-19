@@ -1,7 +1,7 @@
 import { describe, it, expect } from "bun:test";
-import { isBlock, isText } from "../../../src/view/types/elements";
-import type { ViewElement, BlockView, TextView } from "../../../src/view/types/elements";
-import { BaseView } from "../../../src/view/base";
+import { isBlock, isText } from "@/view/types/elements";
+import type { BlockView, TextView } from "@/view/types/elements";
+import { BaseView } from "@/view/base";
 
 // Mock implementations for testing
 class MockBlock extends BaseView implements BlockView {

@@ -1,6 +1,7 @@
 import { describe, it, expect, afterEach, beforeAll } from "bun:test";
-import type { App } from "@/runtime/app";
+import type { App } from "@/runtime/types";
 import { ref } from "@/reactivity";
+import type { KeyEvent } from "@/terminal";
 import { Block, Text } from "@/view/primitives";
 import type { TerminalAdapter } from "@/runtime/terminal-adapter";
 
@@ -93,7 +94,7 @@ describe("createApp", () => {
       platform,
       init({ onKey }) {
         const key = ref("");
-        onKey((k) => {
+        onKey((k: KeyEvent) => {
           key.value = k.name;
           keyValue = k.name;
         });

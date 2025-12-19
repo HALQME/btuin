@@ -1,4 +1,4 @@
-import type {  KeyHandler } from "./types";
+import type { KeyHandler } from "./types";
 import { clearScreen, hideCursor, showCursor } from "./io";
 import { AnsiInputParser } from "./parser/ansi";
 import type { InputParser } from "./parser/types";
@@ -64,7 +64,6 @@ function handleData(chunk: string) {
 export function setInputParser(parser: InputParser) {
   terminalState.setInputParser(parser);
 }
-
 
 /**
  * Enables raw mode for the terminal

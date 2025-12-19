@@ -1,5 +1,5 @@
-import type { KeyEvent } from "../../terminal";
-import type { Component, ComponentInitContext, ExitReason, RuntimeContext } from "../../component";
+import type { KeyEvent } from "@/terminal";
+import type { Component, ComponentInitContext, ExitReason, RuntimeContext } from "@/component";
 import type { ViewElement } from "../types/elements";
 import { isBlock } from "../types/elements";
 import {

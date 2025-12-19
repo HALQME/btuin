@@ -1,5 +1,5 @@
 import { describe, expect, test, beforeAll } from "bun:test";
-import { layout, renderElement } from "../../src/layout";
+import { layout, renderElement } from "@/layout";
 import { ZStack, Text } from "../../src";
 import { createBuffer } from "@/renderer";
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import { Text } from "../../../src/view/primitives/text";
+import { Text } from "@/view/primitives/text";
 
 describe("Text Primitive", () => {
   it("should create a TextElement with the correct content", () => {

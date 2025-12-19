@@ -1,4 +1,4 @@
-import { describe, it, expect, mock, beforeEach } from "bun:test";
+import { describe, it, expect, beforeEach } from "bun:test";
 import { renderDiff } from "@/renderer/diff";
 import { FlatBuffer } from "@/renderer/buffer";
 import type { Buffer2D } from "@/renderer/types";

@@ -1,6 +1,6 @@
-import type { KeyEvent } from "../../terminal";
+import type { KeyEvent } from "@/terminal";
+import type { Rect } from "@/layout-engine";
 import type { ViewElement } from "./elements";
-import type { Rect } from "../../layout-engine";
 
 export interface FocusContext {
   focusables: FocusTarget[];

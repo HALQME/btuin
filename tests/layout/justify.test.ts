@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import { HStack, VStack } from "../../src/view/layout";
-import { Text } from "../../src/view/primitives";
-import { layout } from "../../src/layout/index";
+import { HStack, VStack } from "@/view/layout";
+import { Text } from "@/view/primitives";
+import { layout } from "@/layout/index";
 
 describe("btuin layout centering", () => {
   test("justify:center centers children vertically in a column", async () => {

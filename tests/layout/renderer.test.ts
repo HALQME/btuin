@@ -1,7 +1,7 @@
 import { describe, expect, test, beforeAll } from "bun:test";
-import { renderElement } from "../../src/layout/renderer";
-import { layout } from "../../src/layout";
-import { Block, Text } from "../../src/view/primitives";
+import { renderElement } from "@/layout/renderer";
+import { layout } from "@/layout";
+import { Block, Text } from "@/view/primitives";
 import { createBuffer, resolveColor, type Buffer2D } from "@/renderer";
 
 // Helper to visualize the buffer

@@ -5,7 +5,7 @@
  * These hooks are called during different phases of a component's lifecycle.
  */
 
-import type { KeyEvent } from "../../terminal";
+import type { KeyEvent } from "@/terminal";
 
 export type LifecycleHook = () => void;
 export type KeyEventHook = (event: KeyEvent) => void | boolean;

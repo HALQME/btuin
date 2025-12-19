@@ -1,6 +1,6 @@
-import { type ViewElement, isBlock, isText } from "../view/types/elements";
-import type { ComputedLayout } from "../layout-engine";
-import { type Buffer2D, drawText, fillRect } from "../renderer";
+import { type ViewElement, isBlock, isText } from "@/view/types/elements";
+import type { ComputedLayout } from "@/layout-engine";
+import { type Buffer2D, drawText, fillRect } from "@/renderer";
 
 /**
  * Draw the element tree to the buffer.

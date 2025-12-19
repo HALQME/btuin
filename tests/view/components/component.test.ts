@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "bun:test";
+import { describe, it, expect } from "bun:test";
 import {
   defineComponent,
   isComponent,
@@ -7,10 +7,8 @@ import {
   renderComponent,
   handleComponentKey,
 } from "@/view/components/component";
-import type { Component, RenderFunction } from "@/view/components/component";
-import { onKey } from "../../../src/view/components/lifecycle";
-import { ref } from "@/reactivity";
-import { Block, Text } from "../../../src/view/primitives";
+import { onKey } from "@/view/components/lifecycle";
+import { Block, Text } from "@/view/primitives";
 
 describe("defineComponent", () => {
   it("should define a component", () => {

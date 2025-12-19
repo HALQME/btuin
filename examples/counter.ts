@@ -11,7 +11,7 @@ const app = createApp({
 
     watchEffect(() => {
       setExitOutput(count.value.toString());
-    })
+    });
 
     return { count };
   },
@@ -23,8 +23,8 @@ const app = createApp({
       .align("center");
   },
   profile: {
-    hud: true
-  }
+    hud: true,
+  },
 });
 
 await app.mount();
