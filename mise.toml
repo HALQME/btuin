@@ -1,5 +1,7 @@
 [tools]
 bun="1.3.5"
+"npm:oxfmt" = "latest"
+"npm:oxlint" = "latest"
 pnpm="10.26.0"
 rust="stable"
 
