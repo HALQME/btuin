@@ -88,7 +88,7 @@ interface RenderLoopState {
  * @returns Object containing render function and state getter
  */
 export function createRenderer<State>(config: RenderLoopConfig<State>) {
-  const deps: RenderLoopDeps = { ...defaultDeps, ...(config.deps ?? {}) };
+  const deps: RenderLoopDeps = { ...defaultDeps, ...config.deps };
 
   // Initialize with current size
   const initialSize = config.getSize();
@@ -192,11 +192,15 @@ export function createRenderer<State>(config: RenderLoopConfig<State>) {
         : state.prevBuffer;
 
       const output =
-        config.profiler?.measure(frame, "diffMs", () => deps.renderDiff(prevForDiff, buf, diffStats)) ??
-        deps.renderDiff(prevForDiff, buf);
+        config.profiler?.measure(frame, "diffMs", () =>
+          deps.renderDiff(prevForDiff, buf, diffStats),
+        ) ?? deps.renderDiff(prevForDiff, buf);
       const safeOutput =
         output === ""
-          ? deps.renderDiff(new deps.FlatBuffer(state.currentSize.rows, state.currentSize.cols), buf)
+          ? deps.renderDiff(
+              new deps.FlatBuffer(state.currentSize.rows, state.currentSize.cols),
+              buf,
+            )
           : output;
       if (frame && diffStats) {
         config.profiler?.recordDiffStats(frame, diffStats);
