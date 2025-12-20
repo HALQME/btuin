@@ -10,6 +10,8 @@ permissions:
 
 jobs:
   build-binaries:
+    name: Build Native Binary
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         include:
@@ -22,18 +24,57 @@ jobs:
             artifact_name: liblayout_engine.dylib
             rename_to: liblayout-darwin-arm64.dylib
 
-    uses: ./.github/workflows/build-ffi.yml
-    with:
-      os: ${{ matrix.os }}
-      target: ${{ matrix.target }}
-      artifact_name: ${{ matrix.artifact_name }}
-      rename_to: ${{ matrix.rename_to }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # Rustビルドキャッシュ
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            src/layout-engine/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-${{ hashFiles('src/layout-engine/src/lib.rs') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Setup mise
+        uses: jdx/mise-action@v2
+        with:
+          cache: true
+
+      - name: Install toolchains
+        run: mise install
+
+      - name: Install dependencies
+        run: mise exec -- bun install --frozen-lockfile
+
+      - name: Build Binary
+        run: mise run build:ffi
+
+      - name: Prepare Artifact
+        run: |
+          mkdir -p output
+          cp src/layout-engine/target/release/${{ matrix.rename_to }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: binary-${{ matrix.target }}
+          path: output/*
 
   publish:
     needs: build-binaries
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Setup mise
+        uses: jdx/mise-action@v2
+        with:
+          cache: true
+
+      - name: Install toolchains
+        run: mise install
 
       - name: Install dependencies
         run: mise exec -- bun install --frozen-lockfile
