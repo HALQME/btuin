@@ -1,4 +1,4 @@
-name: Lint & Format & Check
+name: Tests
 
 on:
   push:
@@ -19,6 +19,17 @@ jobs:
         with:
           cache: true
 
+      # Rustビルドキャッシュ
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            src/layout-engine/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-${{ hashFiles('src/layout-engine/src/lib.rs') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
       - name: Setup mise
         uses: jdx/mise-action@v2
         with:
@@ -30,11 +41,8 @@ jobs:
       - name: Install dependencies
         run: mise exec -- bun install --frozen-lockfile
 
-      - name: Check Formatting
-        run: mise run format -- --check .
+      - name: Build Binary
+        run: mise run build:ffi
 
-      - name: Lint
-        run: mise run lint -- .
-
-      - name: Type Check
-        run: mise run check
+      - name: Run Tests
+        run: mise run test
