@@ -5,54 +5,29 @@ on:
     types: [created]
 
 permissions:
-  contents: read
+  contents: write
   id-token: write
 
 jobs:
   build-binaries:
-    name: Build Native Binary
-    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         include:
-          # Linux x64
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             artifact_name: liblayout_engine.so
             rename_to: liblayout-linux-x64.so
-
-          # macOS ARM64
           - os: macos-latest
             target: aarch64-apple-darwin
             artifact_name: liblayout_engine.dylib
             rename_to: liblayout-darwin-arm64.dylib
 
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup mise
-        uses: jdx/mise-action@v2
-        with:
-          cache: true
-
-      - name: Install toolchains
-        run: mise install
-
-      - name: Install dependencies
-        run: mise exec -- pnpm install --frozen-lockfile
-
-      - name: Build Binary
-        run: mise run build:ffi
-
-      - name: Prepare Artifact
-        run: |
-          mkdir -p output
-          cp src/layout-engine/target/release/${{ matrix.artifact_name }} output/${{ matrix.rename_to }}
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: binary-${{ matrix.target }}
-          path: output/*
+    uses: ./.github/workflows/build-ffi.yml
+    with:
+      os: ${{ matrix.os }}
+      target: ${{ matrix.target }}
+      artifact_name: ${{ matrix.artifact_name }}
+      rename_to: ${{ matrix.rename_to }}
 
   publish:
     needs: build-binaries
@@ -60,16 +35,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup mise
-        uses: jdx/mise-action@v2
-        with:
-          cache: true
-
-      - name: Install toolchains
-        run: mise install
-
       - name: Install dependencies
-        run: mise exec -- pnpm install --frozen-lockfile
+        run: mise exec -- bun install --frozen-lockfile
 
       - name: Download all binaries
         uses: actions/download-artifact@v4
@@ -80,9 +47,16 @@ jobs:
 
       - name: Organize binaries
         run: |
-          mkdir -p native
+          mkdir -p src/layout-engine/native
           mv native-temp/* src/layout-engine/native/
-          ls -R src/layout-engine/native/ # デバッグ用：ファイル構成確認
+          ls -R src/layout-engine/native/
+
+      - name: Upload binaries to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: src/layout-engine/native/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # # npmへの公開
       # - name: Publish to NPM
