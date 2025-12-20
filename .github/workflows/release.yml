@@ -19,7 +19,7 @@ jobs:
             target: x86_64-unknown-linux-gnu
             artifact_name: liblayout_engine.so
             rename_to: liblayout-linux-x64.so
-          - os: macos-latest
+          - os: macos-14
             target: aarch64-apple-darwin
             artifact_name: liblayout_engine.dylib
             rename_to: liblayout-darwin-arm64.dylib
@@ -55,7 +55,7 @@ jobs:
       - name: Prepare Artifact
         run: |
           mkdir -p output
-          cp src/layout-engine/target/release/${{ matrix.rename_to }}
+          cp "src/layout-engine/target/release/${{ matrix.artifact_name }}" "output/${{ matrix.rename_to }}"
 
       - uses: actions/upload-artifact@v4
         with:
