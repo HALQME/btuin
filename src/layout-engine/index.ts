@@ -1,6 +1,7 @@
 import { dlopen, FFIType, suffix, ptr, toArrayBuffer } from "bun:ffi";
 import path from "node:path";
 import type { LayoutInputNode, ComputedLayout, Dimension, LayoutStyle } from "./types";
+import { existsSync } from "node:fs";
 
 export * from "./types";
 
@@ -129,9 +130,27 @@ function serializeTree(root: LayoutInputNode): {
 // --- FFI setup ---
 
 const libName = "liblayout_engine";
-const libPath = path.join(import.meta.dir, "target", "release", `${libName}.${suffix}`);
+const libPath = () => {
+  let devpath = path.join(import.meta.dir, "target", "release", `${libName}.${suffix}`);
+  if (existsSync(devpath)) {
+    return devpath;
+  }
+  const platform = process.platform;
+  const arch = process.arch;
+  const binName = `liblayout_engine-${platform}-${arch}.${suffix}`;
+  const libPath = path.join(import.meta.dir, "native", binName);
 
-const { symbols } = dlopen(libPath, {
+  if (!existsSync(libPath))
+    throw new Error(`
+        [btuin] Native binary not found at: ${libPath}
+        Platform: ${platform}, Arch: ${arch}
+        Please ensure the package is installed correctly.
+      `);
+
+  return libPath;
+};
+
+const { symbols } = dlopen(libPath(), {
   create_engine: { args: [], returns: FFIType.ptr },
   destroy_engine: { args: [FFIType.ptr], returns: FFIType.void },
   compute_layout_from_buffers: {

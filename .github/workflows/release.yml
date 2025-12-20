@@ -79,8 +79,8 @@ jobs:
       - name: Organize binaries
         run: |
           mkdir -p native
-          mv native-temp/* native/
-          ls -R native/ # デバッグ用：ファイル構成確認
+          mv native-temp/* src/layout-engine/native/
+          ls -R src/layout-engine/native/ # デバッグ用：ファイル構成確認
 
       # # npmへの公開
       # - name: Publish to NPM
