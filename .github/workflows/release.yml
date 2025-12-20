@@ -27,12 +27,6 @@ jobs:
             artifact_name: liblayout_engine.dylib
             rename_to: liblayout-darwin-arm64.dylib
 
-          # macOS Intel
-          - os: macos-13
-            target: x86_64-apple-darwin
-            artifact_name: liblayout_engine.dylib
-            rename_to: liblayout-darwin-x64.dylib
-
     steps:
       - uses: actions/checkout@v4
 
@@ -53,7 +47,7 @@ jobs:
       - name: Prepare Artifact
         run: |
           mkdir -p output
-          cp src/layout-engine/target/${{ matrix.target }}/release/${{ matrix.artifact_name }} output/${{ matrix.rename_to }}
+          cp src/layout-engine/target/release/${{ matrix.artifact_name }} output/${{ matrix.rename_to }}
 
       - uses: actions/upload-artifact@v4
         with:
