@@ -20,7 +20,10 @@ export const counterAppConfig: Parameters<typeof createApp>[0] = {
     return { count };
   },
   render({ count }) {
-    return VStack([Text("Counter"), Text(String(count.value))])
+    return VStack([
+      Text("Counter"), //
+      Text(String(count.value)),
+    ])
       .width("100%")
       .height("100%")
       .justify("center")

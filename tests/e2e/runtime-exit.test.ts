@@ -1,7 +1,7 @@
 import { describe, it, expect } from "bun:test";
 import { createApp } from "@/index";
-import { Block, Text } from "@/view/primitives";
-import { sanitizeAnsi } from "@/sanitize";
+import { Block, Text } from "@/view";
+import { sanitizeAnsi } from "@/renderer";
 import { createMockPlatform, createMockTerminal } from "./helpers";
 
 describe("Runtime exit integration", () => {

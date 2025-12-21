@@ -1,6 +1,6 @@
 import { describe, expect, test, beforeAll } from "bun:test";
 import { layout, renderElement } from "@/layout";
-import { ZStack, Text } from "@/index";
+import { Text, ZStack } from "@/index";
 import { createBuffer } from "@/renderer";
 
 function bufferToString(buf: ReturnType<typeof createBuffer>): string {
@@ -18,7 +18,10 @@ describe("ZStack", () => {
   beforeAll(async () => {});
 
   test("should overlay children at the same origin", () => {
-    const root = ZStack([Text("Hello"), Text("X")])
+    const root = ZStack([
+      Text("Hello"), //
+      Text("X"),
+    ])
       .setKey("root")
       .width(5)
       .height(1)

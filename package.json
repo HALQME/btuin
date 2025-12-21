@@ -1,14 +1,33 @@
 {
   "name": "btuin",
-  "version": "0.1.0",
+  "version": "0.1.0-alpha.1",
   "private": false,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/HALQME/btuin.git"
+  },
   "files": [
-    "native",
     "README.md",
     "src",
     "tsconfig.json"
   ],
   "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./components": "./src/components/index.ts",
+    "./layout": "./src/layout/index.ts",
+    "./layout-engine": "./src/layout-engine/index.ts",
+    "./reactivity": "./src/reactivity/index.ts",
+    "./renderer": "./src/renderer/index.ts",
+    "./runtime": "./src/runtime/index.ts",
+    "./terminal": "./src/terminal/index.ts",
+    "./types": "./src/types/index.ts",
+    "./view": "./src/view/index.ts"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "devDependencies": {
     "@types/bun": "^1.3.5"
   },

@@ -1,5 +1,5 @@
-import type { KeyEvent } from "./terminal";
-import type { ViewElement } from "./view/types/elements";
+import type { KeyEvent } from "@/terminal";
+import type { ViewElement } from "@/view/types/elements";
 
 export type KeyHandler = (key: KeyEvent) => void | boolean;
 export type TickHandler = () => void;
@@ -44,14 +44,14 @@ export type ComponentDefinition<State> = {
 type AssertSync<T> = T extends PromiseLike<any> ? never : T;
 
 /**
- * Defines a reusable UI Component.
+ * Defines a reusable core Component.
  *
  * This only defines a component. Nothing is executed until a Runtime mounts it.
  */
-export function defineComponent(
+export function createComponent(
   definition: Omit<ComponentDefinition<void>, "init"> & { init?: undefined },
 ): Component<void>;
-export function defineComponent<Init extends (ctx: ComponentInitContext) => any>(
+export function createComponent<Init extends (ctx: ComponentInitContext) => any>(
   definition: AssertSync<ReturnType<Init>> extends never
     ? never
     : {
@@ -59,7 +59,7 @@ export function defineComponent<Init extends (ctx: ComponentInitContext) => any>
         render: (state: ReturnType<Init>) => ViewElement;
       },
 ): Component<ReturnType<Init>>;
-export function defineComponent<State>(definition: ComponentDefinition<State>): Component<State> {
+export function createComponent<State>(definition: ComponentDefinition<State>): Component<State> {
   return {
     __type: "Component",
     init: definition.init,

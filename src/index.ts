@@ -2,6 +2,21 @@
  * btuin core entry point
  */
 
+export { createApp, App } from "./runtime/app";
+export { defineComponent } from "./components/component";
+export * from "./view";
+
+export {
+  onBeforeUpdate,
+  onKey,
+  onMounted,
+  onTick,
+  onUnmounted,
+  onUpdated,
+} from "./components/lifecycle";
+
+export * from "./reactivity";
+
 export type {
   Component,
   ComponentDefinition,
@@ -10,19 +25,6 @@ export type {
   KeyHandler,
   RuntimeContext,
   TickHandler,
-} from "./component";
-export { defineComponent } from "./view/components/component";
-export * from "./runtime";
-
-export * from "./view/base";
-export * from "./view/layout";
-export * from "./view/primitives";
-export * from "./layout";
-export * from "./renderer";
-export * from "./grapheme";
-
-export * from "./reactivity";
-
-export * from "./types";
-
+} from "./components/core";
+export type { App as AppType, CreateAppOptions, MountOptions } from "./runtime/types";
 export type { KeyEvent } from "./terminal";

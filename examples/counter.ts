@@ -1,4 +1,5 @@
-import { createApp, VStack, Text, ref, watchEffect } from "../src/index";
+import { createApp, ref, watchEffect } from "@/index";
+import { Text, VStack } from "@/view";
 
 const app = createApp({
   init({ onKey, setExitOutput, runtime }) {
@@ -16,14 +17,14 @@ const app = createApp({
     return { count };
   },
   render({ count }) {
-    return VStack([Text("Counter"), Text(String(count.value))])
+    return VStack([
+      Text("Counter"), //
+      Text(String(count.value)),
+    ])
       .width("100%")
       .height("100%")
       .justify("center")
       .align("center");
-  },
-  profile: {
-    hud: true,
   },
 });
 

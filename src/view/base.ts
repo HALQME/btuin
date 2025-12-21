@@ -1,4 +1,4 @@
-import type { KeyEventHook } from "./components/lifecycle";
+import type { KeyEventHook } from "@/components/lifecycle";
 import type { KeyEvent } from "@/terminal";
 import type { OutlineOptions } from "@/renderer";
 import type { Dimension, LayoutStyle } from "@/layout-engine";

@@ -1,5 +1,5 @@
-import type { ExitReason } from "@/component";
-import { unmountComponent } from "@/view/components";
+import type { ExitReason } from "@/components/core";
+import { unmountComponent } from "@/components";
 import type { AppContext } from "./context";
 
 export class LifecycleManager {

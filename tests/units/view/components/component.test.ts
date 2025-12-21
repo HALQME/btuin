@@ -6,8 +6,8 @@ import {
   unmountComponent,
   renderComponent,
   handleComponentKey,
-} from "@/view/components/component";
-import { onKey } from "@/view/components/lifecycle";
+} from "@/components/component";
+import { onKey } from "@/components/lifecycle";
 import { Block, Text } from "@/view/primitives";
 
 describe("defineComponent", () => {

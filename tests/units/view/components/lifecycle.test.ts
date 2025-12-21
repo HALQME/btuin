@@ -13,7 +13,7 @@ import {
   stopTickTimers,
   unmountInstance,
   type ComponentInstance,
-} from "@/view/components/lifecycle";
+} from "@/components/lifecycle";
 
 describe("Component Lifecycle", () => {
   let instance: ComponentInstance;

@@ -63,7 +63,7 @@ mise run profiler:limit
 ## 使い方
 
 ```ts
-import { createApp, VStack, Text, ref } from "btuin";
+import { createApp, ref, ui } from "btuin";
 
 const app = createApp({
   init({ onKey, runtime }) {
@@ -76,7 +76,8 @@ const app = createApp({
     return { count };
   },
   render({ count }) {
-    return VStack([Text("Counter"), Text(String(count.value))])
+    return ui
+      .VStack([ui.Text("Counter"), ui.Text(String(count.value))])
       .width("100%")
       .height("100%")
       .justify("center")

@@ -1,0 +1,8 @@
+src/layout-engine/target/
+.github/
+.vscode/
+.zed/
+.kiro/
+node_modules/
+scripts/
+test/

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from "bun:test";
 import { counterAppConfig } from "./counter";
-import { sanitizeAnsi } from "@/sanitize";
+import { sanitizeAnsi } from "@/renderer";
 import { createApp } from "@/index";
 import { createMockPlatform, createMockTerminal } from "./helpers";
 

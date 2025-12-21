@@ -1,6 +1,6 @@
 import type { ReactiveEffect } from "@/reactivity";
-import type { ExitReason } from "@/component";
-import type { MountedComponent } from "@/view/components";
+import type { ExitReason } from "@/components/core";
+import type { MountedComponent } from "@/components";
 import type { TerminalAdapter } from "./terminal-adapter";
 import type { PlatformAdapter } from "./platform-adapter";
 import type { Profiler } from "./profiler";

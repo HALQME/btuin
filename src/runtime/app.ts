@@ -1,6 +1,6 @@
-import type { Component, ComponentInitContext } from "@/component";
+import type { Component, ComponentInitContext } from "@/components/core";
 import type { ViewElement } from "@/view/types/elements";
-import { mountComponent } from "@/view/components";
+import { mountComponent } from "@/components";
 import { createErrorContext, createErrorHandler } from "./error-boundary";
 import { createDefaultTerminalAdapter } from "./terminal-adapter";
 import { createDefaultPlatformAdapter, type PlatformAdapter } from "./platform-adapter";

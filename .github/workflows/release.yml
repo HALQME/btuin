@@ -18,11 +18,11 @@ jobs:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             artifact_name: liblayout_engine.so
-            rename_to: liblayout-linux-x64.so
+            rename_to: liblayout_engine-linux-x64.so
           - os: macos-14
             target: aarch64-apple-darwin
             artifact_name: liblayout_engine.dylib
-            rename_to: liblayout-darwin-arm64.dylib
+            rename_to: liblayout_engine-darwin-arm64.dylib
 
     steps:
       - uses: actions/checkout@v4
@@ -92,10 +92,19 @@ jobs:
           mv native-temp/* src/layout-engine/native/
           ls -R src/layout-engine/native/
 
-      - name: Upload binaries to GitHub Release
+      - name: Create distributable package tarball
+        run: |
+          rm -rf dist
+          mkdir -p dist/package
+          cp package.json README.md tsconfig.json dist/package/
+          rsync -a --exclude 'layout-engine/target' src/ dist/package/src/
+          tar -czf "dist/btuin-${{ github.event.release.tag_name }}.tgz" -C dist package
+          ls -la dist
+
+      - name: Upload package to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: src/layout-engine/native/*
+          files: dist/*.tgz
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

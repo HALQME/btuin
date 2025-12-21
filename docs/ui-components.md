@@ -41,11 +41,7 @@ VStack([
 ```typescript
 import { HStack, Text } from "btuin";
 
-HStack([
-  Text("Left"),
-  Text("Center"),
-  Text("Right"),
-]);
+HStack([Text("Left"), Text("Center"), Text("Right")]);
 ```
 
 ### `ZStack(children: ViewElement[])`
@@ -55,10 +51,7 @@ HStack([
 ```typescript
 import { ZStack, Text } from "btuin";
 
-ZStack([
-  Text("背景のテキスト"),
-  Text("前面のテキスト").color("red"),
-]);
+ZStack([Text("背景のテキスト"), Text("前面のテキスト").color("red")]);
 ```
 
 ---
@@ -83,13 +76,11 @@ ZStack([
 import { Block, Text } from "btuin";
 
 // 要素を中央に配置するコンテナ
-Block(
-  Text("中央に表示")
-)
-.width("100%")
-.height("100%")
-.justify("center")
-.align("center");
+Block(Text("中央に表示"))
+  .width("100%")
+  .height("100%")
+  .justify("center")
+  .align("center");
 ```
 
 ---
@@ -124,6 +115,5 @@ HStack([
   Text("左側"),
   Spacer(), // 中央の空きスペースをすべて埋める
   Text("右側"),
-])
-.width("100%");
+]).width("100%");
 ```

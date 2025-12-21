@@ -1,7 +1,7 @@
 import type { KeyEvent } from "@/terminal";
 import { stop } from "@/reactivity";
 import { Block } from "@/view/primitives";
-import { handleComponentKey, renderComponent } from "@/view/components";
+import { handleComponentKey, renderComponent } from "@/components";
 import { createRenderer } from "./render-loop";
 import { createErrorContext, createErrorHandler } from "./error-boundary";
 import type { AppContext } from "./context";

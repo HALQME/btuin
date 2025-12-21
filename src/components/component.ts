@@ -1,7 +1,7 @@
 import type { KeyEvent } from "@/terminal";
-import type { Component, ComponentInitContext, ExitReason, RuntimeContext } from "@/component";
-import type { ViewElement } from "../types/elements";
-import { isBlock } from "../types/elements";
+import type { Component, ComponentInitContext, ExitReason, RuntimeContext } from "./core";
+import type { ViewElement } from "@/view/types/elements";
+import { isBlock } from "@/view/types/elements";
 import {
   createComponentInstance,
   invokeHooks,
@@ -99,11 +99,6 @@ function normalizeProps(options: PropsOptions | undefined, raw: unknown): Record
   return out;
 }
 
-/**
- * Vue-like defineComponent helper.
- * This returns a core `Component` that can be mounted by the runtime,
- * while keeping the original options available for inspection/testing.
- */
 export function defineComponent<Props extends Record<string, any> = Record<string, any>>(
   options: DefineComponentOptions<Props>,
 ): Component<{ render: RenderFunction }> & { options: DefineComponentOptions<Props> } {
@@ -134,11 +129,6 @@ function getInstanceStore<State>(component: Component<State>): WeakMap<any, Moun
   return anyComponent[INSTANCES] as WeakMap<any, MountedComponent>;
 }
 
-/**
- * Mounts a component and creates its instance.
- *
- * @internal
- */
 export function mountComponent<State>(
   component: Component<State>,
   keyOrProps?: any,
@@ -217,11 +207,6 @@ export function mountComponent<State>(
   return mounted;
 }
 
-/**
- * Unmounts a component and cleans up its instance.
- *
- * @internal
- */
 export function unmountComponent(mounted: MountedComponent) {
   unmountInstance(mounted.instance);
   if (mounted.renderEffect && mounted.renderEffect.effect) {
@@ -229,11 +214,6 @@ export function unmountComponent(mounted: MountedComponent) {
   }
 }
 
-/**
- * Renders a component and returns the view element.
- *
- * @internal
- */
 export function renderComponent(mounted: MountedComponent): ViewElement {
   const { instance, render } = mounted;
 
@@ -249,6 +229,17 @@ export function renderComponent(mounted: MountedComponent): ViewElement {
   }
 
   return element;
+}
+
+export function handleComponentKey(mounted: MountedComponent, event: KeyEvent): boolean {
+  if (mounted.lastElement) {
+    const handled = traverseKeyHandlers(mounted.lastElement, (element) =>
+      invokeKeyHooks(element.keyHooks, event),
+    );
+    if (handled) return true;
+  }
+
+  return invokeKeyHooks(mounted.instance.keyHooks, event);
 }
 
 function traverseKeyHandlers(
@@ -269,23 +260,6 @@ function traverseKeyHandlers(
   }
 
   return false;
-}
-
-/**
- * Handles key events for a component.
- * Returns true if the event was handled and should stop propagation.
- *
- * @internal
- */
-export function handleComponentKey(mounted: MountedComponent, event: KeyEvent): boolean {
-  if (mounted.lastElement) {
-    const handled = traverseKeyHandlers(mounted.lastElement, (element) =>
-      invokeKeyHooks(element.keyHooks, event),
-    );
-    if (handled) return true;
-  }
-
-  return invokeKeyHooks(mounted.instance.keyHooks, event);
 }
 
 export function isComponent(value: any): value is Component<any> {
