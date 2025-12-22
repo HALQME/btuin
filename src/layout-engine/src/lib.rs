@@ -35,6 +35,10 @@ enum StyleProp {
     TotalProps,
 }
 const STYLE_STRIDE: usize = StyleProp::TotalProps as usize;
+const RESULT_STRIDE: usize = 5; // js_id, x, y, width, height
+
+// Increment this when changing any exported FFI surface or buffer layout.
+const LAYOUT_ENGINE_ABI_VERSION: u32 = 1;
 
 pub struct LayoutEngineState {
     taffy: TaffyTree,
@@ -108,7 +112,6 @@ pub unsafe extern "C" fn compute_layout_from_buffers(
             style.size.width = length(width);
         }
 
-
         let height = style_slice[StyleProp::Height as usize];
         if !height.is_nan() {
             style.size.height = length(height);
@@ -126,14 +129,16 @@ pub unsafe extern "C" fn compute_layout_from_buffers(
             height: length(style_slice[StyleProp::GapRow as usize]),
         };
 
-        style.justify_content = Some(match style_slice[StyleProp::JustifyContent as usize] as i32 {
-            1 => JustifyContent::FlexEnd,
-            2 => JustifyContent::Center,
-            3 => JustifyContent::SpaceBetween,
-            4 => JustifyContent::SpaceAround,
-            5 => JustifyContent::SpaceEvenly,
-            _ => JustifyContent::FlexStart,
-        });
+        style.justify_content = Some(
+            match style_slice[StyleProp::JustifyContent as usize] as i32 {
+                1 => JustifyContent::FlexEnd,
+                2 => JustifyContent::Center,
+                3 => JustifyContent::SpaceBetween,
+                4 => JustifyContent::SpaceAround,
+                5 => JustifyContent::SpaceEvenly,
+                _ => JustifyContent::FlexStart,
+            },
+        );
 
         style.align_items = Some(match style_slice[StyleProp::AlignItems as usize] as i32 {
             0 => AlignItems::FlexStart,
@@ -230,4 +235,76 @@ pub unsafe extern "C" fn get_results_len(engine_ptr: *mut LayoutEngineState) -> 
     }
     let engine = unsafe { &*engine_ptr };
     engine.results_buffer.len()
+}
+
+// --- FFI boundary introspection (for sync tests) ---
+
+#[unsafe(no_mangle)]
+pub extern "C" fn layout_engine_abi_version() -> u32 {
+    LAYOUT_ENGINE_ABI_VERSION
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn layout_engine_style_stride() -> u32 {
+    STYLE_STRIDE as u32
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn layout_engine_result_stride() -> u32 {
+    RESULT_STRIDE as u32
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn layout_engine_f32_size() -> u32 {
+    std::mem::size_of::<f32>() as u32
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn layout_engine_u32_size() -> u32 {
+    std::mem::size_of::<u32>() as u32
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn layout_engine_style_prop_flex_grow() -> u32 {
+    StyleProp::FlexGrow as u32
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn layout_engine_style_prop_flex_shrink() -> u32 {
+    StyleProp::FlexShrink as u32
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn layout_engine_style_prop_flex_direction() -> u32 {
+    StyleProp::FlexDirection as u32
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn layout_engine_style_prop_width() -> u32 {
+    StyleProp::Width as u32
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn layout_engine_style_prop_height() -> u32 {
+    StyleProp::Height as u32
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn layout_engine_style_prop_gap_row() -> u32 {
+    StyleProp::GapRow as u32
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn layout_engine_style_prop_gap_column() -> u32 {
+    StyleProp::GapColumn as u32
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn layout_engine_style_prop_children_count() -> u32 {
+    StyleProp::ChildrenCount as u32
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn layout_engine_style_prop_children_offset() -> u32 {
+    StyleProp::ChildrenOffset as u32
 }
