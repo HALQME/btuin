@@ -1,6 +1,5 @@
 import { afterAll, beforeAll, describe, it, expect } from "bun:test";
 import { mkdir, rm, cp, readdir } from "node:fs/promises";
-import { execSync } from "node:child_process";
 import path from "node:path";
 import { existsSync } from "node:fs";
 
@@ -10,10 +9,29 @@ const RELEASE_MATRIX = [
   { os: "darwin", arch: "arm64", suffix: "dylib" },
 ];
 
-const PKG_ROOT = path.resolve(import.meta.dir, "..");
-const DIST_DIR = path.join(PKG_ROOT, "dist");
+const PKG_ROOT = path.resolve(import.meta.dir, "../..");
+const DIST_DIR = path.join(PKG_ROOT, ".tmp", "verify-package");
 const TEMP_PKG_DIR = path.join(DIST_DIR, "package");
 const NATIVE_DIR_IN_PKG = path.join(TEMP_PKG_DIR, "src/layout-engine/native");
+
+const PLATFORM_SUFFIX: Record<string, string> = {
+  darwin: "dylib",
+  linux: "so",
+  win32: "dll",
+};
+
+async function run(command: string, args: string[], cwd: string) {
+  const proc = Bun.spawn([command, ...args], {
+    cwd,
+    stdin: "inherit",
+    stdout: "inherit",
+    stderr: "inherit",
+  });
+  const exitCode = await proc.exited;
+  if (exitCode !== 0) {
+    throw new Error(`Command failed (${exitCode}): ${command} ${args.join(" ")}`);
+  }
+}
 
 describe("Package Verification", () => {
   // beforeAll: Executes the setup once before all tests in this file.
@@ -29,7 +47,7 @@ describe("Package Verification", () => {
     // 2. Build the actual FFI library for the current platform
     console.log("Building FFI library for current platform...");
     try {
-      execSync("mise run build:ffi", { stdio: "inherit", cwd: PKG_ROOT });
+      await run("mise", ["run", "build:ffi"], PKG_ROOT);
     } catch (e) {
       console.error("Failed to build FFI library. This is a prerequisite for the test.");
       throw e;
@@ -48,8 +66,7 @@ describe("Package Verification", () => {
 
       if (target.os === currentPlatform && target.arch === currentArch) {
         // This is the binary we just built. Copy it.
-        const suffixMap: Record<string, string> = { darwin: "dylib", linux: "so", win32: "dll" };
-        const builtBinaryName = `liblayout_engine.${suffixMap[currentPlatform] ?? target.suffix}`;
+        const builtBinaryName = `liblayout_engine.${PLATFORM_SUFFIX[currentPlatform] ?? target.suffix}`;
         const builtBinaryPath = path.join(
           PKG_ROOT,
           "src/layout-engine/target/release",
@@ -108,15 +125,11 @@ describe("Package Verification", () => {
     // which should correctly find the binary in the `native` directory.
     const layoutEnginePath = path.join(TEMP_PKG_DIR, "src/layout-engine/index.ts");
 
-    // The expect().toThrow() check is inverted. We want to ensure it *doesn't* throw.
     // A successful import means the path was resolved.
-    await expect(async () => {
-      // The cleanup function is exported, we can use it to test if the module is loaded
-      const { cleanupLayoutEngine, computeLayout } = await import(layoutEnginePath);
-      expect(cleanupLayoutEngine).toBeInstanceOf(Function);
-      expect(computeLayout).toBeInstanceOf(Function);
-      // Call cleanup to ensure the engine instance is destroyed if it was created
-      cleanupLayoutEngine();
-    }).resolves.not.toThrow();
+    const { cleanupLayoutEngine, computeLayout } = await import(layoutEnginePath);
+    expect(cleanupLayoutEngine).toBeInstanceOf(Function);
+    expect(computeLayout).toBeInstanceOf(Function);
+    // Call cleanup to ensure the engine instance is destroyed if it was created
+    cleanupLayoutEngine();
   });
 });

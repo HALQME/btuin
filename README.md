@@ -14,21 +14,37 @@ Bunのパフォーマンスを最大限に活かし、快適な開発体験を�
 - **Vue ライクなリアクティビティ**: `ref`, `computed`, `watch`, `effect` などを備えた独自のリアクティビティシステムを搭載。状態の変化に応じて画面の差分だけを自動的に効率よく再描画します。
 - **宣言的レイアウト**: `VStack`, `HStack`, `ZStack` などのレイアウトプリミティブを提供。絶対座標を計算することなく、Flexbox のように柔軟な UI を構築できます。
 - **Bun ネイティブ**: Bun の高速な起動と実行速度、Bunのネイティブ API を活用し、軽量かつハイパフォーマンスに動作します。
-- **コンポーネント指向**: `defineComponent` による再利用可能なコンポーネント設計が可能。標準で `List`, `Table`, `Input`, `ProgressBar` などの実用的な UI キットを提供しています。
-- **フォーカス管理**: キーボード操作を前提としたフォーカス移動（Tab や矢印キー）の仕組みが組み込まれています。
+- **コンポーネント指向**: `defineComponent` による再利用可能なコンポーネント設計が可能。現状は `Text` / `Block` / `Spacer` などのプリミティブ中心で、実用コンポーネントは順次追加予定です。
+- **入力・実行基盤**: raw mode / 差分描画 / stdout capture など、TUI を成立させる足回りを内蔵しています。
 
 ## ロードマップ
 
-以下の機能を計画しています。
-
-- [x] **コア機能**: リアクティビティシステム、基本レンダリングループ
-- [x] **レイアウト**: Stack (Vertical, Horizontal, Z-axis), Box, Center
-- [x] **基本コンポーネント**: Paragraph, TextInput, List, Console
-- [ ] **インラインモード**: ターミナルの全体を書き換えずに描画するモード
-- [ ] **入力拡張**: マウスイベントのサポート、ショートカットキー管理の強化
-- [ ] **スタイル**: テーマ機能の実装、より高度なボーダー・カラー設定
-- [ ] **エコシステム**: デバッグツールの充実、ドキュメント整備
-- [ ] **拡張コンポーネント**: Table, ProgressBar, Spinner, Toast, Selector
+- [ ] 入力
+  - [x] 入力パーサーをステートフル化（チャンク分割耐性）: `src/terminal/parser/ansi.ts`
+  - [ ] `ESC` 単体 vs `Alt+Key` の曖昧さを解消
+  - [x] ブラケットペーストを「1イベント」に正規化: `src/terminal/parser/ansi.ts`
+  - [ ] ブラケットペーストの on/off をランタイムへ統合
+- [ ] マウス
+  - [ ] マウス入力（SGR など）をランタイムへ統合（有効化/無効化・イベント形式の確定）
+  - [ ] ヒットテスト（`ComputedLayout` と座標の照合、重なり順の決定）
+  - [ ] バブリング/伝播（子→親、キャンセル可能なイベントモデル）
+- [ ] Developer Tools
+  - [ ] シェル統合
+    - [x] stdout/stderr capture 基盤（listener/console patch/テストモード）: `src/terminal/capture.ts`
+    - [ ] `useLog`（capture → reactive state）でログUIを簡単にする
+  - [ ] デバッグ
+    - [ ] インスペクターモード（境界線/座標/サイズ可視化）
+- [x] 配布
+  - [x] GitHub Release 用 tarball 生成（`src/layout-engine/native/` 同梱）: `.github/workflows/release.yml`
+  - [x] `npm pack` の成果物を展開し、`src/layout-engine/native/` と `src/layout-engine/index.ts` の解決が噛み合うことを自動チェック
+- [ ] Inline モード
+- [ ] コンポーネント
+  - [ ] `TextInput` を実用レベルへ（編集・カーソル移動・IME確定後の反映）
+  - [ ] `ScrollView` / `ListView`（必要に応じて仮想スクロール、マウスホイール連動）
+- [ ] 安全性
+  - [ ] FFI 境界の同期テスト（Rust 定数/構造体 ↔ JS 定義）を CI に追加
+- [ ] ドキュメント / スターター
+  - [ ] `examples/` の拡充
 
 ## クイックスタート
 
