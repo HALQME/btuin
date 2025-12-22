@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import tty from "node:tty";
-import { getOriginalStderr, getOriginalStdout } from "./capture";
+import { bypassStderrWrite, bypassStdoutWrite } from "./capture";
 
 type UiOutput = NodeJS.WriteStream & { isTTY?: boolean; columns?: number; rows?: number };
 type UiInput = NodeJS.ReadStream & { isTTY?: boolean; setRawMode?: (enabled: boolean) => void };
@@ -9,6 +9,20 @@ let cachedDevTty: {
   input: UiInput;
   output: UiOutput;
 } | null = null;
+
+let cachedUiOutput: UiOutput | null = null;
+let cachedUiInput: UiInput | null = null;
+
+function createWriteBypassProxy<T extends NodeJS.WriteStream>(
+  target: T,
+  writeFn: typeof bypassStdoutWrite,
+): UiOutput {
+  const proxy = Object.create(target) as UiOutput;
+  proxy.write = function (chunk: any, encoding?: any, callback?: any) {
+    return writeFn(chunk, encoding, callback);
+  } as any;
+  return proxy;
+}
 
 function ensureDevTty(): { input: UiInput; output: UiOutput } | null {
   if (cachedDevTty) return cachedDevTty;
@@ -38,20 +52,40 @@ function ensureDevTty(): { input: UiInput; output: UiOutput } | null {
 }
 
 export function getUiOutputStream(): UiOutput {
-  if (process.stdout.isTTY) return getOriginalStdout() as UiOutput;
-  if (process.stderr.isTTY) return getOriginalStderr() as UiOutput;
+  if (cachedUiOutput) return cachedUiOutput;
+
+  if (process.stdout.isTTY) {
+    cachedUiOutput = createWriteBypassProxy(process.stdout, bypassStdoutWrite);
+    return cachedUiOutput;
+  }
+  if (process.stderr.isTTY) {
+    cachedUiOutput = createWriteBypassProxy(process.stderr, bypassStderrWrite);
+    return cachedUiOutput;
+  }
 
   const devTty = ensureDevTty();
-  if (devTty) return devTty.output;
+  if (devTty) {
+    cachedUiOutput = devTty.output;
+    return cachedUiOutput;
+  }
 
-  return getOriginalStdout() as UiOutput;
+  cachedUiOutput = createWriteBypassProxy(process.stdout, bypassStdoutWrite);
+  return cachedUiOutput;
 }
 
 export function getUiInputStream(): UiInput {
-  if (process.stdin.isTTY) return process.stdin as UiInput;
+  if (cachedUiInput) return cachedUiInput;
+  if (process.stdin.isTTY) {
+    cachedUiInput = process.stdin as UiInput;
+    return cachedUiInput;
+  }
 
   const devTty = ensureDevTty();
-  if (devTty) return devTty.input;
+  if (devTty) {
+    cachedUiInput = devTty.input;
+    return cachedUiInput;
+  }
 
-  return process.stdin as UiInput;
+  cachedUiInput = process.stdin as UiInput;
+  return cachedUiInput;
 }

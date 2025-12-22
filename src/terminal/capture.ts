@@ -187,6 +187,24 @@ export function getOriginalStdout(): typeof process.stdout {
 }
 
 /**
+ * Write to stdout bypassing capture (for UI rendering).
+ * In test mode, this records output instead of writing.
+ */
+export const bypassStdoutWrite: WriteFunction = (chunk: any, encoding?: any, callback?: any) => {
+  if (state.testModeEnabled) {
+    const text = typeof chunk === "string" ? chunk : chunk.toString();
+    state.capturedOutput.push(text);
+    if (typeof encoding === "function") encoding();
+    if (typeof callback === "function") callback();
+    return true;
+  }
+
+  const writeFn = state.isCapturing ? state.originalStdoutWrite : process.stdout.write;
+  if (!writeFn) return true;
+  return writeFn.call(process.stdout, chunk, encoding as any, callback as any);
+};
+
+/**
  * Get the original stderr write function.
  * This allows error output directly to the terminal without being captured.
  */
@@ -196,6 +214,24 @@ export function getOriginalStderr(): typeof process.stderr {
   }
   return process.stderr;
 }
+
+/**
+ * Write to stderr bypassing capture (for UI rendering).
+ * In test mode, this records output instead of writing.
+ */
+export const bypassStderrWrite: WriteFunction = (chunk: any, encoding?: any, callback?: any) => {
+  if (state.testModeEnabled) {
+    const text = typeof chunk === "string" ? chunk : chunk.toString();
+    state.capturedOutput.push(text);
+    if (typeof encoding === "function") encoding();
+    if (typeof callback === "function") callback();
+    return true;
+  }
+
+  const writeFn = state.isCapturing ? state.originalStderrWrite : process.stderr.write;
+  if (!writeFn) return true;
+  return writeFn.call(process.stderr, chunk, encoding as any, callback as any);
+};
 
 /**
  * Patch console methods to route through stdout/stderr.
