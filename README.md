@@ -109,8 +109,28 @@ await app.mount();
 - `reactivity`: `ref/computed/effect/watch` による状態管理
 - `layout-engine`: Flexbox ライクなレイアウト（Rust FFI）
 - `renderer`: バッファ描画 + 差分レンダリング（`renderDiff` は文字列を返す純粋関数）
-- `terminal`: raw mode / 入力 / stdout 書き込み
+- `terminal`: raw mode / 入力 / TTY へのUI描画
 - `btuin`: それらを束ねる “アプリ実行” と View API
+
+## パイプ/ヘッドレスでの実行
+
+- UI描画は可能ならTTYへ直接出力し、`setExitOutput()` で指定した内容だけを標準出力に流します（`fzf`の挙動に近い）。
+- ヘッドレス環境では `Bun.Terminal`(PTY) でプロセスを起動すると、PTY越しにUIへアクセスできます。
+
+```ts
+const terminal = new Bun.Terminal({
+  cols: 80,
+  rows: 24,
+  data(_term, data) {
+    // UIの描画(ANSI)が流れてくる
+    process.stdout.write(data);
+  },
+});
+
+const proc = Bun.spawn(["bun", "run", "examples/counter.ts"], { terminal });
+terminal.write("q"); // キー入力
+await proc.exited;
+```
 
 ## アダプタ（テスト/差し替え用）
 

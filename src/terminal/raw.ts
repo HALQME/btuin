@@ -1,6 +1,7 @@
 import { AnsiInputParser } from "./parser/ansi";
 import type { InputParser } from "./parser/types";
 import type { KeyHandler } from "./types";
+import { getUiInputStream } from "./tty-streams";
 
 const ESCAPE_KEY_TIMEOUT_MS = 30;
 
@@ -44,6 +45,7 @@ class TerminalState {
 const terminalState = new TerminalState();
 
 let escapeFlushTimer: ReturnType<typeof setTimeout> | null = null;
+let activeInputStream: ReturnType<typeof getUiInputStream> | null = null;
 
 function clearEscapeFlushTimer() {
   if (escapeFlushTimer) {
@@ -108,12 +110,16 @@ export function setInputParser(parser: InputParser) {
  */
 export function setupRawMode() {
   if (terminalState.isRawModeActive()) return;
-  if (!process.stdin.isTTY) return;
 
-  process.stdin.setRawMode(true);
-  process.stdin.resume();
-  process.stdin.setEncoding("utf8");
-  process.stdin.on("data", handleData);
+  const input = getUiInputStream();
+  activeInputStream = input;
+
+  if (!input.isTTY || typeof input.setRawMode !== "function") return;
+
+  input.setRawMode(true);
+  input.resume();
+  input.setEncoding("utf8");
+  input.on("data", handleData);
   process.once("exit", cleanupWithoutClear);
 
   terminalState.setRawModeActive(true);
@@ -145,15 +151,18 @@ export function cleanupWithoutClear() {
 
   terminalState.setRawModeActive(false);
 
-  if (process.stdin.listenerCount("data") > 0) {
-    process.stdin.off("data", handleData);
+  const input = activeInputStream ?? getUiInputStream();
+  activeInputStream = null;
+
+  if (input.listenerCount("data") > 0) {
+    input.off("data", handleData);
   }
 
-  if (process.stdin.isTTY) {
-    process.stdin.setRawMode(false);
+  if (input.isTTY && typeof input.setRawMode === "function") {
+    input.setRawMode(false);
   }
 
-  process.stdin.pause();
+  input.pause();
 }
 
 /**
@@ -170,13 +179,16 @@ export function cleanup() {
 
   terminalState.setRawModeActive(false);
 
-  if (process.stdin.listenerCount("data") > 0) {
-    process.stdin.off("data", handleData);
+  const input = activeInputStream ?? getUiInputStream();
+  activeInputStream = null;
+
+  if (input.listenerCount("data") > 0) {
+    input.off("data", handleData);
   }
 
-  if (process.stdin.isTTY) {
-    process.stdin.setRawMode(false);
+  if (input.isTTY && typeof input.setRawMode === "function") {
+    input.setRawMode(false);
   }
 
-  process.stdin.pause();
+  input.pause();
 }

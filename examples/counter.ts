@@ -21,11 +21,11 @@ const app = createApp({
       Text("Counter"), //
       Text(String(count.value)),
     ])
-      // .width("100%")
-      // .height("100%")
+      .width("100%")
+      .height("100%")
       .justify("center")
       .align("center");
   },
 });
 
-await app.mount({ inline: true, "inlineCleanupOnExit": true});
+await app.mount();

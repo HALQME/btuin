@@ -1,3 +1,5 @@
+import { getUiOutputStream } from "@/terminal/tty-streams";
+
 export interface PlatformAdapter {
   onStdoutResize(handler: () => void): () => void;
   onExit(handler: () => void): void;
@@ -10,8 +12,12 @@ export interface PlatformAdapter {
 export function createDefaultPlatformAdapter(): PlatformAdapter {
   return {
     onStdoutResize: (handler) => {
-      process.stdout.on("resize", handler);
-      return () => process.stdout.off("resize", handler);
+      const stream = getUiOutputStream() as any;
+      if (typeof stream?.on !== "function" || typeof stream?.off !== "function") {
+        return () => {};
+      }
+      stream.on("resize", handler);
+      return () => stream.off("resize", handler);
     },
     onExit: (handler) => {
       process.once("exit", handler);
