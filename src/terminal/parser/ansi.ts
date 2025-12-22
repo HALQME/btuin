@@ -104,48 +104,152 @@ const SPECIAL_CHARS: Record<string, string> = {
 };
 
 /**
- * A state-less parser for ANSI keyboard input sequences.
+ * A stateful parser for ANSI keyboard input sequences.
+ * It handles chunked data by buffering incomplete escape sequences.
  */
 export class AnsiInputParser implements InputParser {
-  parse(chunk: string): KeyEvent {
-    if (ESCAPE_SEQUENCES[chunk]) {
-      return { sequence: chunk, ...ESCAPE_SEQUENCES[chunk] };
-    }
+  private buffer: string = "";
+  private isPasting: boolean = false;
+  private pasteBuffer: string = "";
 
-    let sequence = chunk;
-    let meta = false;
-    if (chunk.length > 1 && chunk.startsWith("\x1b") && !chunk.startsWith("\x1b[")) {
-      meta = true;
-      sequence = chunk.slice(1);
-    }
+  // A sorted list of escape sequences, longest first, to ensure correct matching.
+  private readonly sortedEscapeSequences: string[] = Object.keys(ESCAPE_SEQUENCES).sort(
+    (a, b) => b.length - a.length,
+  );
 
-    const code = sequence.charCodeAt(0);
-    let name = sequence;
-    let ctrl = false;
-    let shift = false;
+  parse(chunk: string): KeyEvent[] {
+    this.buffer += chunk;
+    const events: KeyEvent[] = [];
 
-    if (SPECIAL_CHARS[sequence]) {
-      name = SPECIAL_CHARS[sequence]!;
-    } else if (code >= 0x01 && code <= 0x1a) {
-      ctrl = true;
-      name = CTRL_KEY_MAP[code] || String.fromCharCode(code + 96);
-    } else if (code === 0x00) {
-      ctrl = true;
-      name = "space";
-    } else if (code >= 0x20 && code <= 0x7e) {
-      const char = sequence;
-      name = char;
-      if (char.length === 1) {
-        const isUpperLetter = char >= "A" && char <= "Z";
-        const isLowerLetter = char >= "a" && char <= "z";
-        const isShiftedSymbol =
-          '!@#$%^&*()_+{}|:"<>?'.includes(char) || (char >= "A" && char <= "Z");
-        if (isUpperLetter || (isShiftedSymbol && !isLowerLetter)) {
-          shift = true;
+    while (this.buffer.length > 0) {
+      // Priority 1: Handle pasting state
+      if (this.isPasting) {
+        const endSequence = "\x1b[201~";
+        const endMatch = this.buffer.indexOf(endSequence);
+
+        if (endMatch !== -1) {
+          // End of paste found
+          this.pasteBuffer += this.buffer.slice(0, endMatch);
+          if (this.pasteBuffer.length > 0) {
+            events.push({
+              name: "paste",
+              sequence: this.pasteBuffer,
+              data: this.pasteBuffer,
+              ctrl: false,
+              meta: false,
+              shift: false,
+            });
+          }
+          this.isPasting = false;
+          this.pasteBuffer = "";
+          this.buffer = this.buffer.slice(endMatch + endSequence.length);
+        } else {
+          // Still pasting, add entire buffer to paste buffer and wait for more
+          this.pasteBuffer += this.buffer;
+          this.buffer = "";
+        }
+        continue;
+      }
+
+      // Priority 2: Check for start of paste
+      const startSequence = "\x1b[200~";
+      if (this.buffer.startsWith(startSequence)) {
+        this.isPasting = true;
+        this.buffer = this.buffer.slice(startSequence.length);
+        continue;
+      }
+
+      // Priority 4: Find a matching escape sequence
+      let matchedKey: Omit<KeyEvent, "sequence"> | undefined;
+      let matchedSequence: string | undefined;
+      for (const seq of this.sortedEscapeSequences) {
+        if (this.buffer.startsWith(seq)) {
+          matchedSequence = seq;
+          matchedKey = ESCAPE_SEQUENCES[seq];
+          break;
         }
       }
+
+      if (matchedSequence && matchedKey) {
+        events.push({
+          sequence: matchedSequence,
+          name: matchedKey.name,
+          ctrl: matchedKey.ctrl,
+          meta: matchedKey.meta,
+          shift: matchedKey.shift,
+        });
+        this.buffer = this.buffer.slice(matchedSequence.length);
+        continue;
+      }
+
+      // Priority 5: Check for a partial escape sequence match
+      const isPartial = this.sortedEscapeSequences.some(
+        (seq) => seq.startsWith(this.buffer) && seq !== this.buffer,
+      );
+
+      if (isPartial) {
+        break; // Wait for more data
+      }
+
+      // Priority 6: Process as a single character
+      const firstChar = this.buffer[0];
+      if (firstChar === undefined) break; // Should be unreachable
+
+      let name: string;
+      let ctrl = false;
+      let meta = false;
+      let shift = false;
+      let consumedLength = 1;
+      let char = firstChar;
+
+      // Handle Alt/Meta key (ESC + char)
+      if (char === "\x1b" && this.buffer.length > 1) {
+        const nextChar = this.buffer[1];
+        if (nextChar && nextChar !== "[" && nextChar !== "O") {
+          meta = true;
+          char = nextChar;
+          consumedLength = 2;
+        }
+      }
+
+      const code = char.charCodeAt(0);
+      const specialName = SPECIAL_CHARS[char];
+
+      if (specialName) {
+        name = specialName;
+      } else if (meta === false && code >= 0x01 && code <= 0x1a) {
+        ctrl = true;
+        name = CTRL_KEY_MAP[code] ?? String.fromCharCode(code + 96);
+      } else if (meta === false && code === 0x00) {
+        ctrl = true;
+        name = "space";
+      } else {
+        // Printable characters
+        const isUpperLetter = char >= "A" && char <= "Z";
+        const isLowerLetter = char >= "a" && char <= "z";
+        const isShiftedSymbol = !meta && `!@#$%^&*()_+{}|:"<>?`.includes(char);
+
+        if (!meta && (isUpperLetter || (isShiftedSymbol && !isLowerLetter))) {
+          shift = true;
+        }
+        name = char;
+      }
+
+      const originalSequence = this.buffer.slice(0, consumedLength);
+      events.push({ sequence: originalSequence, name, ctrl, meta, shift });
+      this.buffer = this.buffer.slice(consumedLength);
     }
 
-    return { sequence: chunk, name, ctrl, meta, shift };
+    return events;
+  }
+
+  hasPendingEscape(): boolean {
+    return this.isPasting === false && this.buffer === "\x1b";
+  }
+
+  flush(): KeyEvent[] {
+    if (!this.hasPendingEscape()) return [];
+    this.buffer = "";
+    return [{ sequence: "\x1b", name: "escape", ctrl: false, meta: false, shift: false }];
   }
 }

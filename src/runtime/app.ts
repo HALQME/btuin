@@ -100,6 +100,7 @@ export function App<State>(root: Component<State>, options: CreateAppOptions = {
       updaters.unpatchConsole(terminal.patchConsole());
       terminal.startCapture();
       terminal.setupRawMode();
+      terminal.setBracketedPaste?.(true);
       terminal.clearScreen();
 
       updaters.mounted(

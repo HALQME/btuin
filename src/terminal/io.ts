@@ -32,3 +32,11 @@ export function hideCursor() {
 export function showCursor() {
   getOriginalStdout().write("\x1b[?25h");
 }
+
+export function enableBracketedPaste() {
+  getOriginalStdout().write("\x1b[?2004h");
+}
+
+export function disableBracketedPaste() {
+  getOriginalStdout().write("\x1b[?2004l");
+}

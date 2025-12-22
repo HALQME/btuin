@@ -118,4 +118,54 @@ describe("Raw Mode and Key Handling", () => {
     setupRawMode();
     mockStdin.emitData("\x1bb"); // Alt+b
   });
+
+  it("should disambiguate Escape vs Alt/Meta across chunks (Alt)", async () => {
+    const events: KeyEvent[] = [];
+    onKey((event: KeyEvent) => {
+      events.push(event);
+    });
+
+    setupRawMode();
+    mockStdin.emitData("\x1b");
+    mockStdin.emitData("b");
+
+    await new Promise((r) => setTimeout(r, 60));
+
+    expect(events).toHaveLength(1);
+    expect(events[0]?.name).toBe("b");
+    expect(events[0]?.meta).toBe(true);
+  });
+
+  it("should emit Escape when ESC is pressed alone", async () => {
+    const events: KeyEvent[] = [];
+    onKey((event: KeyEvent) => {
+      events.push(event);
+    });
+
+    setupRawMode();
+    mockStdin.emitData("\x1b");
+
+    await new Promise((r) => setTimeout(r, 60));
+
+    expect(events).toHaveLength(1);
+    expect(events[0]?.name).toBe("escape");
+    expect(events[0]?.sequence).toBe("\x1b");
+    expect(events[0]?.meta).toBe(false);
+  });
+
+  it("should handle chunked escape sequences (arrow key)", async () => {
+    const events: KeyEvent[] = [];
+    onKey((event: KeyEvent) => {
+      events.push(event);
+    });
+
+    setupRawMode();
+    mockStdin.emitData("\x1b");
+    mockStdin.emitData("[A");
+
+    await new Promise((r) => setTimeout(r, 60));
+
+    expect(events).toHaveLength(1);
+    expect(events[0]?.name).toBe("up");
+  });
 });

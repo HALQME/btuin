@@ -7,6 +7,7 @@ export interface TerminalAdapter {
   clearScreen(): void;
   moveCursor(row: number, col: number): void;
   cleanupWithoutClear(): void;
+  setBracketedPaste?(enabled: boolean): void;
   patchConsole(): () => void;
   startCapture(): void;
   stopCapture(): void;
@@ -32,6 +33,8 @@ export function createDefaultTerminalAdapter(
     clearScreen: terminal.clearScreen,
     moveCursor: terminal.moveCursor,
     cleanupWithoutClear: terminal.cleanupWithoutClear,
+    setBracketedPaste: (enabled) =>
+      enabled ? terminal.enableBracketedPaste() : terminal.disableBracketedPaste(),
     patchConsole: terminal.patchConsole,
     startCapture: terminal.startCapture,
     stopCapture: terminal.stopCapture,

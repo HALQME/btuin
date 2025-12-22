@@ -11,6 +11,7 @@ describe("createApp", () => {
   let appInstance: App;
   let app: typeof import("@/runtime/app").app;
   const terminal: TerminalAdapter = {
+    setBracketedPaste: () => {},
     setupRawMode: () => {},
     clearScreen: () => {},
     moveCursor: () => {},
@@ -67,8 +68,12 @@ describe("createApp", () => {
 
   it("should mount and unmount the app", async () => {
     let initCalled = false;
+    const bracketedPasteCalls: boolean[] = [];
     appInstance = app({
-      terminal,
+      terminal: {
+        ...terminal,
+        setBracketedPaste: (enabled) => bracketedPasteCalls.push(enabled),
+      },
       platform,
       init() {
         initCalled = true;
@@ -82,9 +87,11 @@ describe("createApp", () => {
     await appInstance.mount();
     expect(initCalled).toBe(true);
     expect(appInstance.getComponent()).toBeDefined();
+    expect(bracketedPasteCalls[0]).toBe(true);
 
     appInstance.unmount();
     expect(appInstance.getComponent()).toBe(null);
+    expect(bracketedPasteCalls).toEqual([true, false]);
   });
 
   it("should handle key events", async () => {

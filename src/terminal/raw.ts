@@ -1,7 +1,8 @@
-import type { KeyHandler } from "./types";
-import { clearScreen, hideCursor, showCursor } from "./io";
 import { AnsiInputParser } from "./parser/ansi";
 import type { InputParser } from "./parser/types";
+import type { KeyHandler } from "./types";
+
+const ESCAPE_KEY_TIMEOUT_MS = 30;
 
 /**
  * Terminal raw mode state - encapsulated in a singleton
@@ -42,18 +43,49 @@ class TerminalState {
 
 const terminalState = new TerminalState();
 
+let escapeFlushTimer: ReturnType<typeof setTimeout> | null = null;
+
+function clearEscapeFlushTimer() {
+  if (escapeFlushTimer) {
+    clearTimeout(escapeFlushTimer);
+    escapeFlushTimer = null;
+  }
+}
+
 /**
  * Handles raw data from stdin and dispatches to registered handlers
  *
  * @param chunk - Raw input data as string
  */
 function handleData(chunk: string) {
-  const parser = terminalState.getInputParser();
-  const event = parser.parse(chunk);
+  clearEscapeFlushTimer();
 
-  for (const handler of terminalState.getKeyHandlers()) {
-    handler(event);
+  const parser = terminalState.getInputParser();
+  const events = parser.parse(chunk);
+
+  for (const event of events) {
+    for (const handler of terminalState.getKeyHandlers()) {
+      handler(event);
+    }
   }
+
+  if (!terminalState.isRawModeActive()) return;
+  if (!parser.hasPendingEscape?.()) return;
+  if (!parser.flush) return;
+
+  const parserAtSchedule = parser;
+  escapeFlushTimer = setTimeout(() => {
+    escapeFlushTimer = null;
+    if (!terminalState.isRawModeActive()) return;
+    if (terminalState.getInputParser() !== parserAtSchedule) return;
+
+    const flushed = parserAtSchedule.flush?.() ?? [];
+    for (const event of flushed) {
+      for (const handler of terminalState.getKeyHandlers()) {
+        handler(event);
+      }
+    }
+  }, ESCAPE_KEY_TIMEOUT_MS);
 }
 
 /**
@@ -84,7 +116,6 @@ export function setupRawMode() {
   process.stdin.on("data", handleData);
   process.once("exit", cleanupWithoutClear);
 
-  hideCursor();
   terminalState.setRawModeActive(true);
 }
 
@@ -107,13 +138,12 @@ export function resetKeyHandlers() {
  * Should be called before program exit when you want to preserve screen content
  */
 export function cleanupWithoutClear() {
+  clearEscapeFlushTimer();
   if (!terminalState.isRawModeActive()) {
-    showCursor();
     return;
   }
 
   terminalState.setRawModeActive(false);
-  showCursor();
 
   if (process.stdin.listenerCount("data") > 0) {
     process.stdin.off("data", handleData);
@@ -133,14 +163,12 @@ export function cleanupWithoutClear() {
  * is left in a usable state
  */
 export function cleanup() {
+  clearEscapeFlushTimer();
   if (!terminalState.isRawModeActive()) {
-    showCursor();
     return;
   }
 
   terminalState.setRawModeActive(false);
-  clearScreen();
-  showCursor();
 
   if (process.stdin.listenerCount("data") > 0) {
     process.stdin.off("data", handleData);

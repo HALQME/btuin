@@ -31,6 +31,7 @@ export class LifecycleManager {
       }
       terminal.disposeSingletonCapture();
       profiler.flushSync();
+      terminal.setBracketedPaste?.(false);
       terminal.cleanupWithoutClear();
 
       updaters.isMounted(false);
