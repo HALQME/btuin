@@ -9,7 +9,10 @@ import type { ViewElement } from "@/view/types/elements";
 export interface ILoopManager {
   start(rows: number, cols: number): void;
   stop(): void;
+  cleanupTerminal?(): void;
 }
+
+export type RenderMode = "fullscreen" | "inline";
 
 export type AppConfig<State> = {
   platform?: Partial<PlatformAdapter>;
@@ -38,6 +41,8 @@ export interface App {
 export interface MountOptions {
   rows?: number;
   cols?: number;
+  inline?: boolean;
+  inlineCleanupOnExit?: boolean;
 }
 
 export type CreateAppOptions = {

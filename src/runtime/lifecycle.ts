@@ -18,6 +18,9 @@ export class LifecycleManager {
       options.onExit?.();
 
       loopManager.stop();
+      if (state.renderMode === "inline" && state.inlineCleanupOnExit) {
+        loopManager.cleanupTerminal?.();
+      }
 
       if (state.mounted) {
         unmountComponent(state.mounted);
@@ -38,6 +41,8 @@ export class LifecycleManager {
     } finally {
       updaters.isUnmounting(false);
       updaters.processHasActiveMount(false);
+      updaters.renderMode("fullscreen");
+      updaters.inlineCleanupOnExit(false);
     }
   };
 
@@ -45,6 +50,8 @@ export class LifecycleManager {
     const { state, updaters, terminal, platform, app } = this.ctx;
     if (state.isUnmounting || state.isExiting) return;
     updaters.isExiting(true);
+
+    const renderModeAtExit = state.renderMode;
 
     for (const handler of state.exitHandlers) {
       try {
@@ -66,10 +73,12 @@ export class LifecycleManager {
       }
     }
 
-    const { rows } = terminal.getTerminalSize();
-    terminal.moveCursor(rows, 1);
-    terminal.write("\n");
-    terminal.clearScreen();
+    if (renderModeAtExit !== "inline") {
+      const { rows } = terminal.getTerminalSize();
+      terminal.moveCursor(rows, 1);
+      terminal.write("\n");
+      terminal.clearScreen();
+    }
     if (output) {
       terminal.write(output.endsWith("\n") ? output : `${output}\n`);
     }

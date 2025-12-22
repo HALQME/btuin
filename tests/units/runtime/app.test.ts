@@ -124,4 +124,35 @@ describe("createApp", () => {
     // but we can check if the key event was processed.
     expect(keyValue).toBe("a");
   });
+
+  it("should mount in inline mode without clearing the screen", async () => {
+    const calls: { clearScreen: number; writes: string[] } = { clearScreen: 0, writes: [] };
+
+    appInstance = app({
+      terminal: {
+        ...terminal,
+        clearScreen: () => {
+          calls.clearScreen++;
+        },
+        write: (output: string) => {
+          calls.writes.push(output);
+        },
+      },
+      platform,
+      init() {
+        return {};
+      },
+      render: () => Block(Text("X")),
+    });
+
+    await appInstance.mount({ rows: 2, cols: 3, inline: true });
+
+    expect(calls.clearScreen).toBe(0);
+    expect(calls.writes.join("")).toContain("\x1b[2K\r");
+
+    const beforeUnmount = calls.writes.join("");
+    appInstance.unmount();
+    const afterUnmount = calls.writes.join("");
+    expect(afterUnmount).toBe(beforeUnmount);
+  });
 });

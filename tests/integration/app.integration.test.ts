@@ -75,6 +75,30 @@ describe("Framework integration: App lifecycle", () => {
     app.unmount();
   });
 
+  it("exit in inline mode does not clear screen", async () => {
+    const terminal = createMockTerminal();
+    const platform = createMockPlatform();
+
+    const app = createApp({
+      terminal,
+      platform,
+      init({ runtime }) {
+        runtime.setExitOutput("done");
+        runtime.exit(0);
+        return {};
+      },
+      render: () => Block(Text("ignored")),
+    });
+
+    await app.mount({ inline: true });
+    await Bun.sleep(50);
+
+    expect(platform.state.exitCode).toBe(0);
+    expect(terminal.calls.moveCursor.length).toBe(0);
+    expect(terminal.calls.clearScreen).toBe(0);
+    app.unmount();
+  });
+
   it("prevents mounting two apps in one process", async () => {
     const t1 = createMockTerminal();
     const p1 = createMockPlatform();

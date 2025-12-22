@@ -4,7 +4,7 @@ import type { MountedComponent } from "@/components";
 import type { TerminalAdapter } from "./terminal-adapter";
 import type { PlatformAdapter } from "./platform-adapter";
 import type { Profiler } from "./profiler";
-import type { App, CreateAppOptions, ILoopManager } from "./types";
+import type { App, CreateAppOptions, ILoopManager, RenderMode } from "./types";
 
 export type AppContext = {
   app: App;
@@ -19,6 +19,8 @@ export type AppContext = {
     exitOutput: string | (() => string) | null;
     isExiting: boolean;
     processHasActiveMount: boolean;
+    renderMode: RenderMode;
+    inlineCleanupOnExit: boolean;
   };
   updaters: {
     mounted: (m: MountedComponent | null) => void;
@@ -29,6 +31,8 @@ export type AppContext = {
     unpatchConsole: (u: (() => void) | null) => void;
     isExiting: (v: boolean) => void;
     processHasActiveMount: (v: boolean) => void;
+    renderMode: (mode: RenderMode) => void;
+    inlineCleanupOnExit: (v: boolean) => void;
   };
   terminal: TerminalAdapter;
   platform: PlatformAdapter;

@@ -24,6 +24,8 @@ export function App<State>(root: Component<State>, options: CreateAppOptions = {
     exitOutput: null,
     isExiting: false,
     processHasActiveMount: false,
+    renderMode: "fullscreen",
+    inlineCleanupOnExit: false,
   };
 
   const updaters: AppContext["updaters"] = {
@@ -35,6 +37,8 @@ export function App<State>(root: Component<State>, options: CreateAppOptions = {
     unpatchConsole: (u) => (state.unpatchConsole = u),
     isExiting: (v) => (state.isExiting = v),
     processHasActiveMount: (v) => (processHasActiveMount = v),
+    renderMode: (mode) => (state.renderMode = mode),
+    inlineCleanupOnExit: (v) => (state.inlineCleanupOnExit = v),
   };
 
   const terminal = options.terminal ?? createDefaultTerminalAdapter();
@@ -96,12 +100,17 @@ export function App<State>(root: Component<State>, options: CreateAppOptions = {
 
       const rows = mountOptions.rows ?? 0;
       const cols = mountOptions.cols ?? 0;
+      const inline = mountOptions.inline ?? false;
+      updaters.renderMode(inline ? "inline" : "fullscreen");
+      updaters.inlineCleanupOnExit(mountOptions.inlineCleanupOnExit ?? false);
 
       updaters.unpatchConsole(terminal.patchConsole());
       terminal.startCapture();
       terminal.setupRawMode();
       terminal.setBracketedPaste?.(true);
-      terminal.clearScreen();
+      if (!inline) {
+        terminal.clearScreen();
+      }
 
       updaters.mounted(
         mountComponent(root, undefined, {
@@ -156,6 +165,8 @@ export function App<State>(root: Component<State>, options: CreateAppOptions = {
         updaters.unpatchConsole(null);
       }
       if (!state.isMounted) {
+        updaters.renderMode("fullscreen");
+        updaters.inlineCleanupOnExit(false);
         processHasActiveMount = false;
       }
     }

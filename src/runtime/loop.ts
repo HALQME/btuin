@@ -7,10 +7,13 @@ import { createErrorContext, createErrorHandler } from "./error-boundary";
 import type { AppContext } from "./context";
 import type { ViewElement } from "@/view/types/elements";
 import type { ILoopManager } from "./types";
+import { createInlineDiffRenderer } from "@/renderer";
+import { layout } from "@/layout";
 
 export class LoopManager implements ILoopManager {
   private ctx: AppContext;
   private handleError: ReturnType<typeof createErrorHandler>;
+  private cleanupTerminalFn: (() => void) | null = null;
 
   constructor(context: AppContext, handleError: ReturnType<typeof createErrorHandler>) {
     this.ctx = context;
@@ -56,6 +59,20 @@ export class LoopManager implements ILoopManager {
       getState: () => ({}),
       handleError: this.handleError,
       profiler: profiler.isEnabled() ? profiler : undefined,
+      deps:
+        state.renderMode === "inline"
+          ? (() => {
+              const inline = createInlineDiffRenderer();
+              this.cleanupTerminalFn = () => {
+                const seq = inline.cleanup();
+                if (seq) terminal.write(seq);
+              };
+              return {
+                renderDiff: inline.renderDiff,
+                layout: (root, containerSize) => layout(root, containerSize, { inline: true }),
+              };
+            })()
+          : undefined,
     });
 
     renderer.renderOnce(true);
@@ -75,7 +92,9 @@ export class LoopManager implements ILoopManager {
       updaters.disposeResize(
         platform.onStdoutResize(() => {
           try {
-            terminal.clearScreen();
+            if (state.renderMode !== "inline") {
+              terminal.clearScreen();
+            }
             renderer.renderOnce(true);
           } catch (error) {
             this.handleError(createErrorContext("resize", error));
@@ -95,5 +114,10 @@ export class LoopManager implements ILoopManager {
       state.disposeResize();
       updaters.disposeResize(null);
     }
+  }
+
+  cleanupTerminal() {
+    this.cleanupTerminalFn?.();
+    this.cleanupTerminalFn = null;
   }
 }
