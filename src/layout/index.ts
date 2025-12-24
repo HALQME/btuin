@@ -26,7 +26,6 @@ function ensureKeys(element: ViewElement, prefix: string) {
   }
 }
 
-
 function isPercent(value: unknown): value is string {
   return typeof value === "string" && /^\s*\d+(\.\d+)?%\s*$/.test(value);
 }

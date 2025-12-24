@@ -8,7 +8,14 @@ export {
   showCursor,
   write,
 } from "./io";
-export { cleanup, cleanupWithoutClear, onKey, resetKeyHandlers, setInputParser, setupRawMode } from "./raw";
+export {
+  cleanup,
+  cleanupWithoutClear,
+  onKey,
+  resetKeyHandlers,
+  setInputParser,
+  setupRawMode,
+} from "./raw";
 export {
   bypassStderrWrite,
   bypassStdoutWrite,

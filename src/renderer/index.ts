@@ -10,7 +10,12 @@ export {
   wrapTextWidth,
 } from "./grapheme";
 export { cloneBuffer, createBuffer, drawText, fillRect, setCell } from "./grid";
-export { BufferPool, getGlobalBufferPool, resetGlobalBufferPool, setGlobalBufferPool } from "./pool";
+export {
+  BufferPool,
+  getGlobalBufferPool,
+  resetGlobalBufferPool,
+  setGlobalBufferPool,
+} from "./pool";
 export {
   createSanitizer,
   escapeSpecial,

@@ -1,11 +1,21 @@
 export type { Component, ComponentDefinition, ComponentInitContext } from "../components/core";
 export type { ExitReason, KeyHandler, RuntimeContext, TickHandler } from "../components/core";
-export type { DefineComponentOptions, MountedComponent, PropsOptions } from "../components/component";
+export type {
+  DefineComponentOptions,
+  MountedComponent,
+  PropsOptions,
+} from "../components/component";
 export type { PropDefinition, RenderFunction } from "../components/component";
 export type { KeyEventHook, LifecycleHook, TickHook } from "../components/lifecycle";
 
 export type { LayoutContainerSize, LayoutEngine, LayoutOptions } from "../layout/types";
-export type { ComputedLayout, Dimension, LayoutInputNode, LayoutStyle, Rect } from "../layout-engine/types";
+export type {
+  ComputedLayout,
+  Dimension,
+  LayoutInputNode,
+  LayoutStyle,
+  Rect,
+} from "../layout-engine/types";
 
 export type {
   App as AppType,
