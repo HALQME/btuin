@@ -55,3 +55,33 @@ const myMockTerminalAdapter: Partial<TerminalAdapter> = {
 
 createApp({ terminal: myMockTerminalAdapter /* ... */ });
 ```
+
+# Inline Mode
+
+Inline mode renders the UI in-place (without clearing the whole terminal screen), making it suitable for prompts, progress indicators, or tools that should leave scrollback intact.
+
+## Basic usage
+
+```ts
+import { createApp, ui } from "btuin";
+
+const app = createApp({
+  init: () => ({}),
+  render: () => ui.Text("Hello (inline)"),
+});
+
+await app.mount({ inline: true });
+```
+
+## Cleanup behavior
+
+- `inlineCleanupOnExit: false` (default): leaves the last rendered UI in the terminal output.
+- `inlineCleanupOnExit: true`: clears the inline UI on `exit()`/`unmount()`.
+
+```ts
+await app.mount({ inline: true, inlineCleanupOnExit: true });
+```
+
+## stdout/stderr passthrough
+
+When mounted in inline mode with the default terminal adapter, `process.stdout`/`process.stderr` output (including `console.log`) is printed above the inline UI and the UI is re-rendered afterwards.

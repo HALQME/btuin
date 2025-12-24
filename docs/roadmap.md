@@ -19,7 +19,7 @@
 - [x] Distribution
   - [x] Generate tarball for GitHub Release (including `src/layout-engine/native/`): `.github/workflows/release.yml`
   - [x] Automated check to ensure `npm pack` artifacts work with `src/layout-engine/native/` and `src/layout-engine/index.ts` resolution
-- [ ] Inline Mode
+- [x] Inline Mode
 - [ ] Components
   - [ ] Bring `TextInput` to a practical level (editing, cursor movement, IME finalization)
   - [ ] `ScrollView` / `ListView` (virtual scrolling as needed, mouse wheel support)

@@ -55,3 +55,33 @@ const myMockTerminalAdapter: Partial<TerminalAdapter> = {
 
 createApp({ terminal: myMockTerminalAdapter /* ... */ });
 ```
+
+# Inline モード
+
+Inline モードは、ターミナル全体を `clear` せずに現在のカーソル位置から UI を描画します。プロンプトや進捗表示など、スクロールバックを残したい用途に向いています。
+
+## 基本
+
+```ts
+import { createApp, ui } from "btuin";
+
+const app = createApp({
+  init: () => ({}),
+  render: () => ui.Text("Hello (inline)"),
+});
+
+await app.mount({ inline: true });
+```
+
+## 終了時のクリーンアップ
+
+- `inlineCleanupOnExit: false`（デフォルト）: 最後に描画された UI をそのまま残します。
+- `inlineCleanupOnExit: true`: `exit()` / `unmount()` 時に inline UI を消します。
+
+```ts
+await app.mount({ inline: true, inlineCleanupOnExit: true });
+```
+
+## stdout/stderr のパススルー
+
+デフォルトのターミナルアダプタで inline モードを使う場合、`process.stdout` / `process.stderr`（`console.log` 等）への出力は inline UI の上に表示され、出力後に UI が再描画されます。

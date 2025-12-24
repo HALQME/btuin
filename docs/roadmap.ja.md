@@ -19,7 +19,7 @@
 - [x] 配布
   - [x] GitHub Release 用 tarball 生成（`src/layout-engine/native/` 同梱）: `.github/workflows/release.yml`
   - [x] `npm pack` の成果物を展開し、`src/layout-engine/native/` と `src/layout-engine/index.ts` の解決が噛み合うことを自動チェック
-- [ ] Inline モード
+- [x] Inline モード
 - [ ] コンポーネント
   - [ ] `TextInput` を実用レベルへ（編集・カーソル移動・IME確定後の反映）
   - [ ] `ScrollView` / `ListView`（必要に応じて仮想スクロール、マウスホイール連動）
