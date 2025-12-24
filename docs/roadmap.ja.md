@@ -1,29 +1,49 @@
 # ロードマップ
 
-- [x] 入力
-  - [x] 入力パーサーをステートフル化（チャンク分割耐性）: `src/terminal/parser/ansi.ts`
+- [x] **入力**
+  - [x] 入力パーサーをステートフル化（チャンク分割耐性）
   - [x] `ESC` 単体 vs `Alt+Key` の曖昧さを解消
-  - [x] ブラケットペーストを「1イベント」に正規化: `src/terminal/parser/ansi.ts`
+  - [x] ブラケットペーストを「1イベント」に正規化
   - [x] ブラケットペーストの on/off をランタイムへ統合
-- [ ] マウス
-  - [ ] マウス入力（SGR など）をランタイムへ統合（有効化/無効化・イベント形式の確定）
+- [ ] **マウス**
+  - [ ] マウス入力（SGR など）をランタイムへ統合
   - [ ] ヒットテスト（`ComputedLayout` と座標の照合、重なり順の決定）
   - [ ] バブリング/伝播（子→親、キャンセル可能なイベントモデル）
-- [x] Developer Tools
-  - [x] シェル統合
-    - [x] stdout/stderr capture 基盤（listener/console patch/テストモード）: `src/terminal/capture.ts`
-    - [x] `useLog`（capture → reactive state）でログUIを作る
-  - [x] デバッグ
-    - [x] インスペクターモード（境界線/座標/サイズ可視化）
-    - [x] ホットリロード
-- [x] 配布
-  - [x] GitHub Release 用 tarball 生成（`src/layout-engine/native/` 同梱）: `.github/workflows/release.yml`
-  - [x] `npm pack` の成果物を展開し、`src/layout-engine/native/` と `src/layout-engine/index.ts` の解決が噛み合うことを自動チェック
-- [x] Inline モード
+- [ ] **Developer Tools**
+  - [x] シェル統合（stdout/stderr capture, `useLog`）
+  - [x] デバッグ基盤（インスペクターモード, ホットリロード）
+  - [ ] **レイアウトエンジンの詳細可視化**
+    - [ ] Flexbox プロパティのインスペクト（`flex-grow`, `padding` 等の表示）
+    - [ ] 計算済みボックスモデルのカラー表示（Margin/Padding の視覚化）
+    - [ ] Z-Index / 階層構造の 3D 可視化
+  - [ ] **パフォーマンス・プロファイリング**
+    - [ ] レンダリング・タイムライン（FFI境界・レイアウト計算・Diff生成の計測）
+    - [ ] リアクティビティ・グラフ（どの Ref がどのコンポーネントを更新したかの可視化）
+  - [ ] **双方向デバッグ**
+    - [ ] ブラウザ側からのリアクティブ・ステート（Ref）の直接書き換え
+    - [ ] リモートキーイベント送信（ブラウザ仮想キーボードからの入力注入）
+- [ ] **アーキテクチャ・最適化**
+  - [ ] **FFI通信の効率化**
+    - [ ] フルシリアライズの回避（Dirty Checking による部分的なレイアウト更新）
+  - [ ] **大規模描画サポート**
+    - [ ] 仮想ウィンドウ化（Virtual Scrolling）による数万行のリスト表示
+    - [ ] スクロールリージョン（DECSTBM）を活用した高速スクロール
+  - [ ] **リアクティビティの高度化**
+    - [ ] Effect Scope の導入（コンポーネントに紐付いた Effect の自動追跡・破棄）
+- [ ] **開発体験 (DX) / 大規模開発サポート**
+  - [ ] **状態共有パターン**
+  - [ ] `Provide/Inject` または `Context API` 相当の依存注入機能
+- [ ] **安全性・堅牢性**
+  - [x] FFI 境界の同期テスト
+  - [ ] 致命的エラー時のセーフティネット（パニック時の Raw Mode 強制解除）
+- [ ] **AI・アクセシビリティ**
+  - [ ] セマンティック・メタデータのサポート（AIエージェントや将来のA11y支援用）
 - [ ] コンポーネント
-  - [ ] `TextInput` を実用レベルへ（編集・カーソル移動・IME確定後の反映）
-  - [ ] `ScrollView` / `ListView`（必要に応じて仮想スクロール、マウスホイール連動）
-- [x] 安全性
-  - [x] FFI 境界の同期テスト（Rust 定数/構造体 ↔ JS 定義）を CI に追加
+  - [ ] `TextInput` を実用レベルへ（編集・カーソル移動・IME）
+  - [ ] `ScrollView` / `ListView`（仮想スクロール、マウスホイール連動）
+- [x] 配布
+  - [x] GitHub Release 用 tarball 生成
+  - [x] npm pack 成果物の整合性チェック
+- [x] Inline モード
 - [ ] ドキュメント / スターター
   - [ ] `examples/` の拡充
