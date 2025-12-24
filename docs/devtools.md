@@ -15,6 +15,7 @@ You can also enable it without code by setting env vars:
 
 - `BTUIN_DEVTOOLS=1` (enable)
 - `BTUIN_DEVTOOLS_HOST` / `BTUIN_DEVTOOLS_PORT` (optional)
+- `BTUIN_DEVTOOLS_CONTROLLER` (optional; module spec/path for the controller)
 
 # Hot Reload (Dev Runner)
 
@@ -41,22 +42,9 @@ Options:
 - `--watch <path>` (repeatable)
 - `--debounce <ms>` (default: `50`)
 - `--cwd <path>` (default: `process.cwd()`)
-- `--no-preserve-state` (default: preserve enabled)
 - `--no-tcp` (disable TCP reload trigger)
 - `--tcp-host <host>` (default: `127.0.0.1`)
 - `--tcp-port <port>` (default: `0`)
-
-## Preserve state across restarts
-
-Use `enableHotReloadState()` in your app to opt into state preservation.
-
-Disable state preservation:
-
-```bash
-btuin dev examples/devtools.ts --no-preserve-state
-```
-
-Note: hot reload is applied by `btuin dev` (dev runner).
 
 ## TCP Trigger (Optional)
 
@@ -74,23 +62,4 @@ Or JSONL:
 printf '{"type":"reload"}\n' | nc 127.0.0.1 <port>
 ```
 
-## Preserving State (Opt-in)
-
-Because the runner restarts the process, in-memory state resets by default.
-
-If you want to preserve state across restarts, opt in from your app:
-
-```ts
-import { enableHotReloadState, ref } from "btuin";
-
-const count = ref(0);
-
-enableHotReloadState({
-  getSnapshot: () => ({ count: count.value }),
-  applySnapshot: (snapshot) => {
-    if (!snapshot || typeof snapshot !== "object") return;
-    const maybe = (snapshot as any).count;
-    if (typeof maybe === "number") count.value = maybe;
-  },
-});
-```
+Note: hot reload is applied by `btuin dev` (dev runner).

@@ -8,7 +8,6 @@ export type BtuinCliParsed =
       cwd?: string;
       watch: string[];
       debounceMs?: number;
-      preserveState: boolean;
       devtools: { enabled: boolean };
       openBrowser: boolean;
       tcp: { enabled: false } | { enabled: true; host?: string; port?: number };
@@ -40,7 +39,6 @@ export function parseBtuinCliArgs(argv: string[]): BtuinCliParsed {
   let tcpEnabled = true;
   let tcpHost: string | undefined;
   let tcpPort: number | undefined;
-  let preserveState = true;
   let devtoolsEnabled = true;
   let openBrowser = true;
 
@@ -95,11 +93,6 @@ export function parseBtuinCliArgs(argv: string[]): BtuinCliParsed {
       continue;
     }
 
-    if (a === "--no-preserve-state") {
-      preserveState = false;
-      continue;
-    }
-
     if (a === "--tcp-host") {
       const v = takeFlagValue(rest, i, "--tcp-host");
       tcpHost = v;
@@ -139,7 +132,6 @@ export function parseBtuinCliArgs(argv: string[]): BtuinCliParsed {
     cwd,
     watch,
     debounceMs,
-    preserveState,
     devtools: { enabled: devtoolsEnabled },
     openBrowser,
     tcp: tcpEnabled ? { enabled: true, host: tcpHost, port: tcpPort } : { enabled: false },

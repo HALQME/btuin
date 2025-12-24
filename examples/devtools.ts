@@ -1,18 +1,9 @@
-import { createApp, enableHotReloadState, ref } from "@/index";
+import { createApp, ref } from "@/index";
 import { Text, VStack } from "@/view";
 
 const app = createApp({
   init({ onKey, onTick, runtime }) {
     const count = ref(0);
-
-    enableHotReloadState({
-      getSnapshot: () => ({ count: count.value }),
-      applySnapshot: (snapshot) => {
-        if (!snapshot || typeof snapshot !== "object") return;
-        const maybe = (snapshot as any).count;
-        if (typeof maybe === "number") count.value = maybe;
-      },
-    });
 
     onKey((k) => {
       if (k.name === "up") count.value++;

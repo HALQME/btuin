@@ -15,6 +15,7 @@ btuin には、TUI 開発時にアプリを観測するための軽量なブラ�
 
 - `BTUIN_DEVTOOLS=1`（有効化）
 - `BTUIN_DEVTOOLS_HOST` / `BTUIN_DEVTOOLS_PORT`（任意）
+- `BTUIN_DEVTOOLS_CONTROLLER`（任意 / controller の module spec/path）
 
 # ホットリロード（開発用ランナー）
 
@@ -41,22 +42,9 @@ btuin dev src/main.ts -- --foo bar
 - `--watch <path>`（複数指定可）
 - `--debounce <ms>`（デフォルト: `50`）
 - `--cwd <path>`（デフォルト: `process.cwd()`）
-- `--no-preserve-state`（デフォルト: preserve 有効）
 - `--no-tcp`（TCP リロードトリガー無効化）
 - `--tcp-host <host>`（デフォルト: `127.0.0.1`）
 - `--tcp-port <port>`（デフォルト: `0`）
-
-## リスタート時のステート保持
-
-アプリ側で `enableHotReloadState()` を使うと、リスタート間で状態を引き継げます。
-
-ステート保持を無効化:
-
-```bash
-btuin dev examples/devtools.ts --no-preserve-state
-```
-
-注意: ホットリロードは `btuin dev`（dev runner）が適用します。
 
 ## TCPトリガ（任意）
 
@@ -74,23 +62,4 @@ JSONLでもOK:
 printf '{"type":"reload"}\n' | nc 127.0.0.1 <port>
 ```
 
-## ステート保持（任意 / opt-in）
-
-この方式はプロセスを再起動するため、通常はメモリ上の状態はリセットされます。
-
-再起動後も状態を引き継ぎたい場合は、アプリ側で opt-in します:
-
-```ts
-import { enableHotReloadState, ref } from "btuin";
-
-const count = ref(0);
-
-enableHotReloadState({
-  getSnapshot: () => ({ count: count.value }),
-  applySnapshot: (snapshot) => {
-    if (!snapshot || typeof snapshot !== "object") return;
-    const maybe = (snapshot as any).count;
-    if (typeof maybe === "number") count.value = maybe;
-  },
-});
-```
+注意: ホットリロードは `btuin dev`（dev runner）が適用します。

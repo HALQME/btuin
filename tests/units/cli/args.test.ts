@@ -13,7 +13,6 @@ describe("btuin cli args", () => {
     expect(parsed.entry).toBe("examples/devtools.ts");
     expect(parsed.childArgs).toEqual(["--foo", "bar"]);
     expect(parsed.tcp.enabled).toBe(true);
-    expect(parsed.preserveState).toBe(true);
   });
 
   it("should parse watch and tcp options", () => {
@@ -45,10 +44,5 @@ describe("btuin cli args", () => {
     expect(parsed.tcp).toEqual({ enabled: false });
   });
 
-  it("should disable preserve state", () => {
-    const parsed = parseBtuinCliArgs(["dev", "src/main.ts", "--no-preserve-state"]);
-    expect(parsed.kind).toBe("dev");
-    if (parsed.kind !== "dev") return;
-    expect(parsed.preserveState).toBe(false);
-  });
+  // preserve-state support intentionally removed
 });

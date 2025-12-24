@@ -25,7 +25,6 @@ export type {
   MountOptions,
   RenderMode,
 } from "../runtime/types";
-export type { EnableHotReloadStateOptions } from "../dev/hot-reload-state";
 export type { PlatformAdapter } from "../runtime/platform-adapter";
 export type { TerminalAdapter } from "../runtime/terminal-adapter";
 export type { FrameMetrics, ProfileOptions, ProfileOutput } from "../runtime/profiler";

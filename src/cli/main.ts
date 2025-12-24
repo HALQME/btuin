@@ -1,8 +1,8 @@
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { runHotReloadProcess } from "../dev/hot-reload";
 import { parseBtuinCliArgs } from "./args";
+import { runHotReloadProcess } from "./hot-reload";
 
 function printHelp() {
   process.stderr.write(
@@ -21,7 +21,6 @@ function printHelp() {
       "  --watch <path>       Add watch path (repeatable)",
       "  --debounce <ms>      Debounce fs events (default: 50)",
       "  --cwd <path>         Child working directory (default: process.cwd())",
-      "  --no-preserve-state  Disable state preservation (default: enabled)",
       "  --no-devtools        Disable browser DevTools auto-enable",
       "  --no-open-browser    Do not auto-open DevTools URL in browser",
       "  --no-tcp             Disable TCP reload trigger",
@@ -115,15 +114,29 @@ export async function btuinCli(argv: string[]) {
   }
 
   const devtoolsEnv = (() => {
+    const out: Record<string, string | undefined> = {};
+
     if (!parsed.devtools.enabled) {
       return {
+        ...out,
         BTUIN_DEVTOOLS: undefined,
         BTUIN_DEVTOOLS_HOST: undefined,
         BTUIN_DEVTOOLS_PORT: undefined,
+        BTUIN_DEVTOOLS_CONTROLLER: undefined,
       };
     }
 
-    const env: Record<string, string | undefined> = { BTUIN_DEVTOOLS: "1" };
+    const env: Record<string, string | undefined> = { ...out, BTUIN_DEVTOOLS: "1" };
+
+    // Let the runtime load DevTools via an env-provided module spec/path.
+    // This avoids hard-coding an internal import path, which makes future package split easier.
+    try {
+      env.BTUIN_DEVTOOLS_CONTROLLER = fileURLToPath(
+        new URL("../devtools/controller.ts", import.meta.url),
+      );
+    } catch {
+      // ignore
+    }
 
     // Keep DevTools URL stable across hot-reload restarts by pinning host/port once.
     const host = process.env.BTUIN_DEVTOOLS_HOST ?? "127.0.0.1";
@@ -164,7 +177,6 @@ export async function btuinCli(argv: string[]) {
     args: [entryAbs, ...parsed.childArgs],
     cwd,
     watch: { paths: watchPaths, debounceMs: parsed.debounceMs },
-    preserveState: parsed.preserveState,
     env: devtoolsEnv,
     openDevtoolsBrowser: parsed.openBrowser && parsed.devtools.enabled,
     tcp: parsed.tcp.enabled

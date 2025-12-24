@@ -9,6 +9,8 @@ import { createRenderer } from "./render-loop";
 import { createErrorContext, createErrorHandler } from "./error-boundary";
 import type { AppContext } from "./context";
 import type { ILoopManager } from "./types";
+import { pathToFileURL } from "node:url";
+import { resolve } from "node:path";
 
 type DevtoolsControllerLike = {
   handleKey(event: KeyEvent): boolean;
@@ -43,7 +45,7 @@ export class LoopManager implements ILoopManager {
 
     this.devtoolsInit = (async () => {
       try {
-        const mod: any = await import("../" + "devtools/controller");
+        const mod: any = await import(resolveDevtoolsControllerModule());
         const factory: undefined | ((opts: unknown) => DevtoolsControllerLike) =
           mod?.createDevtoolsController;
         if (!factory) return;
@@ -249,4 +251,13 @@ export class LoopManager implements ILoopManager {
     this.cleanupTerminalFn?.();
     this.cleanupTerminalFn = null;
   }
+}
+
+function resolveDevtoolsControllerModule(): string {
+  const spec = process.env.BTUIN_DEVTOOLS_CONTROLLER;
+  if (!spec) return "../" + "devtools/controller";
+  if (spec.startsWith("file:")) return spec;
+  if (spec.startsWith("/")) return pathToFileURL(spec).href;
+  if (spec.startsWith(".")) return pathToFileURL(resolve(process.cwd(), spec)).href;
+  return spec;
 }

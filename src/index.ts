@@ -3,7 +3,6 @@
  */
 
 export { createApp, App } from "./runtime";
-export * from "./dev";
 export { defineComponent } from "./components";
 export * from "./view";
 export * from "./hooks/";
