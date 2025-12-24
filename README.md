@@ -48,6 +48,14 @@ const app = createApp({
 await app.mount();
 ```
 
+## Inline Mode
+
+Render without clearing the whole screen:
+
+```ts
+await app.mount({ inline: true, inlineCleanupOnExit: true });
+```
+
 ## API Overview
 
 - `createApp(options)`: Creates an application instance.
@@ -61,6 +69,7 @@ await app.mount();
 ## Links
 
 - [**Documentation**](./docs/) (Architecture, Roadmap)
+- [**Inline Mode**](./docs/inline-mode.md)
 - [**GitHub**](https://github.com/HALQME/btuin) (Source Code, Issues)
 
 ## Language

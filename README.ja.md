@@ -48,6 +48,14 @@ const app = createApp({
 await app.mount();
 ```
 
+## Inline モード
+
+ターミナル全体を消さずに描画します:
+
+```ts
+await app.mount({ inline: true, inlineCleanupOnExit: true });
+```
+
 ## API概要
 
 - `createApp(options)`: アプリケーションインスタンスを作成します。
@@ -61,6 +69,7 @@ await app.mount();
 ## リンク
 
 - [**ドキュメント**](./docs/) (アーキテクチャ, ロードマップ)
+- [**Inline モード**](./docs/inline-mode.ja.md)
 - [**GitHub**](https://github.com/HALQME/btuin) (ソースコード, Issue)
 
 ## 言語
