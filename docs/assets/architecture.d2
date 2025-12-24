@@ -1,0 +1,93 @@
+direction: left
+
+classes: {
+  step: {
+    style.fill: "#F8FAFC"
+    style.stroke: "#334155"
+  }
+  file: {
+    style.fill: "#E8F3FF"
+    style.stroke: "#3B82F6"
+  }
+  io: {
+    style.fill: "#FFF7ED"
+    style.stroke: "#F97316"
+  }
+}
+
+entry: "User\nawait app.mount()" {
+  class: step
+}
+
+app_ts: "src/runtime/app.ts\nmount()" {
+  class: file
+}
+
+terminal_setup: "Terminal setup\n(1) patchConsole()\n(2) startCapture()\n(3) setupRawMode()\n(4) setBracketedPaste(true)\n(5) clearScreen() [fullscreen]" {
+  class: step
+}
+
+mount_component: "mountComponent(root)\n-> init(ctx)\n-> returns state" {
+  class: step
+}
+
+loop_start: "LoopManager.start()\n- terminal.onKey(...)\n- createRenderer(...)\n- renderOnce(true)\n- render() effect" {
+  class: step
+}
+
+signals: "Platform hooks\nonExit / SIGINT / SIGTERM\n-> app.exit(...)" {
+  class: step
+}
+
+steady: "Steady state\n- key events -> handleComponentKey\n- resize -> rerender" {
+  class: step
+}
+
+reactive: "Reactivity\n(init/setup creates refs)\nrender() reads -> deps tracked\nstate change -> rerender" {
+  class: step
+}
+
+layout: "Layout\nlayout-engine (Rust FFI)\nView tree -> computed layout\n(x/y/w/h)" {
+  class: step
+}
+
+diff: "Diff + buffer\nrenderDiff(prev, next)\n-> minimal ANSI" {
+  class: step
+}
+
+write_path: "UI write path\nterminal.write(str)\n-> src/terminal/io.ts\n-> UI TTY (stdout/stderr/devtty)\n(bypass capture)" {
+  class: io
+}
+
+exit_path: "Exit path\nLifecycleManager.exit()\n- run onExit handlers\n- unmount()\n- if normal: compute exitOutput\n- UI cleanup to TTY\n- exitOutput -> stdout only\n- platform.exit(code)" {
+  class: step
+}
+
+stdout: "stdout\n(pipe/redirect)" {
+  shape: cylinder
+  class: io
+}
+
+tty: "TTY\n(stdout/stderr/devtty)" {
+  shape: cylinder
+  class: io
+}
+
+entry -> app_ts: "call"
+app_ts -> terminal_setup: "in order"
+app_ts -> mount_component: "mount root"
+app_ts -> loop_start: "start loop"
+app_ts -> signals: "register handlers"
+loop_start -> steady: "runs until exit"
+
+mount_component -> reactive: "init/setup"
+loop_start -> reactive: "effect(render)"
+reactive -> layout: "layout(view)"
+layout -> diff: "render to buffer"
+diff -> write_path: "ANSI"
+write_path -> tty: "UI"
+
+signals -> exit_path: "trigger exit"
+steady -> exit_path: "runtime.exit()"
+exit_path -> tty: "cleanup sequences"
+exit_path -> stdout: "exitOutput only"

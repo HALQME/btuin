@@ -1,4 +1,4 @@
-import { getOriginalStdout } from "./capture";
+import { getUiOutputStream } from "./tty-streams";
 
 /**
  * Gets the current terminal size.
@@ -7,36 +7,38 @@ import { getOriginalStdout } from "./capture";
  * @returns Object with cols and rows properties
  */
 export function getTerminalSize(): { cols: number; rows: number } {
-  const cols = process.stdout.columns || 80;
-  const rows = process.stdout.rows || 24;
+  const stream = getUiOutputStream();
+  const cols = stream.columns || 80;
+  const rows = stream.rows || 24;
   return { cols, rows };
 }
 
 export function clearScreen() {
-  getOriginalStdout().write("\x1b[2J");
-  getOriginalStdout().write("\x1b[H");
+  const out = getUiOutputStream();
+  out.write("\x1b[2J");
+  out.write("\x1b[H");
 }
 
 export function moveCursor(row: number, col: number) {
-  getOriginalStdout().write(`\x1b[${row};${col}H`);
+  getUiOutputStream().write(`\x1b[${row};${col}H`);
 }
 
 export function write(str: string) {
-  getOriginalStdout().write(str);
+  getUiOutputStream().write(str);
 }
 
 export function hideCursor() {
-  getOriginalStdout().write("\x1b[?25l");
+  getUiOutputStream().write("\x1b[?25l");
 }
 
 export function showCursor() {
-  getOriginalStdout().write("\x1b[?25h");
+  getUiOutputStream().write("\x1b[?25h");
 }
 
 export function enableBracketedPaste() {
-  getOriginalStdout().write("\x1b[?2004h");
+  getUiOutputStream().write("\x1b[?2004h");
 }
 
 export function disableBracketedPaste() {
-  getOriginalStdout().write("\x1b[?2004l");
+  getUiOutputStream().write("\x1b[?2004l");
 }

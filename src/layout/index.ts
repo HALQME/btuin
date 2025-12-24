@@ -39,7 +39,7 @@ export interface LayoutContainerSize {
 }
 
 export interface LayoutOptions {
-  inline?: boolean
+  inline?: boolean;
 }
 
 function isPercent(value: unknown): value is string {

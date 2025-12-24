@@ -80,7 +80,7 @@ export class LifecycleManager {
       terminal.clearScreen();
     }
     if (output) {
-      terminal.write(output.endsWith("\n") ? output : `${output}\n`);
+      process.stdout.write(output.endsWith("\n") ? output : `${output}\n`);
     }
 
     platform.exit(code);

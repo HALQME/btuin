@@ -9,46 +9,70 @@ describe("Runtime exit integration", () => {
     const terminal = createMockTerminal();
     const platform = createMockPlatform();
 
-    const app = createApp({
-      terminal,
-      platform,
-      init({ runtime }) {
-        runtime.setExitOutput("bye");
-        runtime.exit(0);
-        return {};
-      },
-      render: () => Block(Text("ignored")),
-    });
+    const originalStdoutWrite = process.stdout.write;
+    let stdout = "";
+    process.stdout.write = ((chunk: any) => {
+      stdout += typeof chunk === "string" ? chunk : chunk.toString();
+      return true;
+    }) as any;
 
-    await app.mount();
-    await Bun.sleep(50);
+    try {
+      const app = createApp({
+        terminal,
+        platform,
+        init({ runtime }) {
+          runtime.setExitOutput("bye");
+          runtime.exit(0);
+          return {};
+        },
+        render: () => Block(Text("ignored")),
+      });
 
-    expect(platform.state.exitCode).toBe(0);
-    expect(sanitizeAnsi(terminal.output)).toContain("bye");
-    app.unmount();
+      await app.mount();
+      await Bun.sleep(50);
+
+      expect(platform.state.exitCode).toBe(0);
+      expect(stdout).toContain("bye");
+      expect(sanitizeAnsi(terminal.output)).not.toContain("bye");
+      app.unmount();
+    } finally {
+      process.stdout.write = originalStdoutWrite;
+    }
   });
 
   it("does not write exit output on sigint exit", async () => {
     const terminal = createMockTerminal();
     const platform = createMockPlatform();
 
-    const app = createApp({
-      terminal,
-      platform,
-      init({ runtime }) {
-        runtime.setExitOutput("should-not-print");
-        runtime.exit(0, "sigint");
-        return {};
-      },
-      render: () => Block(Text("ignored")),
-    });
+    const originalStdoutWrite = process.stdout.write;
+    let stdout = "";
+    process.stdout.write = ((chunk: any) => {
+      stdout += typeof chunk === "string" ? chunk : chunk.toString();
+      return true;
+    }) as any;
 
-    await app.mount();
-    await Bun.sleep(50);
+    try {
+      const app = createApp({
+        terminal,
+        platform,
+        init({ runtime }) {
+          runtime.setExitOutput("should-not-print");
+          runtime.exit(0, "sigint");
+          return {};
+        },
+        render: () => Block(Text("ignored")),
+      });
 
-    expect(platform.state.exitCode).toBe(0);
-    expect(sanitizeAnsi(terminal.output)).not.toContain("should-not-print");
-    app.unmount();
+      await app.mount();
+      await Bun.sleep(50);
+
+      expect(platform.state.exitCode).toBe(0);
+      expect(stdout).not.toContain("should-not-print");
+      expect(sanitizeAnsi(terminal.output)).not.toContain("should-not-print");
+      app.unmount();
+    } finally {
+      process.stdout.write = originalStdoutWrite;
+    }
   });
 
   it("triggers sigint exit on unhandled ctrl+c", async () => {
