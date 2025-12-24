@@ -1,14 +1,14 @@
-import type { KeyEvent } from "@/terminal";
-import { stop } from "@/reactivity";
-import { Block } from "@/view/primitives";
-import { handleComponentKey, renderComponent } from "@/components";
+import type { KeyEvent } from "../terminal/types/key-event";
+import { stop } from "../reactivity";
+import { handleComponentKey, renderComponent } from "../components";
+import { createInlineDiffRenderer } from "../renderer";
+import { layout } from "../layout";
+import { Block } from "../view/primitives";
+import type { ViewElement } from "../view/types/elements";
 import { createRenderer } from "./render-loop";
 import { createErrorContext, createErrorHandler } from "./error-boundary";
 import type { AppContext } from "./context";
-import type { ViewElement } from "@/view/types/elements";
 import type { ILoopManager } from "./types";
-import { createInlineDiffRenderer } from "@/renderer";
-import { layout } from "@/layout";
 
 export class LoopManager implements ILoopManager {
   private ctx: AppContext;

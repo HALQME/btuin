@@ -1,10 +1,10 @@
-import type { ComponentInitContext, ExitReason } from "@/components/core";
-import type { MountedComponent } from "@/components";
+import type { ComponentInitContext, ExitReason } from "../components/core";
+import type { MountedComponent } from "../components/component";
+import type { InputParser } from "../terminal/parser/types";
+import type { ViewElement } from "../view/types/elements";
 import type { TerminalAdapter } from "./terminal-adapter";
 import type { PlatformAdapter } from "./platform-adapter";
 import type { ProfileOptions } from "./profiler";
-import type { InputParser } from "@/terminal/parser/types";
-import type { ViewElement } from "@/view/types/elements";
 
 export interface ILoopManager {
   start(rows: number, cols: number): void;

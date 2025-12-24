@@ -24,26 +24,13 @@
  * ```
  */
 
-export { reactive, isReactive, toRaw, shallowReactive, type ReactiveFlags } from "./reactive";
+export { reactive, isReactive, toRaw, shallowReactive } from "./reactive";
 
-export { ref, shallowRef, isRef, unref, toRef, toRefs, customRef, type Ref } from "./ref";
+export { ref, shallowRef, isRef, unref, toRef, toRefs, customRef } from "./ref";
 
-export {
-  computed,
-  type ComputedRef,
-  type ComputedGetter,
-  type ComputedSetter,
-  type ComputedUnwrap,
-} from "./computed";
+export { computed } from "./computed";
 
-export {
-  watch,
-  watchEffect,
-  type WatchSource,
-  type WatchCallback,
-  type WatchOptions,
-  type WatchStopHandle,
-} from "./watch";
+export { watch, watchEffect } from "./watch";
 
 export {
   effect,
@@ -55,7 +42,4 @@ export {
   resetTracking,
   getCurrentEffect,
   ReactiveEffect,
-  type EffectFn,
-  type EffectScheduler,
-  type ReactiveEffectOptions,
 } from "./effect";

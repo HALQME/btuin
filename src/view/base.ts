@@ -1,7 +1,7 @@
-import type { KeyEventHook } from "@/components/lifecycle";
-import type { KeyEvent } from "@/terminal";
-import type { OutlineOptions } from "@/renderer";
-import type { Dimension, LayoutStyle } from "@/layout-engine";
+import type { KeyEventHook } from "../components/lifecycle";
+import type { Dimension, LayoutStyle } from "../layout-engine/types";
+import type { OutlineOptions } from "../renderer/types";
+import type { KeyEvent } from "../terminal/types/key-event";
 
 // 1. 基本的なプロパティ定義（スタイリング以外）
 export interface ViewProps {

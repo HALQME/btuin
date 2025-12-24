@@ -1,7 +1,6 @@
-import type { ViewElement } from "@/view/types/elements";
-import type { ComputedLayout } from "@/layout-engine";
-import type { FocusTarget } from "@/view/types/focus";
-import { isBlock } from "@/view/types/elements";
+import type { ComputedLayout } from "../layout-engine/types";
+import { isBlock, type ViewElement } from "../view/types/elements";
+import type { FocusTarget } from "../view/types/focus";
 
 function visitFocusTargets(
   element: ViewElement,

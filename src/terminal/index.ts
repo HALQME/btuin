@@ -1,4 +1,37 @@
-export * from "./io";
-export * from "./raw";
-export * from "./capture";
-export * from "./types";
+export {
+  clearScreen,
+  disableBracketedPaste,
+  enableBracketedPaste,
+  getTerminalSize,
+  hideCursor,
+  moveCursor,
+  showCursor,
+  write,
+} from "./io";
+export {
+  cleanup,
+  cleanupWithoutClear,
+  onKey,
+  resetKeyHandlers,
+  setInputParser,
+  setupRawMode,
+} from "./raw";
+export {
+  bypassStderrWrite,
+  bypassStdoutWrite,
+  clearCapturedOutput,
+  createConsoleCapture,
+  disableTestMode,
+  disposeSingletonCapture,
+  enableTestMode,
+  getCapturedOutput,
+  getConsoleCaptureInstance,
+  getOriginalStderr,
+  getOriginalStdout,
+  isCapturing,
+  onStderr,
+  onStdout,
+  patchConsole,
+  startCapture,
+  stopCapture,
+} from "./capture";

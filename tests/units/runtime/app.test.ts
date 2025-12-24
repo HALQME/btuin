@@ -1,9 +1,7 @@
 import { describe, it, expect, afterEach, beforeAll } from "bun:test";
-import type { App } from "@/runtime/types";
 import { ref } from "@/reactivity";
-import type { KeyEvent } from "@/terminal";
 import { Block, Text } from "@/view/primitives";
-import type { TerminalAdapter } from "@/runtime/terminal-adapter";
+import type { AppType as App, KeyEvent, TerminalAdapter } from "@/types";
 
 const keyHandlers: any[] = [];
 

@@ -1,4 +1,4 @@
-import { getUiOutputStream } from "@/terminal/tty-streams";
+import { getUiOutputStream } from "../terminal/tty-streams";
 
 export interface PlatformAdapter {
   onStdoutResize(handler: () => void): () => void;

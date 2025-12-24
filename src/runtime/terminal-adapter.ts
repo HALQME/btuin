@@ -1,6 +1,6 @@
-import type { KeyEvent } from "@/terminal";
-import * as terminal from "@/terminal";
-import type { InputParser } from "@/terminal/parser/types";
+import type { KeyEvent } from "../terminal/types/key-event";
+import * as terminal from "../terminal";
+import type { InputParser } from "../terminal/parser/types";
 
 export interface TerminalAdapter {
   setupRawMode(): void;

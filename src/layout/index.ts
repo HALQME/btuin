@@ -1,17 +1,10 @@
-import {
-  computeLayout as computeLayoutWasm,
-  type LayoutInputNode,
-  type ComputedLayout,
-  type Dimension,
-} from "@/layout-engine";
-import { isBlock, isText, type ViewElement, type BlockView } from "@/view/types/elements";
-import { measureTextWidth } from "@/renderer/grapheme";
+import { computeLayout as computeLayoutWasm } from "../layout-engine";
+import type { ComputedLayout, Dimension, LayoutInputNode } from "../layout-engine/types";
+import { measureTextWidth } from "../renderer/grapheme";
+import { isBlock, isText, type BlockView, type ViewElement } from "../view/types/elements";
+import type { LayoutContainerSize, LayoutEngine, LayoutOptions } from "./types";
 
 export { renderElement } from "./renderer";
-
-export interface LayoutEngine {
-  computeLayout(root: LayoutInputNode): ComputedLayout;
-}
 
 function ensureKeys(element: ViewElement, prefix: string) {
   if (!element.identifier && !element.key) {
@@ -31,15 +24,6 @@ function ensureKeys(element: ViewElement, prefix: string) {
       ensureKeys(child, `${element.identifier}/${child.type}-${i}`);
     }
   }
-}
-
-export interface LayoutContainerSize {
-  width: number;
-  height: number;
-}
-
-export interface LayoutOptions {
-  inline?: boolean;
 }
 
 function isPercent(value: unknown): value is string {

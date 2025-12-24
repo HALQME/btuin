@@ -1,6 +1,4 @@
-import type { TerminalAdapter } from "@/runtime/terminal-adapter";
-import type { KeyEvent } from "@/terminal";
-import type { PlatformAdapter } from "@/runtime/platform-adapter";
+import type { KeyEvent, PlatformAdapter, TerminalAdapter } from "@/types";
 
 export type MockTerminal = TerminalAdapter & {
   output: string;

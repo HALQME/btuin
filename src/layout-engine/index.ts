@@ -3,8 +3,6 @@ import path from "node:path";
 import type { LayoutInputNode, ComputedLayout, Dimension, LayoutStyle } from "./types";
 import { existsSync } from "node:fs";
 
-export * from "./types";
-
 // --- Data Layout Constants (must match Rust) ---
 // prettier-ignore
 enum StyleProp {
