@@ -1,0 +1,29 @@
+# ロードマップ
+
+- [x] 入力
+  - [x] 入力パーサーをステートフル化（チャンク分割耐性）: `src/terminal/parser/ansi.ts`
+  - [x] `ESC` 単体 vs `Alt+Key` の曖昧さを解消
+  - [x] ブラケットペーストを「1イベント」に正規化: `src/terminal/parser/ansi.ts`
+  - [x] ブラケットペーストの on/off をランタイムへ統合
+- [ ] マウス
+  - [ ] マウス入力（SGR など）をランタイムへ統合（有効化/無効化・イベント形式の確定）
+  - [ ] ヒットテスト（`ComputedLayout` と座標の照合、重なり順の決定）
+  - [ ] バブリング/伝播（子→親、キャンセル可能なイベントモデル）
+- [ ] Developer Tools
+  - [ ] シェル統合
+    - [x] stdout/stderr capture 基盤（listener/console patch/テストモード）: `src/terminal/capture.ts`
+    - [ ] `useLog`（capture → reactive state）でログUIを作る
+  - [ ] デバッグ
+    - [ ] インスペクターモード（境界線/座標/サイズ可視化）
+    - [ ] ホットリロード
+- [x] 配布
+  - [x] GitHub Release 用 tarball 生成（`src/layout-engine/native/` 同梱）: `.github/workflows/release.yml`
+  - [x] `npm pack` の成果物を展開し、`src/layout-engine/native/` と `src/layout-engine/index.ts` の解決が噛み合うことを自動チェック
+- [ ] Inline モード
+- [ ] コンポーネント
+  - [ ] `TextInput` を実用レベルへ（編集・カーソル移動・IME確定後の反映）
+  - [ ] `ScrollView` / `ListView`（必要に応じて仮想スクロール、マウスホイール連動）
+- [x] 安全性
+  - [x] FFI 境界の同期テスト（Rust 定数/構造体 ↔ JS 定義）を CI に追加
+- [ ] ドキュメント / スターター
+  - [ ] `examples/` の拡充
