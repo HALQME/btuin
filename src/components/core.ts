@@ -1,5 +1,5 @@
-import type { KeyEvent } from "@/terminal";
-import type { ViewElement } from "@/view/types/elements";
+import type { KeyEvent } from "../terminal/types/key-event";
+import type { ViewElement } from "../view/types/elements";
 
 export type KeyHandler = (key: KeyEvent) => void | boolean;
 export type TickHandler = () => void;

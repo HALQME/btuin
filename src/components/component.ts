@@ -1,7 +1,6 @@
-import type { KeyEvent } from "@/terminal";
+import type { KeyEvent } from "../terminal/types/key-event";
 import type { Component, ComponentInitContext, ExitReason, RuntimeContext } from "./core";
-import type { ViewElement } from "@/view/types/elements";
-import { isBlock } from "@/view/types/elements";
+import { isBlock, type ViewElement } from "../view/types/elements";
 import {
   createComponentInstance,
   invokeHooks,

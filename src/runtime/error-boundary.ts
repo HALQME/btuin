@@ -4,6 +4,9 @@
  * Handles error contexts and provides error handling utilities for the runtime.
  */
 
+import { createWriteStream } from "node:fs";
+import { getOriginalStderr } from "../terminal";
+
 /**
  * Error context information for error handlers
  */
@@ -28,10 +31,6 @@ export type ErrorHandler = (context: ErrorContext) => void;
  * @param errorLogPath - Optional file path to write error logs to
  * @returns Error handling function
  */
-import { createWriteStream } from "fs";
-import { getOriginalStderr } from "@/terminal";
-
-// ...
 
 export function createErrorHandler(
   userHandler: ErrorHandler | undefined,

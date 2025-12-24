@@ -1,8 +1,7 @@
 import { describe, it, expect } from "bun:test";
 import { collectFocusTargets } from "@/layout/focus";
 import { Block, Text } from "@/view/primitives";
-import type { ViewElement } from "@/view/types/elements";
-import type { ComputedLayout } from "@/layout-engine";
+import type { ComputedLayout, ViewElement } from "@/types";
 
 describe("collectFocusTargets", () => {
   it("should collect focusable elements from a simple tree", () => {

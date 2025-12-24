@@ -1,6 +1,6 @@
-import type { Buffer2D } from "@/renderer";
 import path from "node:path";
 import { mkdirSync, writeFileSync } from "node:fs";
+import type { Buffer2D } from "../renderer/types";
 
 export interface ProfileOptions {
   /**

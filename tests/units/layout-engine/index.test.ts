@@ -1,5 +1,6 @@
 import { describe, it, expect } from "bun:test";
-import { computeLayout, type LayoutInputNode } from "@/layout-engine";
+import { computeLayout } from "@/layout-engine";
+import type { LayoutInputNode } from "@/types";
 
 describe("Layout Engine", () => {
   it("should compute a simple layout", () => {

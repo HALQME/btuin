@@ -2,7 +2,7 @@ import { describe, it, expect } from "bun:test";
 import { createLayout } from "@/layout";
 import { Block, Text } from "@/view/primitives";
 import { LayoutBoundary } from "@/view/layout";
-import type { LayoutInputNode, ComputedLayout } from "@/layout-engine";
+import type { ComputedLayout, LayoutInputNode } from "@/types";
 
 // Mock the layout engine
 let receivedLayoutNode: LayoutInputNode | null = null;

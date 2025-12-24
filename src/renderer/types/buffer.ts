@@ -1,4 +1,4 @@
-import { FlatBuffer } from "@/renderer/buffer";
+import { FlatBuffer } from "../buffer";
 /**
  * Public buffer type used throughout the renderer.
  */

@@ -2,8 +2,8 @@
  * btuin core entry point
  */
 
-export { createApp, App } from "./runtime/app";
-export { defineComponent } from "./components/component";
+export { createApp, App } from "./runtime";
+export { defineComponent } from "./components";
 export * from "./view";
 
 export {
@@ -13,18 +13,6 @@ export {
   onTick,
   onUnmounted,
   onUpdated,
-} from "./components/lifecycle";
+} from "./components";
 
 export * from "./reactivity";
-
-export type {
-  Component,
-  ComponentDefinition,
-  ComponentInitContext,
-  ExitReason,
-  KeyHandler,
-  RuntimeContext,
-  TickHandler,
-} from "./components/core";
-export type { App as AppType, CreateAppOptions, MountOptions } from "./runtime/types";
-export type { KeyEvent } from "./terminal";

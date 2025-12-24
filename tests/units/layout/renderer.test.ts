@@ -2,7 +2,8 @@ import { describe, expect, test, beforeAll } from "bun:test";
 import { renderElement } from "@/layout/renderer";
 import { layout } from "@/layout";
 import { Block, Text } from "@/view/primitives";
-import { createBuffer, resolveColor, type Buffer2D } from "@/renderer";
+import { createBuffer, resolveColor } from "@/renderer";
+import type { Buffer2D } from "@/types";
 
 // Helper to visualize the buffer
 function bufferToString(buf: Buffer2D): string {

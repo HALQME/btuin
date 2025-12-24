@@ -1,7 +1,8 @@
 import { describe, it, expect } from "bun:test";
 import { createRenderer } from "@/runtime/render-loop";
 import { Block } from "@/view/primitives";
-import { FlatBuffer, type Buffer2D } from "@/renderer";
+import { FlatBuffer } from "@/renderer";
+import type { Buffer2D } from "@/types";
 
 const mockLayoutResult = { root: { x: 0, y: 0, width: 80, height: 24 } };
 

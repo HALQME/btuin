@@ -1,17 +1,12 @@
-import { effect, stop, type ReactiveEffect } from "@/reactivity";
-import {
-  FlatBuffer,
-  getGlobalBufferPool,
-  renderDiff,
-  type Buffer2D,
-  type DiffStats,
-} from "@/renderer";
-import { layout, renderElement } from "@/layout";
-import type { ViewElement } from "@/view/types/elements";
-import { isBlock } from "@/view/types/elements";
+import { effect, stop, type ReactiveEffect } from "../reactivity";
+import { FlatBuffer, getGlobalBufferPool, renderDiff } from "../renderer";
+import { layout, renderElement } from "../layout";
+import type { DiffStats } from "../renderer/diff";
+import type { Buffer2D } from "../renderer/types";
+import { isBlock, type ViewElement } from "../view/types/elements";
 import { createErrorContext } from "./error-boundary";
 import type { Profiler } from "./profiler";
-import type { ComputedLayout } from "@/layout-engine";
+import type { ComputedLayout } from "../layout-engine/types";
 
 export interface BufferPoolLike {
   acquire(): Buffer2D;
