@@ -215,6 +215,7 @@ export function app<Init extends (ctx: ComponentInitContext) => any>(
     onExit: config.onExit,
     profile: config.profile,
     inputParser: config.inputParser,
+    devtools: config.devtools,
   });
 }
 

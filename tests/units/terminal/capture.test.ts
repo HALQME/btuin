@@ -146,6 +146,19 @@ describe("Output Capture", () => {
 
       capture.dispose();
     });
+
+    it("should notify subscribers for new lines", (done) => {
+      const capture = createConsoleCapture({ maxLines: 10 });
+      const dispose = capture.subscribe((line) => {
+        expect(line.text).toBe("hello");
+        expect(line.type).toBe("stdout");
+        dispose();
+        capture.dispose();
+        done();
+      });
+
+      process.stdout.write("hello\n");
+    });
   });
 
   describe("getConsoleCaptureInstance", () => {

@@ -10,12 +10,12 @@
   - [ ] ヒットテスト（`ComputedLayout` と座標の照合、重なり順の決定）
   - [ ] バブリング/伝播（子→親、キャンセル可能なイベントモデル）
 - [ ] Developer Tools
-  - [ ] シェル統合
+  - [x] シェル統合
     - [x] stdout/stderr capture 基盤（listener/console patch/テストモード）: `src/terminal/capture.ts`
-    - [ ] `useLog`（capture → reactive state）でログUIを作る
+    - [x] `useLog`（capture → reactive state）でログUIを作る
   - [ ] デバッグ
     - [ ] インスペクターモード（境界線/座標/サイズ可視化）
-    - [ ] ホットリロード
+    - [x] ホットリロード
 - [x] 配布
   - [x] GitHub Release 用 tarball 生成（`src/layout-engine/native/` 同梱）: `.github/workflows/release.yml`
   - [x] `npm pack` の成果物を展開し、`src/layout-engine/native/` と `src/layout-engine/index.ts` の解決が噛み合うことを自動チェック

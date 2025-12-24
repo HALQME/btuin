@@ -6,6 +6,8 @@ import type { TerminalAdapter } from "./terminal-adapter";
 import type { PlatformAdapter } from "./platform-adapter";
 import type { ProfileOptions } from "./profiler";
 
+import type { DevtoolsOptions } from "../devtools/types";
+
 export interface ILoopManager {
   start(rows: number, cols: number): void;
   stop(): void;
@@ -22,6 +24,7 @@ export type AppConfig<State> = {
   onExit?: () => void;
   profile?: ProfileOptions;
   inputParser?: InputParser;
+  devtools?: DevtoolsOptions;
   init: (ctx: ComponentInitContext) => State;
   render: (state: State) => ViewElement;
 };
@@ -53,4 +56,5 @@ export type CreateAppOptions = {
   platform?: PlatformAdapter;
   profile?: ProfileOptions;
   inputParser?: InputParser;
+  devtools?: DevtoolsOptions;
 };

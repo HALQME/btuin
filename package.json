@@ -6,7 +6,11 @@
     "type": "git",
     "url": "git+https://github.com/HALQME/btuin.git"
   },
+  "bin": {
+    "btuin": "./bin/btuin"
+  },
   "files": [
+    "bin",
     "README.md",
     "src",
     "tsconfig.json"
@@ -15,6 +19,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./components": "./src/components/index.ts",
+    "./dev": "./src/dev/index.ts",
     "./layout": "./src/layout/index.ts",
     "./layout-engine": "./src/layout-engine/index.ts",
     "./reactivity": "./src/reactivity/index.ts",

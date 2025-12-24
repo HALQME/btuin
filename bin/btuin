@@ -1,0 +1,4 @@
+#!/usr/bin/env bun
+import { btuinCli } from "../src/cli/main";
+
+await btuinCli(Bun.argv.slice(2));

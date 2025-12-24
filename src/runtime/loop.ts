@@ -5,6 +5,7 @@ import { createInlineDiffRenderer } from "../renderer";
 import { layout } from "../layout";
 import { Block } from "../view/primitives";
 import type { ViewElement } from "../view/types/elements";
+import { createDevtoolsController, type DevtoolsController } from "../devtools/controller";
 import { createRenderer } from "./render-loop";
 import { createErrorContext, createErrorHandler } from "./error-boundary";
 import type { AppContext } from "./context";
@@ -15,6 +16,7 @@ export class LoopManager implements ILoopManager {
   private handleError: ReturnType<typeof createErrorHandler>;
   private cleanupTerminalFn: (() => void) | null = null;
   private cleanupOutputListeners: (() => void)[] = [];
+  private devtools: DevtoolsController | null = null;
 
   constructor(context: AppContext, handleError: ReturnType<typeof createErrorHandler>) {
     this.ctx = context;
@@ -34,6 +36,9 @@ export class LoopManager implements ILoopManager {
 
     const pendingKeyEvents: KeyEvent[] = [];
 
+    this.devtools = createDevtoolsController(this.ctx.options.devtools);
+    this.cleanupOutputListeners.push(() => this.devtools?.dispose());
+
     terminal.onKey((event: KeyEvent) => {
       if (!state.mounted) {
         pendingKeyEvents.push(event);
@@ -41,6 +46,8 @@ export class LoopManager implements ILoopManager {
       }
 
       try {
+        if (this.devtools?.handleKey(event)) return;
+
         const handled = handleComponentKey(state.mounted, event);
         if (!handled && (event.sequence === "\x03" || (event.ctrl && event.name === "c"))) {
           app.exit(0, "sigint");
@@ -67,9 +74,21 @@ export class LoopManager implements ILoopManager {
       write: terminal.write,
       view: (): ViewElement => {
         if (!state.mounted) return Block();
-        return renderComponent(state.mounted);
+        const root = renderComponent(state.mounted);
+        return this.devtools?.wrapView(root) ?? root;
       },
       getState: () => ({}),
+      onLayout: ({ size, rootElement, layoutMap }) => {
+        try {
+          this.devtools?.onLayout?.({
+            size,
+            rootElement,
+            layoutMap,
+          });
+        } catch {
+          // ignore
+        }
+      },
       handleError: this.handleError,
       profiler: profiler.isEnabled() ? profiler : undefined,
       deps: inline
@@ -175,6 +194,8 @@ export class LoopManager implements ILoopManager {
       state.disposeResize();
       updaters.disposeResize(null);
     }
+
+    this.devtools = null;
   }
 
   cleanupTerminal() {

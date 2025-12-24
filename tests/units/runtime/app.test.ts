@@ -2,6 +2,7 @@ import { describe, it, expect, afterEach, beforeAll } from "bun:test";
 import { ref } from "@/reactivity";
 import { Block, Text } from "@/view/primitives";
 import type { AppType as App, KeyEvent, TerminalAdapter } from "@/types";
+import { disposeSingletonCapture } from "@/terminal/capture";
 
 const keyHandlers: any[] = [];
 
@@ -26,7 +27,7 @@ describe("createApp", () => {
       };
     },
     getTerminalSize: () => ({ rows: 24, cols: 80 }),
-    disposeSingletonCapture: () => {},
+    disposeSingletonCapture,
     write: (_output: string) => {},
   };
   const platform = {
@@ -120,6 +121,31 @@ describe("createApp", () => {
 
     // We can't directly test the rendered output without a full render cycle,
     // but we can check if the key event was processed.
+    expect(keyValue).toBe("a");
+  });
+
+  it("should not intercept F12 even when devtools is enabled", async () => {
+    let keyValue = "";
+    appInstance = app({
+      terminal,
+      platform,
+      devtools: { enabled: true },
+      init({ onKey }) {
+        onKey((k: KeyEvent) => {
+          keyValue = k.name;
+        });
+        return {};
+      },
+      render: () => Block(Text("test")),
+    });
+
+    await appInstance.mount();
+
+    const onKeyCallback = (global as any).__btuin_onKeyCallback;
+    onKeyCallback?.({ name: "f12", sequence: "\x1b[24~", ctrl: false, meta: false, shift: false });
+    expect(keyValue).toBe("f12");
+
+    onKeyCallback?.({ name: "a", sequence: "a", ctrl: false, meta: false, shift: false });
     expect(keyValue).toBe("a");
   });
 

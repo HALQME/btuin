@@ -55,6 +55,12 @@ export interface RenderLoopConfig<State> {
   view: (state: State) => ViewElement;
   /** Function to get current state */
   getState: () => State;
+  /** Optional hook after layout is computed (before render) */
+  onLayout?: (args: {
+    size: TerminalSize;
+    rootElement: ViewElement;
+    layoutMap: ComputedLayout;
+  }) => void;
   /** Error handler */
   handleError: (context: import("./error-boundary").ErrorContext) => void;
   /** Optional profiler */
@@ -146,6 +152,12 @@ export function createRenderer<State>(config: RenderLoopConfig<State>) {
       prevRootElement = rootElement;
       prevLayoutResult = layoutResult;
       prevLayoutSizeKey = layoutSizeKey;
+
+      try {
+        config.onLayout?.({ size: state.currentSize, rootElement, layoutMap: layoutResult });
+      } catch {
+        // ignore devtools hook failures
+      }
 
       let buf = pool.acquire();
       if (buf === state.prevBuffer) {
