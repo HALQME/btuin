@@ -1,4 +1,4 @@
-import { getConsoleCaptureInstance, type ConsoleCaptureHandle } from "../terminal/capture";
+import { createConsoleCapture, type ConsoleCaptureHandle } from "../terminal/capture";
 import { createJsonlFileLogStreamer, createJsonlTcpLogStreamer, type LogStreamer } from "./stream";
 import type { DevtoolsOptions } from "./types";
 
@@ -16,7 +16,7 @@ export function setupDevtoolsLogStreaming(
     return { capture: null, dispose: () => {} };
   }
 
-  const capture = getConsoleCaptureInstance({ maxLines: options?.maxLogLines ?? 1000 });
+  const capture = createConsoleCapture({ maxLines: options?.maxLogLines ?? 1000 });
 
   const streamers: LogStreamer[] = [];
   const filePath = options?.stream?.file;
@@ -60,6 +60,12 @@ export function setupDevtoolsLogStreaming(
         } catch {
           // ignore
         }
+      }
+
+      try {
+        capture.dispose();
+      } catch {
+        // ignore
       }
     },
   };

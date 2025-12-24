@@ -96,6 +96,8 @@ export function App<State>(root: Component<State>, options: CreateAppOptions = {
         options.errorLog,
       );
 
+      context.options.devtools = resolveDevtoolsOptions(context.options.devtools);
+
       context.loopManager = new LoopManager(context, handleError);
 
       const rows = mountOptions.rows ?? 0;
@@ -103,6 +105,10 @@ export function App<State>(root: Component<State>, options: CreateAppOptions = {
       const inline = mountOptions.inline ?? false;
       updaters.renderMode(inline ? "inline" : "fullscreen");
       updaters.inlineCleanupOnExit(mountOptions.inlineCleanupOnExit ?? false);
+
+      // Initialize devtools (e.g. start the browser server) before the TUI begins rendering.
+      // This matches the "hot-reload tcp" logs style: it prints once and doesn't overlay the UI.
+      await context.loopManager.prepare?.();
 
       updaters.unpatchConsole(terminal.patchConsole());
       terminal.startCapture();
@@ -220,3 +226,41 @@ export function app<Init extends (ctx: ComponentInitContext) => any>(
 }
 
 export const createApp = app;
+
+function resolveDevtoolsOptions(
+  explicit: CreateAppOptions["devtools"],
+): CreateAppOptions["devtools"] {
+  if (explicit) return explicit;
+
+  const env = process.env.BTUIN_DEVTOOLS;
+  const enabled =
+    env === "1" || env === "true" || env === "yes" || env === "on" || env === "enabled";
+  if (!enabled) return undefined;
+
+  const host = process.env.BTUIN_DEVTOOLS_HOST;
+  const portRaw = process.env.BTUIN_DEVTOOLS_PORT;
+  const port = portRaw ? Number(portRaw) : undefined;
+
+  return {
+    enabled: true,
+    server: {
+      host: host && host.length > 0 ? host : undefined,
+      port: Number.isInteger(port) && (port as number) >= 0 ? (port as number) : undefined,
+      onListen: (info: { host: string; port: number; url: string }) => {
+        try {
+          process.stderr.write(`[btuin] devtools: ${info.url}\n`);
+        } catch {
+          // ignore
+        }
+        try {
+          const send = (process as any).send as undefined | ((message: unknown) => void);
+          if (typeof send === "function") {
+            send({ type: "btuin:devtools:listen", info });
+          }
+        } catch {
+          // ignore
+        }
+      },
+    },
+  };
+}

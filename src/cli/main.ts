@@ -22,6 +22,8 @@ function printHelp() {
       "  --debounce <ms>      Debounce fs events (default: 50)",
       "  --cwd <path>         Child working directory (default: process.cwd())",
       "  --no-preserve-state  Disable state preservation (default: enabled)",
+      "  --no-devtools        Disable browser DevTools auto-enable",
+      "  --no-open-browser    Do not auto-open DevTools URL in browser",
       "  --no-tcp             Disable TCP reload trigger",
       "  --tcp-host <host>    TCP bind host (default: 127.0.0.1)",
       "  --tcp-port <port>    TCP bind port (default: 0)",
@@ -112,12 +114,59 @@ export async function btuinCli(argv: string[]) {
     };
   }
 
+  const devtoolsEnv = (() => {
+    if (!parsed.devtools.enabled) {
+      return {
+        BTUIN_DEVTOOLS: undefined,
+        BTUIN_DEVTOOLS_HOST: undefined,
+        BTUIN_DEVTOOLS_PORT: undefined,
+      };
+    }
+
+    const env: Record<string, string | undefined> = { BTUIN_DEVTOOLS: "1" };
+
+    // Keep DevTools URL stable across hot-reload restarts by pinning host/port once.
+    const host = process.env.BTUIN_DEVTOOLS_HOST ?? "127.0.0.1";
+    const portFromEnv = process.env.BTUIN_DEVTOOLS_PORT;
+    if (!process.env.BTUIN_DEVTOOLS_HOST) env.BTUIN_DEVTOOLS_HOST = host;
+
+    if (!portFromEnv) {
+      try {
+        // Reserve an ephemeral port, then close immediately. Best-effort.
+        const listener = Bun.listen({
+          hostname: host,
+          port: 0,
+          socket: {
+            open() {},
+            data() {},
+            close() {},
+            error() {},
+          },
+        });
+        const port = listener.port;
+        try {
+          listener.stop(true);
+        } catch {
+          // ignore
+        }
+        env.BTUIN_DEVTOOLS_PORT = String(port);
+        env.BTUIN_DEVTOOLS_HOST = host;
+      } catch {
+        // ignore; child will pick an ephemeral port
+      }
+    }
+
+    return env;
+  })();
+
   runHotReloadProcess({
     command: "bun",
     args: [entryAbs, ...parsed.childArgs],
     cwd,
     watch: { paths: watchPaths, debounceMs: parsed.debounceMs },
     preserveState: parsed.preserveState,
+    env: devtoolsEnv,
+    openDevtoolsBrowser: parsed.openBrowser && parsed.devtools.enabled,
     tcp: parsed.tcp.enabled
       ? {
           host: tcp!.host,

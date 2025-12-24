@@ -20,6 +20,7 @@
     ".": "./src/index.ts",
     "./components": "./src/components/index.ts",
     "./dev": "./src/dev/index.ts",
+    "./hooks": "./src/hooks/index.ts",
     "./layout": "./src/layout/index.ts",
     "./layout-engine": "./src/layout-engine/index.ts",
     "./reactivity": "./src/reactivity/index.ts",

@@ -25,19 +25,11 @@ export type {
   MountOptions,
   RenderMode,
 } from "../runtime/types";
-export type { DevtoolsOptions } from "../devtools/types";
-export type {
-  HotReloadProcessHandle,
-  HotReloadTcpOptions,
-  HotReloadWatchOptions,
-  RunHotReloadProcessOptions,
-  TcpReloadServerHandle,
-} from "../dev/hot-reload";
 export type { EnableHotReloadStateOptions } from "../dev/hot-reload-state";
 export type { PlatformAdapter } from "../runtime/platform-adapter";
 export type { TerminalAdapter } from "../runtime/terminal-adapter";
 export type { FrameMetrics, ProfileOptions, ProfileOutput } from "../runtime/profiler";
-export type { UseLogOptions, UseLogResult } from "../devtools";
+export type * from "../hooks/types";
 
 export type { Buffer2D, ColorValue, OutlineOptions } from "../renderer/types";
 

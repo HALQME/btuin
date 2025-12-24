@@ -100,7 +100,7 @@ describe("Scalability Limit Test (Statistical)", async () => {
   thresholds.forEach((t) => (results[t.fps] = []));
 
   for (let i = 0; i < ITERATIONS; i++) {
-    Bun.stdout.write(`  Run ${i + 1}/${ITERATIONS}... `);
+    process.stdout.write(`  Run ${i + 1}/${ITERATIONS}... `);
 
     Bun.gc(true);
 

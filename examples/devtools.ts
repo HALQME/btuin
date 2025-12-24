@@ -1,31 +1,9 @@
-import { createApp, enableHotReloadState, ref, useLog } from "@/index";
+import { createApp, enableHotReloadState, ref } from "@/index";
 import { Text, VStack } from "@/view";
-import { join } from "node:path";
-import { tmpdir } from "node:os";
-
-const logFile = join(tmpdir(), "btuin-devtools.log");
 
 const app = createApp({
-  devtools: {
-    enabled: true,
-    maxLogLines: 1000,
-    server: {
-      host: "127.0.0.1",
-      port: 0,
-      onListen: ({ url }) => console.log(`[devtools] open ${url}`),
-    },
-    stream: {
-      file: logFile,
-      tcp: {
-        host: "127.0.0.1",
-        port: 9229,
-        backlog: 200,
-      },
-    },
-  },
   init({ onKey, onTick, runtime }) {
     const count = ref(0);
-    const log = useLog({ maxLines: 200 });
 
     enableHotReloadState({
       getSnapshot: () => ({ count: count.value }),
@@ -49,21 +27,16 @@ const app = createApp({
       if (count.value % 10 === 0) console.log(`[tick] count=${count.value}`);
     }, 1000);
 
-    return { count, log };
+    return { count };
   },
-  render({ count, log }) {
-    const tail = log.lines.value.slice(-8);
+  render({ count }) {
     return VStack([
       Text("DevTools example").foreground("cyan"),
-      Text("DevTools: browser UI + log streaming"),
+      Text("DevTools: browser UI (no app code changes)"),
+      Text("Run: btuin dev examples/devtools.ts  (auto enables + opens DevTools)"),
+      Text("Or:  BTUIN_DEVTOOLS=1 bun examples/devtools.ts"),
       Text("Keys: Up/Down=counter  l=console.log  e=console.error  q=quit"),
-      Text(`File stream: ${logFile}`),
-      Text("TCP stream: nc 127.0.0.1 9229 | jq -r '.type + \" \" + .text'"),
       Text(`count: ${count.value}`).foreground("yellow"),
-      Text("LogTail (useLog):").foreground("cyan"),
-      ...tail.map((line, i) =>
-        Text(`${line.type === "stderr" ? "ERR" : "LOG"} ${line.text}`).setKey(`log-tail-${i}`),
-      ),
     ])
       .width("100%")
       .height("100%");

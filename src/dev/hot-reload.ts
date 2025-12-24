@@ -65,6 +65,12 @@ export interface RunHotReloadProcessOptions {
   env?: Record<string, string | undefined>;
 
   /**
+   * Auto-open the DevTools browser URL when the child reports it over IPC.
+   * @default true
+   */
+  openDevtoolsBrowser?: boolean;
+
+  /**
    * Preserve state across restarts (opt-in from the app via `enableHotReloadState`).
    * @default true
    */
@@ -101,7 +107,8 @@ export interface HotReloadProcessHandle {
 type TcpReloadMessage = "reload" | { type: "reload" };
 type HotReloadIpcMessage =
   | { type: "btuin:hot-reload:request-snapshot" }
-  | { type: "btuin:hot-reload:snapshot"; snapshot: unknown };
+  | { type: "btuin:hot-reload:snapshot"; snapshot: unknown }
+  | { type: "btuin:devtools:listen"; info: { host: string; port: number; url: string } };
 
 const SNAPSHOT_ENV_KEY = "BTUIN_HOT_RELOAD_SNAPSHOT";
 
@@ -269,6 +276,7 @@ export function runHotReloadProcess(options: RunHotReloadProcessOptions): HotRel
   const restartSignal = options.restartSignal ?? "SIGTERM";
   const restartTimeoutMs = options.restartTimeoutMs ?? 1500;
   const preserveState = options.preserveState ?? true;
+  const openDevtoolsBrowser = options.openDevtoolsBrowser ?? true;
 
   let closing = false;
   let restarting = false;
@@ -277,6 +285,7 @@ export function runHotReloadProcess(options: RunHotReloadProcessOptions): HotRel
   let tcpServer: TcpReloadServerHandle | null = null;
   let lastSnapshot: unknown = null;
   let snapshotWaiter: ((snapshot: unknown) => void) | null = null;
+  let lastOpenedDevtoolsUrl: string | null = null;
 
   const close = async () => {
     if (closing) return;
@@ -362,6 +371,36 @@ export function runHotReloadProcess(options: RunHotReloadProcessOptions): HotRel
           m &&
           typeof m === "object" &&
           "type" in m &&
+          (m as any).type === "btuin:devtools:listen"
+        ) {
+          const info = (m as any).info as { host?: unknown; port?: unknown; url?: unknown };
+          if (
+            info &&
+            typeof info === "object" &&
+            typeof info.url === "string" &&
+            typeof info.host === "string" &&
+            typeof info.port === "number"
+          ) {
+            try {
+              Bun.stderr.write(`[btuin] devtools: ${info.url}\n`);
+            } catch {
+              // ignore
+            }
+            if (openDevtoolsBrowser && lastOpenedDevtoolsUrl !== info.url) {
+              lastOpenedDevtoolsUrl = info.url;
+              try {
+                openUrlInBrowser(info.url);
+              } catch {
+                // ignore
+              }
+            }
+          }
+          return;
+        }
+        if (
+          m &&
+          typeof m === "object" &&
+          "type" in m &&
           (m as any).type === "btuin:hot-reload:snapshot"
         ) {
           snapshotWaiter?.((m as any).snapshot);
@@ -392,4 +431,25 @@ export function runHotReloadProcess(options: RunHotReloadProcessOptions): HotRel
     close,
     isRunning: () => child !== null,
   };
+}
+
+function openUrlInBrowser(url: string) {
+  const platform = process.platform;
+  const cmd =
+    platform === "darwin"
+      ? ["open", url]
+      : platform === "win32"
+        ? ["cmd", "/c", "start", "", url]
+        : ["xdg-open", url];
+
+  try {
+    Bun.spawn({
+      cmd,
+      stdin: "ignore",
+      stdout: "ignore",
+      stderr: "ignore",
+    });
+  } catch {
+    // ignore
+  }
 }

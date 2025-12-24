@@ -5,22 +5,69 @@ import { createInlineDiffRenderer } from "../renderer";
 import { layout } from "../layout";
 import { Block } from "../view/primitives";
 import type { ViewElement } from "../view/types/elements";
-import { createDevtoolsController, type DevtoolsController } from "../devtools/controller";
 import { createRenderer } from "./render-loop";
 import { createErrorContext, createErrorHandler } from "./error-boundary";
 import type { AppContext } from "./context";
 import type { ILoopManager } from "./types";
+
+type DevtoolsControllerLike = {
+  handleKey(event: KeyEvent): boolean;
+  wrapView(root: ViewElement): ViewElement;
+  onLayout?(snapshot: {
+    size: { rows: number; cols: number };
+    rootElement: ViewElement;
+    layoutMap: any;
+  }): void;
+  dispose(): void;
+};
 
 export class LoopManager implements ILoopManager {
   private ctx: AppContext;
   private handleError: ReturnType<typeof createErrorHandler>;
   private cleanupTerminalFn: (() => void) | null = null;
   private cleanupOutputListeners: (() => void)[] = [];
-  private devtools: DevtoolsController | null = null;
+  private devtools: DevtoolsControllerLike | null = null;
+  private devtoolsInit: Promise<void> | null = null;
+  private stopped = false;
 
   constructor(context: AppContext, handleError: ReturnType<typeof createErrorHandler>) {
     this.ctx = context;
     this.handleError = handleError;
+  }
+
+  private initDevtools() {
+    if (this.devtoolsInit) return;
+
+    const options = this.ctx.options.devtools;
+    if (!options) return;
+
+    this.devtoolsInit = (async () => {
+      try {
+        const mod: any = await import("../" + "devtools/controller");
+        const factory: undefined | ((opts: unknown) => DevtoolsControllerLike) =
+          mod?.createDevtoolsController;
+        if (!factory) return;
+        const controller = factory(options);
+        if (this.stopped) {
+          try {
+            controller.dispose();
+          } catch {
+            // ignore
+          }
+          return;
+        }
+
+        this.devtools = controller;
+        this.cleanupOutputListeners.push(() => controller.dispose());
+      } catch {
+        // devtools is optional
+      }
+    })();
+  }
+
+  prepare(): Promise<void> {
+    this.initDevtools();
+    return this.devtoolsInit ?? Promise.resolve();
   }
 
   start(rows: number, cols: number) {
@@ -36,8 +83,7 @@ export class LoopManager implements ILoopManager {
 
     const pendingKeyEvents: KeyEvent[] = [];
 
-    this.devtools = createDevtoolsController(this.ctx.options.devtools);
-    this.cleanupOutputListeners.push(() => this.devtools?.dispose());
+    this.initDevtools();
 
     terminal.onKey((event: KeyEvent) => {
       if (!state.mounted) {
@@ -177,6 +223,7 @@ export class LoopManager implements ILoopManager {
 
   stop() {
     const { state, updaters } = this.ctx;
+    this.stopped = true;
     if (state.renderEffect) {
       stop(state.renderEffect);
       updaters.renderEffect(null);

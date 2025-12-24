@@ -2,15 +2,14 @@ import { shallowRef } from "../reactivity";
 import type { Ref } from "../reactivity/ref";
 import { getCurrentInstance } from "../components/lifecycle";
 import {
-  getConsoleCaptureInstance,
+  createConsoleCapture,
   type ConsoleCaptureHandle,
   type ConsoleLine,
 } from "../terminal/capture";
 
 export interface UseLogOptions {
   /**
-   * Maximum number of lines stored in the shared console buffer.
-   * Note: This is applied only when the singleton capture is first created.
+   * Maximum number of lines stored in the console buffer.
    */
   maxLines?: number;
 
@@ -54,16 +53,29 @@ export function useLog(options: UseLogOptions = {}): UseLogResult {
   const stdout = options.stdout ?? true;
   const stderr = options.stderr ?? true;
 
-  const capture = getConsoleCaptureInstance({ maxLines: options.maxLines });
+  const capture = createConsoleCapture({ maxLines: options.maxLines });
   const lines = shallowRef<ConsoleLine[]>(filterLines(capture.getLines(), { stdout, stderr }));
 
   const refresh = () => {
     lines.value = filterLines(capture.getLines(), { stdout, stderr });
   };
 
-  const dispose = capture.subscribe(() => {
+  const unsubscribe = capture.subscribe(() => {
     refresh();
   });
+
+  const dispose = () => {
+    try {
+      unsubscribe();
+    } catch {
+      // ignore
+    }
+    try {
+      capture.dispose();
+    } catch {
+      // ignore
+    }
+  };
 
   const instance = getCurrentInstance();
   if (instance) {

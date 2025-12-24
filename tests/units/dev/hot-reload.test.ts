@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import net from "node:net";
-import { createTcpReloadServer } from "@/dev";
+import { createTcpReloadServer } from "@/dev/hot-reload";
 
 describe("hot reload", () => {
   it("should trigger reload via TCP", async () => {
@@ -11,7 +11,7 @@ describe("hot reload", () => {
       {
         host: "127.0.0.1",
         port: 0,
-        onListen: (info) => {
+        onListen: (info: { host: string; port: number }) => {
           onListen = info;
         },
       },

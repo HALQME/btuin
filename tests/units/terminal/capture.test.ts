@@ -17,12 +17,14 @@ import { expect, describe, it, beforeEach, afterEach } from "bun:test";
 
 describe("Output Capture", () => {
   // Mock process.stdout.write and process.stderr.write
-  const originalStdoutWrite = process.stdout.write;
-  const originalStderrWrite = process.stderr.write;
+  let originalStdoutWrite: typeof process.stdout.write;
+  let originalStderrWrite: typeof process.stderr.write;
   let stdoutOutput = "";
   let stderrOutput = "";
 
   beforeEach(() => {
+    originalStdoutWrite = process.stdout.write;
+    originalStderrWrite = process.stderr.write;
     stdoutOutput = "";
     stderrOutput = "";
     process.stdout.write = ((str: string) => {

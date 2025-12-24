@@ -1,129 +1,20 @@
 # DevTools
 
-btuin includes a lightweight DevTools layer focused on observability during TUI development.
-
-- Browser DevTools (local server + WebSocket)
-- Stream logs externally (file / TCP) so you can `tail -f` or `nc` from another terminal
-
-## Enable
-
-Enable DevTools via `createApp({ devtools: ... })`:
-
-```ts
-import { createApp, ui } from "btuin";
-
-const app = createApp({
-  devtools: { enabled: true },
-  init: () => ({}),
-  render: () => ui.Text("Hello"),
-});
-```
+btuin includes a lightweight browser UI for observing your app during TUI development.
 
 ## Browser DevTools (recommended)
 
-Start the local DevTools server:
-
-```ts
-import { createApp, ui } from "btuin";
-
-const app = createApp({
-  devtools: {
-    enabled: true,
-    server: {
-      host: "127.0.0.1",
-      port: 0,
-      onListen: ({ url }) => console.log(`[devtools] open ${url}`),
-    },
-  },
-  init: () => ({}),
-  render: () => ui.Text("Hello"),
-});
-```
+If you use the dev runner (`btuin dev ...`), browser DevTools is auto-enabled (disable with `--no-devtools`).
+The runner also auto-opens the DevTools URL in your browser (disable with `--no-open-browser`).
 
 Open the printed URL in your browser. It shows logs and a snapshot stream.
 
 The Snapshot view includes a simple **Preview** (layout boxes + text) and a **JSON** view (raw snapshot payload).
 
-## `useLog()` hook
+You can also enable it without code by setting env vars:
 
-`useLog()` exposes captured console output as reactive state (useful for building your own log UI).
-
-Options:
-
-- `devtools.maxLogLines` (default: `1000`)
-
-```ts
-import { defineComponent, useLog, ui } from "btuin";
-
-export const LogView = defineComponent({
-  setup() {
-    const log = useLog();
-    return () => ui.Text(`lines: ${log.lines.value.length}`);
-  },
-});
-```
-
-Notes:
-
-- Intended to be called inside component `init()`/`setup()` (auto-disposed on unmount).
-- If you call it outside component initialization, call `dispose()` yourself.
-
-## Stream logs to a file (JSONL)
-
-Append each captured line as JSONL:
-
-```ts
-devtools: {
-  enabled: true,
-  stream: { file: "/tmp/btuin-devtools.log" },
-}
-```
-
-Example:
-
-```bash
-tail -f /tmp/btuin-devtools.log | jq -r '.type + " " + .text'
-```
-
-Format (one line per event):
-
-```json
-{ "text": "hello", "type": "stdout", "timestamp": 1730000000000 }
-```
-
-## Stream logs over TCP (JSONL)
-
-Start a local TCP server and stream JSONL to connected clients:
-
-```ts
-devtools: {
-  enabled: true,
-  stream: {
-    tcp: {
-      host: "127.0.0.1",
-      port: 9229,
-      backlog: 200,
-      onListen: ({ host, port }) => console.log(`DevTools TCP: ${host}:${port}`),
-    },
-  },
-}
-```
-
-Connect from another terminal:
-
-```bash
-nc 127.0.0.1 9229 | jq -r '.type + " " + .text'
-```
-
-Backlog:
-
-- `backlog` is the number of most recent log lines kept in memory and flushed to new clients.
-- This helps avoid missing logs around connect timing.
-
-Security notes:
-
-- Bind to `127.0.0.1` unless you explicitly want remote access.
-- Do not expose the port publicly unless you accept leaking stdout/stderr content.
+- `BTUIN_DEVTOOLS=1` (enable)
+- `BTUIN_DEVTOOLS_HOST` / `BTUIN_DEVTOOLS_PORT` (optional)
 
 # Hot Reload (Dev Runner)
 
@@ -165,44 +56,11 @@ Disable state preservation:
 btuin dev examples/devtools.ts --no-preserve-state
 ```
 
-Or create a small runner script:
-
-```ts
-import { runHotReloadProcess } from "btuin";
-
-runHotReloadProcess({
-  command: "bun",
-  args: ["examples/devtools.ts"],
-  watch: { paths: ["src", "examples"] },
-});
-```
-
-Run it:
-
-```bash
-bun run examples/hot-reload.ts
-```
+Note: hot reload is applied by `btuin dev` (dev runner).
 
 ## TCP Trigger (Optional)
 
-`btuin dev` enables TCP by default (ephemeral port). You can also configure it in code:
-
-```ts
-import { runHotReloadProcess } from "btuin";
-
-runHotReloadProcess({
-  command: "bun",
-  args: ["examples/devtools.ts"],
-  watch: { paths: ["src", "examples"] },
-  tcp: {
-    host: "127.0.0.1",
-    port: 0,
-    onListen: ({ host, port }) => {
-      process.stderr.write(`[btuin] hot-reload tcp: ${host}:${port}\n`);
-    },
-  },
-});
-```
+`btuin dev` enables TCP by default (ephemeral port).
 
 Trigger reload from another terminal:
 

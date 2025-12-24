@@ -73,11 +73,23 @@ describe("devtools stream", () => {
     });
 
     await inst.mount({ rows: 10, cols: 40 });
+
+    // DevTools is lazily loaded; yield once to let the controller initialize.
+    await new Promise((r) => setTimeout(r, 0));
     console.log("hello");
     inst.unmount();
     unpatch();
 
-    const content = readFileSync(filePath, "utf8");
+    const content = await (async () => {
+      for (let i = 0; i < 50; i++) {
+        try {
+          return readFileSync(filePath, "utf8");
+        } catch {
+          await new Promise((r) => setTimeout(r, 5));
+        }
+      }
+      return readFileSync(filePath, "utf8");
+    })();
     const first = content.split("\n").find(Boolean);
     expect(first).toBeTruthy();
     const parsed = JSON.parse(first!);
@@ -99,7 +111,7 @@ describe("devtools stream", () => {
           tcp: {
             host: "127.0.0.1",
             port: 0,
-            onListen: (info) => {
+            onListen: (info: { host: string; port: number }) => {
               listenInfo = info;
             },
           },

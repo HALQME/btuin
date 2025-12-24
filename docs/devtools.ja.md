@@ -1,129 +1,20 @@
 # DevTools
 
-btuin には、TUI 開発時の観測性（ログ確認など）に特化した DevTools があります。
-
-- ブラウザ DevTools（ローカルサーバ + WebSocket）
-- 外部へログをストリーミング（file / TCP）して `tail -f` や `nc` で別ターミナルから閲覧
-
-## 有効化
-
-`createApp({ devtools: ... })` で有効化します:
-
-```ts
-import { createApp, ui } from "btuin";
-
-const app = createApp({
-  devtools: { enabled: true },
-  init: () => ({}),
-  render: () => ui.Text("Hello"),
-});
-```
+btuin には、TUI 開発時にアプリを観測するための軽量なブラウザ UI があります。
 
 ## ブラウザ DevTools（おすすめ）
 
-ローカルの DevTools サーバを起動します:
-
-```ts
-import { createApp, ui } from "btuin";
-
-const app = createApp({
-  devtools: {
-    enabled: true,
-    server: {
-      host: "127.0.0.1",
-      port: 0,
-      onListen: ({ url }) => console.log(`[devtools] open ${url}`),
-    },
-  },
-  init: () => ({}),
-  render: () => ui.Text("Hello"),
-});
-```
+開発用ランナー（`btuin dev ...`）を使う場合、ブラウザ DevTools は自動で有効化されます（無効化は `--no-devtools`）。
+また、DevTools の URL をブラウザで自動で開きます（無効化は `--no-open-browser`）。
 
 表示された URL をブラウザで開くと、ログとスナップショットが確認できます。
 
 スナップショットは **Preview**（レイアウトのボックス + テキスト）と **JSON**（生の payload）の両方で確認できます。
 
-## `useLog()` フック
+コードを変更したくない場合は、環境変数でも有効化できます:
 
-`useLog()` は capture した console 出力をリアクティブに参照するためのフックです（ログUIを自作したい場合に使えます）。
-
-オプション:
-
-- `devtools.maxLogLines`（デフォルト: `1000`）
-
-```ts
-import { defineComponent, useLog, ui } from "btuin";
-
-export const LogView = defineComponent({
-  setup() {
-    const log = useLog();
-    return () => ui.Text(`lines: ${log.lines.value.length}`);
-  },
-});
-```
-
-注意:
-
-- 基本はコンポーネント `init()` / `setup()` 内で呼ぶ想定（unmount で自動 cleanup）。
-- それ以外の場所で呼ぶ場合は `dispose()` を手動で呼んでください。
-
-## file へストリーミング（JSONL）
-
-1行1イベントの JSONL 形式で追記します:
-
-```ts
-devtools: {
-  enabled: true,
-  stream: { file: "/tmp/btuin-devtools.log" },
-}
-```
-
-例:
-
-```bash
-tail -f /tmp/btuin-devtools.log | jq -r '.type + " " + .text'
-```
-
-フォーマット（1行=1イベント）:
-
-```json
-{ "text": "hello", "type": "stdout", "timestamp": 1730000000000 }
-```
-
-## TCP でストリーミング（JSONL）
-
-ローカルで TCP サーバを起動し、接続クライアントへ JSONL を流します:
-
-```ts
-devtools: {
-  enabled: true,
-  stream: {
-    tcp: {
-      host: "127.0.0.1",
-      port: 9229,
-      backlog: 200,
-      onListen: ({ host, port }) => console.log(`DevTools TCP: ${host}:${port}`),
-    },
-  },
-}
-```
-
-別ターミナルから接続:
-
-```bash
-nc 127.0.0.1 9229 | jq -r '.type + " " + .text'
-```
-
-Backlog:
-
-- `backlog` は直近のログをメモリに保持し、新規接続時に先頭へフラッシュするための行数です。
-- 接続前後のタイミングでログを取りこぼしにくくします。
-
-セキュリティ注意:
-
-- 特別な理由がなければ `127.0.0.1` にバインドしてください。
-- stdout/stderr が流れるので、公開ポートにする場合は漏洩リスクを理解した上で運用してください。
+- `BTUIN_DEVTOOLS=1`（有効化）
+- `BTUIN_DEVTOOLS_HOST` / `BTUIN_DEVTOOLS_PORT`（任意）
 
 # ホットリロード（開発用ランナー）
 
@@ -165,44 +56,11 @@ btuin dev src/main.ts -- --foo bar
 btuin dev examples/devtools.ts --no-preserve-state
 ```
 
-または、ランナー用のスクリプトを作ります:
-
-```ts
-import { runHotReloadProcess } from "btuin";
-
-runHotReloadProcess({
-  command: "bun",
-  args: ["examples/devtools.ts"],
-  watch: { paths: ["src", "examples"] },
-});
-```
-
-実行:
-
-```bash
-bun run examples/hot-reload.ts
-```
+注意: ホットリロードは `btuin dev`（dev runner）が適用します。
 
 ## TCPトリガ（任意）
 
-`btuin dev` はデフォルトで TCP を有効化（ポートは自動選択）します。コード側で明示設定することもできます:
-
-```ts
-import { runHotReloadProcess } from "btuin";
-
-runHotReloadProcess({
-  command: "bun",
-  args: ["examples/devtools.ts"],
-  watch: { paths: ["src", "examples"] },
-  tcp: {
-    host: "127.0.0.1",
-    port: 0,
-    onListen: ({ host, port }) => {
-      process.stderr.write(`[btuin] hot-reload tcp: ${host}:${port}\n`);
-    },
-  },
-});
-```
+`btuin dev` はデフォルトで TCP を有効化（ポートは自動選択）します。
 
 別ターミナルからトリガ:
 

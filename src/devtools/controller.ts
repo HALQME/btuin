@@ -6,7 +6,9 @@ import { setupDevtoolsServer, type DevtoolsSnapshot } from "./server";
 
 export interface DevtoolsController {
   handleKey(event: KeyEvent): boolean;
-  wrapView(root: import("../view/types/elements").ViewElement): import("../view/types/elements").ViewElement;
+  wrapView(
+    root: import("../view/types/elements").ViewElement,
+  ): import("../view/types/elements").ViewElement;
   onLayout?(snapshot: DevtoolsSnapshot): void;
   dispose(): void;
 }

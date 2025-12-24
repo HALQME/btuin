@@ -7,13 +7,15 @@ import {
   stopCapture,
   disposeSingletonCapture,
 } from "@/terminal/capture";
-import { useLog, type UseLogResult } from "@/devtools";
+import { useLog, type UseLogResult } from "@/hooks/use-log";
 
 describe("useLog", () => {
-  const originalStdoutWrite = process.stdout.write;
-  const originalStderrWrite = process.stderr.write;
+  let originalStdoutWrite: typeof process.stdout.write;
+  let originalStderrWrite: typeof process.stderr.write;
 
   beforeEach(() => {
+    originalStdoutWrite = process.stdout.write;
+    originalStderrWrite = process.stderr.write;
     process.stdout.write = (() => true) as any;
     process.stderr.write = (() => true) as any;
   });
