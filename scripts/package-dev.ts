@@ -115,11 +115,7 @@ async function main() {
   const currentPlatform = process.platform;
   const currentArch = process.arch;
   const builtBinaryName = `liblayout_engine.${PLATFORM_SUFFIX[currentPlatform] ?? "so"}`;
-  const builtBinaryPath = path.join(
-    PKG_ROOT,
-    "src/layout-engine/target/release",
-    builtBinaryName,
-  );
+  const builtBinaryPath = path.join(PKG_ROOT, "src/layout-engine/target/release", builtBinaryName);
 
   if (!existsSync(builtBinaryPath)) {
     throw new Error(`Could not find built binary at ${builtBinaryPath}`);
