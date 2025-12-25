@@ -1,5 +1,6 @@
 import type { ServerWebSocket } from "bun";
-import type { ComputedLayout } from "../layout-engine/types";
+import type { ComputedLayout, LayoutStyle } from "../layout-engine/types";
+import type { OutlineOptions } from "../renderer/types";
 import type { ConsoleCaptureHandle, ConsoleLine } from "../terminal/capture";
 import { isBlock, isText, type ViewElement } from "../view/types/elements";
 import type { DevtoolsOptions } from "./types";
@@ -13,11 +14,66 @@ export interface DevtoolsSnapshot {
 
 type LayoutBox = { x: number; y: number; width: number; height: number };
 
+type LayoutStyleKey =
+  | "display"
+  | "position"
+  | "width"
+  | "height"
+  | "minWidth"
+  | "minHeight"
+  | "maxWidth"
+  | "maxHeight"
+  | "layoutBoundary"
+  | "padding"
+  | "margin"
+  | "flexDirection"
+  | "flexWrap"
+  | "flexGrow"
+  | "flexShrink"
+  | "flexBasis"
+  | "justifyContent"
+  | "alignItems"
+  | "alignSelf"
+  | "gap";
+
+const layoutStyleKeys: readonly LayoutStyleKey[] = [
+  "display",
+  "position",
+  "width",
+  "height",
+  "minWidth",
+  "minHeight",
+  "maxWidth",
+  "maxHeight",
+  "layoutBoundary",
+  "padding",
+  "margin",
+  "flexDirection",
+  "flexWrap",
+  "flexGrow",
+  "flexShrink",
+  "flexBasis",
+  "justifyContent",
+  "alignItems",
+  "alignSelf",
+  "gap",
+] as const;
+type LayoutStyleInfo = Partial<Pick<LayoutStyle, LayoutStyleKey>>;
+
+type ViewStyleInfo = {
+  foreground?: string | number;
+  background?: string | number;
+  outline?: Pick<OutlineOptions, "color" | "style" | "title">;
+  stack?: "z";
+};
+
 type ViewNode = {
   key: string;
   type: string;
   text?: string;
   children?: ViewNode[];
+  layoutStyle?: LayoutStyleInfo;
+  viewStyle?: ViewStyleInfo;
 };
 
 type BrowserSnapshot = {
@@ -37,40 +93,68 @@ function getKey(el: ViewElement): string {
   return (el.key ?? el.identifier ?? "") as string;
 }
 
-function serializeViewTree(root: ViewElement): { tree: ViewNode; keys: Set<string> } {
-  const keys = new Set<string>();
+function pickLayoutStyle(style: ViewElement["style"] | undefined): LayoutStyleInfo | undefined {
+  if (!style) return undefined;
+  const out: LayoutStyleInfo = {};
+  for (const key of layoutStyleKeys) {
+    if (style[key] !== undefined) {
+      (out as any)[key] = style[key];
+    }
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
+}
 
-  const walk = (el: ViewElement): ViewNode => {
+function pickViewStyle(style: ViewElement["style"] | undefined): ViewStyleInfo | undefined {
+  if (!style) return undefined;
+  const out: ViewStyleInfo = {};
+
+  if (style.foreground !== undefined) out.foreground = style.foreground;
+  if (style.background !== undefined) out.background = style.background;
+  if (style.stack !== undefined) out.stack = style.stack;
+
+  if (style.outline) {
+    const { color, style: outlineStyle, title } = style.outline;
+    out.outline = { color, style: outlineStyle, title };
+  }
+
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
+function buildBrowserSnapshot(snapshot: DevtoolsSnapshot): BrowserSnapshot {
+  const layout: Record<string, LayoutBox> = {};
+
+  const walk = (el: ViewElement, parentX: number, parentY: number): ViewNode => {
     const key = getKey(el);
-    keys.add(key);
+    const entry = snapshot.layoutMap[key];
+    const absX = (entry?.x ?? 0) + parentX;
+    const absY = (entry?.y ?? 0) + parentY;
+    const width = entry?.width ?? 0;
+    const height = entry?.height ?? 0;
+    if (entry) {
+      layout[key] = { x: absX, y: absY, width, height };
+    }
+
+    const layoutStyle = pickLayoutStyle(el.style);
+    const viewStyle = pickViewStyle(el.style);
 
     if (isText(el)) {
-      return { key, type: el.type, text: el.content };
+      return { key, type: el.type, text: el.content, layoutStyle, viewStyle };
     }
 
     if (isBlock(el)) {
       return {
         key,
         type: el.type,
-        children: el.children.map(walk),
+        layoutStyle,
+        viewStyle,
+        children: el.children.map((child) => walk(child, absX, absY)),
       };
     }
 
-    return { key, type: el.type };
+    return { key, type: el.type, layoutStyle, viewStyle };
   };
 
-  return { tree: walk(root), keys };
-}
-
-function buildBrowserSnapshot(snapshot: DevtoolsSnapshot): BrowserSnapshot {
-  const { tree, keys } = serializeViewTree(snapshot.rootElement);
-  const layout: Record<string, LayoutBox> = {};
-
-  for (const key of keys) {
-    const entry = snapshot.layoutMap[key];
-    if (!entry) continue;
-    layout[key] = { x: entry.x, y: entry.y, width: entry.width, height: entry.height };
-  }
+  const tree = walk(snapshot.rootElement, 0, 0);
 
   return {
     timestamp: Date.now(),

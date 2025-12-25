@@ -4,6 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>btuin DevTools</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <style>
       :root {
         color-scheme: dark;
@@ -34,7 +35,7 @@
         height: calc(100vh - 44px);
       }
       section {
-        padding: 12px;
+        padding: 10px;
         overflow: auto;
       }
       h2 {
@@ -110,12 +111,80 @@
       input[type="range"] {
         width: 120px;
       }
-      #previewScroll {
-        --cellw: 9px;
-        --cellh: 18px;
+      .panel {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        height: 100%;
+      }
+      .inspect {
         border: 1px solid #1f2937;
-        border-radius: 10px;
-        background-color: #0b0f14;
+        border-radius: 8px;
+        padding: 8px;
+        overflow: auto;
+        max-height: 260px;
+      }
+      .inspect .row {
+        margin-bottom: 6px;
+      }
+      .style-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12px;
+        line-height: 1.35;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+      .style-table th,
+      .style-table td {
+        border-top: 1px dashed #1f2937;
+        padding: 4px 6px;
+        vertical-align: top;
+      }
+      .style-table th {
+        text-align: left;
+        width: 140px;
+        color: #cbd5e1;
+        font-weight: 600;
+      }
+      .style-table td {
+        color: #e5e7eb;
+        word-break: break-word;
+      }
+      details summary {
+        cursor: pointer;
+        list-style: none;
+        font-size: 12px;
+        color: #93c5fd;
+        margin-bottom: 6px;
+      }
+      details[open] summary {
+        margin-bottom: 6px;
+      }
+      .style-table .section {
+        color: #93c5fd;
+        font-weight: 700;
+      }
+      #previewScroll {
+        border: 1px solid #1f2937;
+        border-radius: 8px;
+        --cell-bg: #0b0f14;
+        background-color: var(--cell-bg);
+        overflow: auto;
+        min-height: 240px;
+        flex: 1 1 auto;
+      }
+      #previewPanel {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        min-height: 0;
+      }
+      #previewStage {
+        position: relative;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 12px;
+        line-height: 1.25;
+        background-color: var(--cell-bg);
         background-image:
           linear-gradient(
             to right,
@@ -127,23 +196,14 @@
             rgba(148, 163, 184, 0.08) 1px,
             transparent 1px
           );
-        background-size: var(--cellw) var(--cellh);
-        overflow: auto;
-        height: calc(100% - 64px);
-        min-height: 220px;
-      }
-      #previewStage {
-        position: relative;
-        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-        font-size: 12px;
-        line-height: 1.25;
+        background-size: var(--cellw, 9px) var(--cellh, 18px);
       }
       .node {
         position: absolute;
         box-sizing: border-box;
         border: none;
         outline: none;
-        background: rgba(15, 23, 42, 0.2);
+        background: transparent;
         font-family: inherit;
         font-size: inherit;
         line-height: inherit;
@@ -154,100 +214,130 @@
         text-overflow: clip;
       }
       .node.boxes {
-        outline: 1px solid rgba(59, 130, 246, 0.35);
+        outline: 1px dotted rgba(148, 163, 184, 0.2);
         outline-offset: -1px;
       }
       .node.boxes:hover {
-        outline: 2px solid rgba(147, 197, 253, 0.85);
+        outline: 1px dotted rgba(148, 163, 184, 0.45);
+        outline-offset: -1px;
+      }
+      .node.outline-text {
+        opacity: 0.6;
+      }
+      .node.outline-text.double {
+        opacity: 0.8;
+      }
+      .selection {
+        position: absolute;
+        box-sizing: border-box;
+        pointer-events: none;
+        outline: 2px solid rgba(244, 114, 182, 0.9);
         outline-offset: -2px;
+      }
+      .ring {
+        position: absolute;
+        pointer-events: none;
+        box-sizing: border-box;
+      }
+      .ring.margin {
+        background: rgba(250, 204, 21, 0.16);
+      }
+      .ring.padding {
+        background: rgba(74, 222, 128, 0.14);
+      }
+      .ring.bg {
+        background: transparent;
       }
     </style>
   </head>
   <body>
-    <header>
-      <div style="font-weight: 600">btuin DevTools</div>
-      <span id="status" class="pill">connecting…</span>
-      <button id="snapshot">Request snapshot</button>
-      <span class="pill">WS: <span id="wsurl"></span></span>
-    </header>
-    <div class="grid">
-      <section>
-        <h2>Logs</h2>
-        <div id="logs"></div>
-      </section>
-      <section>
-        <div class="row" style="margin-bottom: 10px">
-          <h2 style="margin: 0">Snapshot</h2>
-          <div class="tabs">
-            <button id="tabPreview" aria-pressed="true">Preview</button>
-            <button id="tabJson" aria-pressed="false">JSON</button>
+    <div id="app">
+      <header>
+        <div style="font-weight: 600">btuin DevTools</div>
+        <span class="pill">{{ status }}</span>
+        <button @click="requestSnapshot">Request snapshot</button>
+        <span class="pill">WS: <span>{{ wsUrl }}</span></span>
+      </header>
+      <div class="grid">
+        <section>
+          <h2>Logs</h2>
+          <div ref="logsEl">
+            <div
+              v-for="line in logs"
+              :key="line.id"
+              class="logline"
+              :class="line.type === 'stderr' ? 'stderr' : 'stdout'"
+            >
+              {{ line.display }}
+            </div>
           </div>
-        </div>
-        <div id="previewPanel">
-          <div class="controls">
-            <label>Zoom <input id="zoom" type="range" min="60" max="200" value="100" /></label>
-            <label><input id="boxes" type="checkbox" checked /> Boxes</label>
-            <span id="previewSize" class="pill">(none)</span>
+        </section>
+        <section class="panel">
+          <div class="row" style="margin-bottom: 6px">
+            <h2 style="margin: 0">Snapshot</h2>
+            <div class="tabs">
+              <button
+                :aria-pressed="tab === 'preview'"
+                @click="setTab('preview')"
+              >
+                Preview
+              </button>
+              <button :aria-pressed="tab === 'json'" @click="setTab('json')">
+                JSON
+              </button>
+            </div>
           </div>
-          <div id="previewScroll"><div id="previewStage"></div></div>
-        </div>
-        <pre id="snapshotView" style="display: none">(none)</pre>
-      </section>
+          <div v-show="tab === 'preview'" class="panel" id="previewPanel">
+            <div class="controls">
+              <label
+                >Zoom
+                <input v-model.number="zoom" type="range" min="60" max="200"
+              /></label>
+              <label><input v-model="showBoxes" type="checkbox" /> Boxes</label>
+              <label
+                ><input v-model="showMargin" type="checkbox" /> Margin</label
+              >
+              <label
+                ><input v-model="showPadding" type="checkbox" /> Padding</label
+              >
+              <span class="pill">{{ previewSize }}</span>
+            </div>
+            <div id="previewScroll">
+              <div
+                id="previewStage"
+                ref="previewStage"
+                @click="onPreviewClick"
+              ></div>
+            </div>
+            <div class="inspect">
+              <div class="row">
+                <span class="pill"
+                  >Selected: {{ selectedKey || "(none)" }}</span
+                >
+                <span class="pill">Type: {{ selectedType }}</span>
+              </div>
+              <details
+                :open="styleDetailsOpen"
+                ref="styleDetails"
+                @toggle="onStyleDetailsToggle"
+              >
+                <summary>Styles</summary>
+                <table class="style-table">
+                  <tr v-for="row in styleRows" :key="row.id">
+                    <th :class="{ section: row.section }">{{ row.key }}</th>
+                    <td>{{ row.section ? "" : row.value }}</td>
+                  </tr>
+                </table>
+              </details>
+            </div>
+          </div>
+          <pre v-show="tab === 'json'">{{ snapshotText }}</pre>
+        </section>
+      </div>
     </div>
     <script>
-      const wsUrl =
-        (location.protocol === "https:" ? "wss://" : "ws://") +
-        location.host +
-        "/ws";
-      document.getElementById("wsurl").textContent = wsUrl;
-      const statusEl = document.getElementById("status");
-      const logsEl = document.getElementById("logs");
-      const snapshotEl = document.getElementById("snapshotView");
-      const btn = document.getElementById("snapshot");
-      const tabPreview = document.getElementById("tabPreview");
-      const tabJson = document.getElementById("tabJson");
-      const previewPanel = document.getElementById("previewPanel");
-      const previewScroll = document.getElementById("previewScroll");
-      const previewStage = document.getElementById("previewStage");
-      const previewSize = document.getElementById("previewSize");
-      const zoomEl = document.getElementById("zoom");
-      const boxesEl = document.getElementById("boxes");
-
-      let latestSnapshot = null;
-      let showBoxes = true;
-      let scale = 1;
       const baseFontSizePx = 12;
       const baseLineHeight = 1.25;
-      let cellW = 9;
-      let cellH = 18;
-
-      const socket = new WebSocket(wsUrl);
-      socket.addEventListener("open", () => {
-        statusEl.textContent = "connected";
-      });
-      socket.addEventListener("close", () => {
-        statusEl.textContent = "disconnected";
-      });
-      socket.addEventListener("error", () => {
-        statusEl.textContent = "error";
-      });
-
-      btn.addEventListener("click", () => {
-        try {
-          socket.send(JSON.stringify({ type: "requestSnapshot" }));
-        } catch {}
-      });
-
-      function setTab(tab) {
-        const preview = tab === "preview";
-        tabPreview.setAttribute("aria-pressed", preview ? "true" : "false");
-        tabJson.setAttribute("aria-pressed", preview ? "false" : "true");
-        previewPanel.style.display = preview ? "block" : "none";
-        snapshotEl.style.display = preview ? "none" : "block";
-      }
-
-      tabPreview.addEventListener("click", () => setTab("preview"));
-      tabJson.addEventListener("click", () => setTab("json"));
 
       function flattenTree(root) {
         const out = [];
@@ -261,23 +351,422 @@
         return out;
       }
 
-      function renderPreview(snapshot) {
+      function indexTree(root) {
+        const nodes = new Map();
+        const parents = new Map();
+        const children = new Map();
+
+        const walk = (node, parentKey) => {
+          if (node && typeof node.key === "string") {
+            nodes.set(node.key, node);
+            if (parentKey) parents.set(node.key, parentKey);
+            if (!children.has(node.key)) children.set(node.key, []);
+          }
+          if (node && node.children && Array.isArray(node.children)) {
+            for (const child of node.children) {
+              if (node && typeof node.key === "string" && child?.key) {
+                const list = children.get(node.key) || [];
+                list.push(child.key);
+                children.set(node.key, list);
+              }
+              walk(child, node?.key);
+            }
+          }
+        };
+
+        walk(root, null);
+        return { nodes, parents, children };
+      }
+
+      function normalizeInsets(value) {
+        if (typeof value === "number" && Number.isFinite(value)) {
+          return { top: value, right: value, bottom: value, left: value };
+        }
+        if (Array.isArray(value) && value.length === 4) {
+          const top = Number(value[0]);
+          const right = Number(value[1]);
+          const bottom = Number(value[2]);
+          const left = Number(value[3]);
+          return {
+            top: Number.isFinite(top) ? top : 0,
+            right: Number.isFinite(right) ? right : 0,
+            bottom: Number.isFinite(bottom) ? bottom : 0,
+            left: Number.isFinite(left) ? left : 0,
+          };
+        }
+        return { top: 0, right: 0, bottom: 0, left: 0 };
+      }
+
+      function fmt(value) {
+        if (value === undefined || value === null) return "(none)";
+        if (typeof value === "string") return value;
+        if (typeof value === "number") return String(value);
+        return JSON.stringify(value);
+      }
+
+      function addRow(rows, key, value) {
+        rows.push({ key, value });
+      }
+
+      function addRowIf(rows, key, value) {
+        if (value === undefined || value === null || value === "(none)") return;
+        rows.push({ key, value });
+      }
+
+      function addSection(rows, label) {
+        rows.push({ key: label, value: "", section: true });
+      }
+
+      function makeRectDiv(className, x, y, w, h, color, cellW, cellH) {
+        if (
+          !Number.isFinite(x) ||
+          !Number.isFinite(y) ||
+          !Number.isFinite(w) ||
+          !Number.isFinite(h)
+        )
+          return null;
+        if (w <= 0 || h <= 0) return null;
+        const el = document.createElement("div");
+        el.className = className;
+        el.style.left = x * cellW + "px";
+        el.style.top = y * cellH + "px";
+        el.style.width = w * cellW + "px";
+        el.style.height = h * cellH + "px";
+        if (color) el.style.backgroundColor = color;
+        return el;
+      }
+
+      function appendMarginRings(pushLayer, box, inset, cellW, cellH) {
+        const top = inset.top;
+        const right = inset.right;
+        const bottom = inset.bottom;
+        const left = inset.left;
+        if (top > 0) {
+          const el = makeRectDiv(
+            "ring margin",
+            box.x - left,
+            box.y - top,
+            box.width + left + right,
+            top,
+            undefined,
+            cellW,
+            cellH,
+          );
+          if (el) pushLayer(el);
+        }
+        if (bottom > 0) {
+          const el = makeRectDiv(
+            "ring margin",
+            box.x - left,
+            box.y + box.height,
+            box.width + left + right,
+            bottom,
+            undefined,
+            cellW,
+            cellH,
+          );
+          if (el) pushLayer(el);
+        }
+        if (left > 0) {
+          const el = makeRectDiv(
+            "ring margin",
+            box.x - left,
+            box.y,
+            left,
+            box.height,
+            undefined,
+            cellW,
+            cellH,
+          );
+          if (el) pushLayer(el);
+        }
+        if (right > 0) {
+          const el = makeRectDiv(
+            "ring margin",
+            box.x + box.width,
+            box.y,
+            right,
+            box.height,
+            undefined,
+            cellW,
+            cellH,
+          );
+          if (el) pushLayer(el);
+        }
+      }
+
+      function appendOutlineText(
+        pushLayer,
+        box,
+        outlineStyle,
+        color,
+        cellW,
+        cellH,
+      ) {
+        if (!box || box.width <= 0 || box.height <= 0) return;
+        const chars =
+          outlineStyle === "double"
+            ? { h: "═", v: "║", tl: "╔", tr: "╗", bl: "╚", br: "╝" }
+            : { h: "─", v: "│", tl: "┌", tr: "┐", bl: "└", br: "┘" };
+
+        const width = Math.max(1, Math.floor(box.width));
+        const height = Math.max(1, Math.floor(box.height));
+
+        const mkLine = (text, x, y, w, h) => {
+          const el = document.createElement("div");
+          el.className =
+            "node outline-text" + (outlineStyle === "double" ? " double" : "");
+          el.style.left = x * cellW + "px";
+          el.style.top = y * cellH + "px";
+          el.style.width = w * cellW + "px";
+          el.style.height = h * cellH + "px";
+          el.style.whiteSpace = "pre";
+          el.style.pointerEvents = "none";
+          if (color) el.style.color = color;
+          el.textContent = text;
+          return el;
+        };
+
+        if (height === 1) {
+          const line =
+            width === 1
+              ? chars.v
+              : chars.tl + chars.h.repeat(width - 2) + chars.tr;
+          pushLayer(mkLine(line, box.x, box.y, width, 1));
+          return;
+        }
+
+        const topLine =
+          width === 1
+            ? chars.v
+            : chars.tl + chars.h.repeat(width - 2) + chars.tr;
+        const bottomLine =
+          width === 1
+            ? chars.v
+            : chars.bl + chars.h.repeat(width - 2) + chars.br;
+        pushLayer(mkLine(topLine, box.x, box.y, width, 1));
+        pushLayer(mkLine(bottomLine, box.x, box.y + height - 1, width, 1));
+
+        if (height > 2) {
+          const midCount = height - 2;
+          const leftCol = Array.from({ length: midCount }, () => chars.v).join(
+            "\n",
+          );
+          const rightCol = leftCol;
+          pushLayer(mkLine(leftCol, box.x, box.y + 1, 1, midCount));
+          if (width > 1) {
+            pushLayer(
+              mkLine(rightCol, box.x + width - 1, box.y + 1, 1, midCount),
+            );
+          }
+        }
+      }
+
+      function appendPaddingRings(pushLayer, box, inset, cellW, cellH) {
+        const top = inset.top;
+        const right = inset.right;
+        const bottom = inset.bottom;
+        const left = inset.left;
+        if (top > 0) {
+          const el = makeRectDiv(
+            "ring padding",
+            box.x,
+            box.y,
+            box.width,
+            top,
+            undefined,
+            cellW,
+            cellH,
+          );
+          if (el) pushLayer(el);
+        }
+        if (bottom > 0) {
+          const el = makeRectDiv(
+            "ring padding",
+            box.x,
+            box.y + box.height - bottom,
+            box.width,
+            bottom,
+            undefined,
+            cellW,
+            cellH,
+          );
+          if (el) pushLayer(el);
+        }
+        const midH = box.height - top - bottom;
+        if (midH > 0 && left > 0) {
+          const el = makeRectDiv(
+            "ring padding",
+            box.x,
+            box.y + top,
+            left,
+            midH,
+            undefined,
+            cellW,
+            cellH,
+          );
+          if (el) pushLayer(el);
+        }
+        if (midH > 0 && right > 0) {
+          const el = makeRectDiv(
+            "ring padding",
+            box.x + box.width - right,
+            box.y + top,
+            right,
+            midH,
+            undefined,
+            cellW,
+            cellH,
+          );
+          if (el) pushLayer(el);
+        }
+      }
+
+      function xtermToRgb(n) {
+        const base = [
+          [0, 0, 0],
+          [128, 0, 0],
+          [0, 128, 0],
+          [128, 128, 0],
+          [0, 0, 128],
+          [128, 0, 128],
+          [0, 128, 128],
+          [192, 192, 192],
+          [128, 128, 128],
+          [255, 0, 0],
+          [0, 255, 0],
+          [255, 255, 0],
+          [0, 0, 255],
+          [255, 0, 255],
+          [0, 255, 255],
+          [255, 255, 255],
+        ];
+        if (!Number.isFinite(n)) return null;
+        const i = Math.max(0, Math.min(255, Math.floor(n)));
+        if (i < 16) return base[i];
+        if (i >= 16 && i <= 231) {
+          const idx = i - 16;
+          const r = Math.floor(idx / 36);
+          const g = Math.floor((idx % 36) / 6);
+          const b = idx % 6;
+          const steps = [0, 95, 135, 175, 215, 255];
+          return [steps[r], steps[g], steps[b]];
+        }
+        const v = 8 + (i - 232) * 10;
+        return [v, v, v];
+      }
+
+      function colorToCss(value) {
+        if (typeof value === "string") return value;
+        if (typeof value === "number") {
+          const rgb = xtermToRgb(value);
+          if (!rgb) return null;
+          return "rgb(" + rgb[0] + "," + rgb[1] + "," + rgb[2] + ")";
+        }
+        return null;
+      }
+
+      const graphemeSegmenter =
+        typeof Intl !== "undefined" && Intl.Segmenter
+          ? new Intl.Segmenter(undefined, { granularity: "grapheme" })
+          : null;
+
+      function splitGraphemes(text) {
+        if (!text) return [];
+        if (!graphemeSegmenter) return Array.from(text);
+        return Array.from(graphemeSegmenter.segment(text), (s) => s.segment);
+      }
+
+      function isWideCodePoint(ucs) {
+        return (
+          (ucs >= 0x1100 && ucs <= 0x115f) ||
+          ucs === 0x2329 ||
+          ucs === 0x232a ||
+          (ucs >= 0x2e80 && ucs <= 0xa4cf && ucs !== 0x303f) ||
+          (ucs >= 0xac00 && ucs <= 0xd7a3) ||
+          (ucs >= 0xf900 && ucs <= 0xfaff) ||
+          (ucs >= 0xfe10 && ucs <= 0xfe19) ||
+          (ucs >= 0xfe30 && ucs <= 0xfe6f) ||
+          (ucs >= 0xff00 && ucs <= 0xff60) ||
+          (ucs >= 0xffe0 && ucs <= 0xffe6) ||
+          (ucs >= 0x20000 && ucs <= 0x2fffd) ||
+          (ucs >= 0x30000 && ucs <= 0x3fffd)
+        );
+      }
+
+      function graphemeWidth(grapheme) {
+        if (!grapheme) return 0;
+        let width = 0;
+        for (const ch of Array.from(grapheme)) {
+          const code = ch.codePointAt(0) || 0;
+          if (code === 0) continue;
+          if (code < 32 || (code >= 0x7f && code < 0xa0)) continue;
+          const w = isWideCodePoint(code) ? 2 : 1;
+          if (w > width) width = w;
+        }
+        return width || 0;
+      }
+
+      function clipToWidth(text, maxCols) {
+        if (!text) return { text: "", width: 0 };
+        if (maxCols <= 0) return { text: "", width: 0 };
+        const segments = splitGraphemes(text);
+        let width = 0;
+        let out = "";
+        for (const seg of segments) {
+          const w = graphemeWidth(seg);
+          if (width + w > maxCols) break;
+          width += w;
+          out += seg;
+        }
+        return { text: out, width };
+      }
+
+      function renderPreview(state, snapshot) {
+        const previewStage = state.$refs.previewStage;
+        if (!previewStage) return;
         previewStage.textContent = "";
         if (!snapshot) {
-          previewSize.textContent = "(none)";
+          state.previewSize = "(none)";
           return;
         }
         const rows = snapshot.size?.rows ?? 0;
         const cols = snapshot.size?.cols ?? 0;
-        previewSize.textContent = cols + "x" + rows;
+        state.previewSize = cols + "x" + rows;
 
-        previewScroll.style.setProperty("--cellw", cellW + "px");
-        previewScroll.style.setProperty("--cellh", cellH + "px");
-
-        previewStage.style.width = cols * cellW + "px";
-        previewStage.style.height = rows * cellH + "px";
+        previewStage.style.setProperty("--cellw", state.cellW + "px");
+        previewStage.style.setProperty("--cellh", state.cellH + "px");
+        previewStage.style.width = cols * state.cellW + "px";
+        previewStage.style.height = rows * state.cellH + "px";
 
         const frag = document.createDocumentFragment();
+        let paintIndex = 0;
+        const pushLayer = (el) => {
+          if (!el) return;
+          paintIndex += 1;
+          el.style.zIndex = String(paintIndex);
+          frag.appendChild(el);
+        };
+        const defaultBg =
+          getComputedStyle(previewStage).backgroundColor || "transparent";
+        const bgCache = new Map();
+        const resolveBgForKey = (key) => {
+          if (bgCache.has(key)) return bgCache.get(key);
+          const node = state.nodeByKey.get(key);
+          const own = colorToCss(node?.viewStyle?.background);
+          if (own) {
+            bgCache.set(key, own);
+            return own;
+          }
+          const parent = state.parentByKey.get(key);
+          if (parent) {
+            const resolved = resolveBgForKey(parent);
+            bgCache.set(key, resolved);
+            return resolved;
+          }
+          bgCache.set(key, defaultBg);
+          return defaultBg;
+        };
         const items = flattenTree(snapshot.tree);
         for (const item of items) {
           const node = item.node;
@@ -286,16 +775,65 @@
               ? snapshot.layout[node.key]
               : null;
           if (!box) continue;
+          const rbox = {
+            x: Math.floor(box.x),
+            y: Math.floor(box.y),
+            width: Math.floor(box.width),
+            height: Math.floor(box.height),
+          };
 
-          const el = document.createElement("div");
-          el.className = "node" + (showBoxes ? " boxes" : "");
-          el.style.left = box.x * cellW + "px";
-          el.style.top = box.y * cellH + "px";
-          el.style.width = box.width * cellW + "px";
-          el.style.height = box.height * cellH + "px";
-          el.style.zIndex = String(item.depth + 1);
-          if (typeof node.text === "string") el.textContent = node.text;
-          el.title =
+          const style = node.layoutStyle || null;
+          const viewStyle = node.viewStyle || null;
+          if (state.showMargin && style && style.margin !== undefined) {
+            appendMarginRings(
+              pushLayer,
+              rbox,
+              normalizeInsets(style.margin),
+              state.cellW,
+              state.cellH,
+            );
+          }
+          const bgColor = colorToCss(viewStyle?.background);
+          if (bgColor) {
+            const bg = makeRectDiv(
+              "ring bg",
+              rbox.x,
+              rbox.y,
+              rbox.width,
+              rbox.height,
+              bgColor,
+              state.cellW,
+              state.cellH,
+            );
+            if (bg) pushLayer(bg);
+          }
+          if (state.showPadding && style && style.padding !== undefined) {
+            appendPaddingRings(
+              pushLayer,
+              rbox,
+              normalizeInsets(style.padding),
+              state.cellW,
+              state.cellH,
+            );
+          }
+          if (viewStyle && viewStyle.outline) {
+            const outlineColor =
+              colorToCss(viewStyle.outline.color) || "rgba(148, 163, 184, 0.8)";
+            appendOutlineText(
+              pushLayer,
+              rbox,
+              viewStyle.outline.style,
+              outlineColor,
+              state.cellW,
+              state.cellH,
+            );
+          }
+
+          const shouldBox =
+            state.showBoxes && !viewStyle?.outline && item.depth > 0;
+          const fg = colorToCss(viewStyle?.foreground);
+          const outline = viewStyle?.outline || null;
+          const title =
             (node.type || "node") +
             " key=" +
             (node.key || "(none)") +
@@ -306,13 +844,84 @@
             ") " +
             box.width +
             "x" +
-            box.height;
-          frag.appendChild(el);
+            box.height +
+            (outline && outline.title ? " title=" + outline.title : "");
+
+          if (typeof node.text === "string") {
+            const maxCols = Math.max(0, Math.floor(rbox.width));
+            const maxRows = Math.max(0, Math.floor(rbox.height));
+            const lines = node.text.split("\n");
+            const lineCount = Math.min(lines.length, maxRows);
+            const textBg = resolveBgForKey(node.key);
+            if (shouldBox) {
+              const boxEl = document.createElement("div");
+              boxEl.className = "node boxes";
+              boxEl.dataset.key = node.key;
+              boxEl.style.left = rbox.x * state.cellW + "px";
+              boxEl.style.top = rbox.y * state.cellH + "px";
+              boxEl.style.width = rbox.width * state.cellW + "px";
+              boxEl.style.height = rbox.height * state.cellH + "px";
+              boxEl.title = title;
+              pushLayer(boxEl);
+            }
+            for (let i = 0; i < lineCount; i += 1) {
+              const raw = lines[i] ?? "";
+              const clipped = clipToWidth(raw, maxCols);
+              if (!clipped.text && clipped.width === 0) continue;
+              const el = document.createElement("div");
+              el.className = "node text";
+              el.dataset.key = node.key;
+              el.style.left = rbox.x * state.cellW + "px";
+              el.style.top = (rbox.y + i) * state.cellH + "px";
+              el.style.width = clipped.width * state.cellW + "px";
+              el.style.height = state.cellH + "px";
+              el.style.whiteSpace = "pre";
+              if (textBg) el.style.backgroundColor = textBg;
+              if (fg) el.style.color = fg;
+              el.textContent = clipped.text;
+              el.title = title;
+              pushLayer(el);
+            }
+          } else {
+            const el = document.createElement("div");
+            el.className = "node" + (shouldBox ? " boxes" : "");
+            el.dataset.key = node.key;
+            el.style.left = rbox.x * state.cellW + "px";
+            el.style.top = rbox.y * state.cellH + "px";
+            el.style.width = rbox.width * state.cellW + "px";
+            el.style.height = rbox.height * state.cellH + "px";
+            el.title = title;
+            pushLayer(el);
+          }
+        }
+        if (state.selectedKey && snapshot.layout?.[state.selectedKey]) {
+          const raw = snapshot.layout[state.selectedKey];
+          const selBox = {
+            x: Math.floor(raw.x),
+            y: Math.floor(raw.y),
+            width: Math.floor(raw.width),
+            height: Math.floor(raw.height),
+          };
+          const sel = makeRectDiv(
+            "selection",
+            selBox.x,
+            selBox.y,
+            selBox.width,
+            selBox.height,
+            undefined,
+            state.cellW,
+            state.cellH,
+          );
+          if (sel) {
+            sel.style.pointerEvents = "none";
+            pushLayer(sel);
+          }
         }
         previewStage.appendChild(frag);
       }
 
-      function measureCell() {
+      function measureCell(previewStage) {
+        if (!previewStage) return null;
         const probe = document.createElement("span");
         probe.textContent = "0000000000";
         probe.style.position = "absolute";
@@ -333,59 +942,256 @@
         return { w, h };
       }
 
-      function applyZoom() {
-        scale = Math.max(0.6, Math.min(2, Number(zoomEl.value) / 100));
+      const { createApp } = Vue;
 
-        previewStage.style.fontSize = baseFontSizePx * scale + "px";
-        previewStage.style.lineHeight = String(baseLineHeight);
+      createApp({
+        data() {
+          return {
+            wsUrl:
+              (location.protocol === "https:" ? "wss://" : "ws://") +
+              location.host +
+              "/ws",
+            status: "connecting…",
+            tab: "preview",
+            zoom: 100,
+            showBoxes: true,
+            showMargin: true,
+            showPadding: true,
+            previewSize: "(none)",
+            logs: [],
+            logSeq: 0,
+            snapshotText: "(none)",
+            selectedKey: null,
+            selectedType: "(none)",
+            styleRows: [{ id: 0, key: "hint", value: "click a node" }],
+            styleDetailsOpen: false,
+            latestSnapshot: null,
+            nodeByKey: new Map(),
+            parentByKey: new Map(),
+            childrenByKey: new Map(),
+            cellW: 9,
+            cellH: 18,
+            socket: null,
+          };
+        },
+        mounted() {
+          this.socket = new WebSocket(this.wsUrl);
+          this.socket.addEventListener("open", () => {
+            this.status = "connected";
+          });
+          this.socket.addEventListener("close", () => {
+            this.status = "disconnected";
+          });
+          this.socket.addEventListener("error", () => {
+            this.status = "error";
+          });
+          this.socket.addEventListener("message", (ev) => {
+            this.onSocketMessage(ev);
+          });
 
-        const measured = measureCell();
-        if (measured) {
-          cellW = measured.w;
-          cellH = measured.h;
-        }
-        renderPreview(latestSnapshot);
-      }
+          this.applyZoom();
+          this.updateInspector();
+        },
+        watch: {
+          zoom() {
+            this.applyZoom();
+          },
+          showBoxes() {
+            renderPreview(this, this.latestSnapshot);
+          },
+          showMargin() {
+            this.updateInspector();
+            renderPreview(this, this.latestSnapshot);
+          },
+          showPadding() {
+            this.updateInspector();
+            renderPreview(this, this.latestSnapshot);
+          },
+        },
+        methods: {
+          setTab(tab) {
+            this.tab = tab;
+          },
+          requestSnapshot() {
+            try {
+              this.socket?.send(JSON.stringify({ type: "requestSnapshot" }));
+            } catch {}
+          },
+          onStyleDetailsToggle(ev) {
+            const target = ev?.target;
+            if (target instanceof HTMLDetailsElement) {
+              this.styleDetailsOpen = target.open;
+            }
+          },
+          onPreviewClick(ev) {
+            const target = ev.target;
+            if (!(target instanceof Element)) return;
+            const nodeEl = target.closest(".node");
+            if (!nodeEl) return;
+            const k = nodeEl.dataset.key;
+            this.selectedKey = typeof k === "string" ? k : null;
+            this.updateInspector();
+            renderPreview(this, this.latestSnapshot);
+          },
+          appendLog(line) {
+            const ts = new Date(line.timestamp).toISOString().slice(11, 19);
+            this.logs.push({
+              id: (this.logSeq += 1),
+              type: line.type === "stderr" ? "stderr" : "stdout",
+              display: "[" + ts + "] " + line.text,
+            });
+            const max = 400;
+            while (this.logs.length > max) this.logs.shift();
+            this.$nextTick(() => {
+              const el = this.$refs.logsEl;
+              if (el) el.scrollTop = el.scrollHeight;
+            });
+          },
+          onSocketMessage(ev) {
+            let msg;
+            try {
+              msg = JSON.parse(ev.data);
+            } catch {
+              return;
+            }
+            if (!msg || typeof msg !== "object") return;
+            if (msg.type === "log" && msg.line) this.appendLog(msg.line);
+            if (msg.type === "logs" && Array.isArray(msg.lines))
+              msg.lines.forEach((line) => this.appendLog(line));
+            if (msg.type === "snapshot" && msg.snapshot) {
+              this.latestSnapshot = msg.snapshot;
+              const indexed = indexTree(this.latestSnapshot.tree);
+              this.nodeByKey = indexed.nodes;
+              this.parentByKey = indexed.parents;
+              this.childrenByKey = indexed.children;
+              this.snapshotText = JSON.stringify(msg.snapshot, null, 2);
+              if (
+                this.selectedKey &&
+                !this.latestSnapshot.layout?.[this.selectedKey]
+              ) {
+                this.selectedKey = null;
+              }
+              this.updateInspector();
+              renderPreview(this, this.latestSnapshot);
+            }
+          },
+          updateInspector() {
+            const key = this.selectedKey;
+            if (!this.latestSnapshot || !key) {
+              this.selectedType = "(none)";
+              this.styleRows = [{ id: 0, key: "hint", value: "click a node" }];
+              this.styleDetailsOpen = false;
+              return;
+            }
 
-      zoomEl.addEventListener("input", applyZoom);
-      boxesEl.addEventListener("change", () => {
-        showBoxes = !!boxesEl.checked;
-        renderPreview(latestSnapshot);
-      });
+            const node = this.nodeByKey.get(key);
+            const box = this.latestSnapshot.layout?.[key];
+            const style = node?.layoutStyle ?? null;
+            const viewStyle = node?.viewStyle ?? null;
+            const margin = normalizeInsets(style?.margin);
+            const padding = normalizeInsets(style?.padding);
+            const parentKey = this.parentByKey.get(key);
+            const parentNode = parentKey ? this.nodeByKey.get(parentKey) : null;
+            const childKeys = this.childrenByKey.get(key) || [];
 
-      function appendLog(line) {
-        const div = document.createElement("div");
-        div.className =
-          "logline " + (line.type === "stderr" ? "stderr" : "stdout");
-        const ts = new Date(line.timestamp).toISOString().slice(11, 19);
-        div.textContent = "[" + ts + "] " + line.text;
-        logsEl.appendChild(div);
-        const max = 400;
-        while (logsEl.childNodes.length > max)
-          logsEl.removeChild(logsEl.firstChild);
-        logsEl.scrollTop = logsEl.scrollHeight;
-      }
+            this.selectedType = String(node?.type ?? "(unknown)");
 
-      socket.addEventListener("message", (ev) => {
-        let msg;
-        try {
-          msg = JSON.parse(ev.data);
-        } catch {
-          return;
-        }
-        if (!msg || typeof msg !== "object") return;
-        if (msg.type === "log" && msg.line) appendLog(msg.line);
-        if (msg.type === "logs" && Array.isArray(msg.lines))
-          msg.lines.forEach(appendLog);
-        if (msg.type === "snapshot" && msg.snapshot) {
-          latestSnapshot = msg.snapshot;
-          snapshotEl.textContent = JSON.stringify(msg.snapshot, null, 2);
-          renderPreview(latestSnapshot);
-        }
-      });
+            const rows = [];
+            addSection(rows, "node");
+            addRow(rows, "key", fmt(key));
+            addRow(rows, "type", fmt(node?.type));
+            addRow(
+              rows,
+              "parent",
+              parentKey
+                ? `${parentKey} (${parentNode?.type ?? "?"})`
+                : "(none)",
+            );
+            addRow(
+              rows,
+              "children",
+              childKeys.length ? childKeys.join(", ") : "(none)",
+            );
 
-      setTab("preview");
-      applyZoom();
+            const layoutRows = [];
+            addRowIf(
+              layoutRows,
+              "box",
+              box ? `${box.x},${box.y} ${box.width}x${box.height}` : "(none)",
+            );
+            addRowIf(layoutRows, "display", fmt(style?.display));
+            addRowIf(layoutRows, "position", fmt(style?.position));
+            addRowIf(layoutRows, "flexDirection", fmt(style?.flexDirection));
+            addRowIf(layoutRows, "flexWrap", fmt(style?.flexWrap));
+            addRowIf(layoutRows, "flexGrow", fmt(style?.flexGrow));
+            addRowIf(layoutRows, "flexShrink", fmt(style?.flexShrink));
+            addRowIf(layoutRows, "flexBasis", fmt(style?.flexBasis));
+            addRowIf(layoutRows, "justifyContent", fmt(style?.justifyContent));
+            addRowIf(layoutRows, "alignItems", fmt(style?.alignItems));
+            addRowIf(layoutRows, "alignSelf", fmt(style?.alignSelf));
+            addRowIf(layoutRows, "gap", fmt(style?.gap));
+            addRowIf(layoutRows, "width", fmt(style?.width));
+            addRowIf(layoutRows, "height", fmt(style?.height));
+            addRowIf(layoutRows, "minWidth", fmt(style?.minWidth));
+            addRowIf(layoutRows, "minHeight", fmt(style?.minHeight));
+            addRowIf(layoutRows, "maxWidth", fmt(style?.maxWidth));
+            addRowIf(layoutRows, "maxHeight", fmt(style?.maxHeight));
+            const hasMargin =
+              margin.top || margin.right || margin.bottom || margin.left;
+            const hasPadding =
+              padding.top || padding.right || padding.bottom || padding.left;
+            if (this.showMargin && hasMargin) {
+              addRowIf(layoutRows, "margin", JSON.stringify(margin));
+            }
+            if (this.showPadding && hasPadding) {
+              addRowIf(layoutRows, "padding", JSON.stringify(padding));
+            }
+            if (style?.layoutBoundary !== undefined) {
+              addRowIf(
+                layoutRows,
+                "layoutBoundary",
+                fmt(style?.layoutBoundary),
+              );
+            }
+            if (layoutRows.length > 0) {
+              addSection(rows, "layout");
+              rows.push(...layoutRows);
+            }
+
+            const styleRows = [];
+            addRowIf(styleRows, "foreground", fmt(viewStyle?.foreground));
+            addRowIf(styleRows, "background", fmt(viewStyle?.background));
+            addRowIf(styleRows, "outline", fmt(viewStyle?.outline));
+            addRowIf(styleRows, "stack", fmt(viewStyle?.stack));
+            if (styleRows.length > 0) {
+              addSection(rows, "style");
+              rows.push(...styleRows);
+            }
+
+            this.styleRows = rows.map((row, index) => ({
+              id: index,
+              ...row,
+            }));
+            this.styleDetailsOpen =
+              layoutRows.length > 0 || styleRows.length > 0;
+          },
+          applyZoom() {
+            const previewStage = this.$refs.previewStage;
+            if (!previewStage) return;
+            const scale = Math.max(0.6, Math.min(2, Number(this.zoom) / 100));
+
+            previewStage.style.fontSize = baseFontSizePx * scale + "px";
+            previewStage.style.lineHeight = String(baseLineHeight);
+
+            const measured = measureCell(previewStage);
+            if (measured) {
+              this.cellW = measured.w;
+              this.cellH = measured.h;
+            }
+            renderPreview(this, this.latestSnapshot);
+          },
+        },
+      }).mount("#app");
     </script>
   </body>
 </html>
