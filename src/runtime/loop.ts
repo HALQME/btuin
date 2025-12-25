@@ -198,6 +198,13 @@ export class LoopManager implements ILoopManager {
 
     renderer.renderOnce(true);
     updaters.renderEffect(renderer.render());
+    if (state.renderEffect && state.mounted) {
+      state.renderEffect.meta = {
+        type: "render",
+        componentId: state.mounted.instance.uid,
+        componentName: state.mounted.instance.name,
+      };
+    }
 
     if (profiler.isEnabled()) {
       const cleanup = profiler.subscribeFrames((frame) => {

@@ -3,6 +3,7 @@ import type { ComputedLayout, LayoutStyle } from "../layout-engine/types";
 import type { OutlineOptions } from "../renderer/types";
 import type { ConsoleCaptureHandle, ConsoleLine } from "../terminal/capture";
 import type { FrameMetrics } from "../runtime/profiler";
+import type { ReactivityEvent } from "../reactivity/devtools";
 import { isBlock, isText, type ViewElement } from "../view/types/elements";
 import type { DevtoolsOptions } from "./types";
 import htmlDocument from "./inspector.html" with { type: "text" };
@@ -88,6 +89,7 @@ export interface DevtoolsServerHandle {
   getInfo(): { host: string; port: number; url: string } | null;
   setSnapshot(snapshot: DevtoolsSnapshot): void;
   setProfileFrame(frame: FrameMetrics): void;
+  setReactivityEvent(event: ReactivityEvent): void;
   dispose(): void;
 }
 
@@ -189,8 +191,10 @@ export function setupDevtoolsServer(
   let cleanupSubscribe: (() => void) | null = null;
   let snapshot: BrowserSnapshot | null = null;
   let profileFrames: FrameMetrics[] = [];
+  let reactivityEvents: ReactivityEvent[] = [];
   let info: { host: string; port: number; url: string } | null = null;
   const maxProfileFrames = 240;
+  const maxReactivityEvents = 600;
 
   let server: ReturnType<typeof Bun.serve> | null = null;
   try {
@@ -237,6 +241,15 @@ export function setupDevtoolsServer(
           if (profileFrames.length > 0) {
             try {
               ws.send(safeJson({ type: "profile", frames: profileFrames }));
+            } catch {
+              // ignore
+            }
+          }
+          if (reactivityEvents.length > 0) {
+            try {
+              ws.send(
+                safeJson({ type: "reactivity", events: reactivityEvents }),
+              );
             } catch {
               // ignore
             }
@@ -321,6 +334,16 @@ export function setupDevtoolsServer(
       }
       broadcast({ type: "profile", frame });
     },
+    setReactivityEvent: (event) => {
+      reactivityEvents.push(event);
+      if (reactivityEvents.length > maxReactivityEvents) {
+        reactivityEvents.splice(
+          0,
+          reactivityEvents.length - maxReactivityEvents,
+        );
+      }
+      broadcast({ type: "reactivity", event });
+    },
     dispose: () => {
       try {
         cleanupSubscribe?.();
@@ -346,6 +369,7 @@ export function setupDevtoolsServer(
       server = null;
       snapshot = null;
       profileFrames = [];
+      reactivityEvents = [];
       info = null;
     },
   };

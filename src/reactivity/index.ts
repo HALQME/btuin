@@ -26,7 +26,7 @@
 
 export { reactive, isReactive, toRaw, shallowReactive } from "./reactive";
 
-export { ref, shallowRef, isRef, unref, toRef, toRefs, customRef } from "./ref";
+export { ref, shallowRef, isRef, unref, toRef, toRefs, customRef, labelRef } from "./ref";
 
 export { computed } from "./computed";
 

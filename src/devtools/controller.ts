@@ -4,6 +4,7 @@ import { setupDevtoolsLogStreaming } from "./log-stream";
 import type { DevtoolsOptions } from "./types";
 import { setupDevtoolsServer, type DevtoolsSnapshot } from "./server";
 import type { FrameMetrics } from "../runtime/profiler";
+import { subscribeReactivity } from "../reactivity/devtools";
 
 export interface DevtoolsController {
   handleKey(event: KeyEvent): boolean;
@@ -22,6 +23,11 @@ export function createDevtoolsController(options: DevtoolsOptions | undefined): 
 
   const capture: ConsoleCaptureHandle | null = enabled ? streaming.capture : null;
   const server = enabled ? setupDevtoolsServer(options, () => capture) : null;
+  const cleanupReactivity = enabled
+    ? subscribeReactivity((event) => {
+        server?.setReactivityEvent(event);
+      })
+    : null;
 
   return {
     handleKey: (event) => {
@@ -39,6 +45,11 @@ export function createDevtoolsController(options: DevtoolsOptions | undefined): 
     },
 
     dispose: () => {
+      try {
+        cleanupReactivity?.();
+      } catch {
+        // ignore
+      }
       try {
         server?.dispose();
       } catch {

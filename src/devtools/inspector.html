@@ -278,6 +278,51 @@
         text-align: right;
         color: #e5e7eb;
       }
+      #reactivityPanel {
+        min-height: 0;
+      }
+      .reactivity-canvas {
+        border: 1px solid #1f2937;
+        border-radius: 8px;
+        background: #0b0f14;
+        min-height: 220px;
+        overflow: auto;
+      }
+      .reactivity-canvas svg {
+        display: block;
+        width: 100%;
+        height: auto;
+      }
+      .reactivity-node {
+        fill: #1f2937;
+        stroke: #94a3b8;
+        stroke-width: 1;
+      }
+      .reactivity-node.active {
+        stroke: #38bdf8;
+      }
+      .reactivity-label {
+        font-size: 11px;
+        fill: #e5e7eb;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+      .reactivity-edge {
+        stroke: rgba(148, 163, 184, 0.4);
+        stroke-width: 1.2;
+      }
+      .reactivity-edge.active {
+        stroke: rgba(56, 189, 248, 0.8);
+      }
+      .reactivity-list {
+        border-top: 1px dashed #1f2937;
+        padding-top: 6px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        font-size: 12px;
+        color: #cbd5e1;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
       #previewScroll {
         border: 1px solid #1f2937;
         border-radius: 8px;
@@ -482,6 +527,12 @@
               <button :aria-pressed="tab === 'json'" @click="setTab('json')">
                 JSON
               </button>
+              <button
+                :aria-pressed="tab === 'reactivity'"
+                @click="setTab('reactivity')"
+              >
+                Reactivity
+              </button>
             </div>
           </div>
           <div v-show="tab === 'preview'" class="panel" id="previewPanel">
@@ -544,6 +595,72 @@
             </div>
           </div>
           <pre v-show="tab === 'json'">{{ snapshotText }}</pre>
+          <div v-show="tab === 'reactivity'" class="panel" id="reactivityPanel">
+            <div class="controls">
+              <span class="pill">{{ reactivityStatus }}</span>
+              <span class="pill">Refs {{ reactivityRefs.length }}</span>
+              <span class="pill">Edges {{ reactivityEdges.length }}</span>
+              <button @click="clearReactivity">Clear</button>
+            </div>
+            <div class="reactivity-canvas">
+              <svg
+                v-if="reactivityLayout"
+                :viewBox="`0 0 ${reactivityLayout.width} ${reactivityLayout.height}`"
+              >
+                <line
+                  v-for="edge in reactivityLayout.edges"
+                  :key="edge.key"
+                  class="reactivity-edge"
+                  :class="{ active: edge.active }"
+                  :x1="edge.x1"
+                  :y1="edge.y1"
+                  :x2="edge.x2"
+                  :y2="edge.y2"
+                  :style="{ strokeWidth: edge.strokeWidth }"
+                >
+                  <title>{{ edge.label }}</title>
+                </line>
+                <g v-for="node in reactivityLayout.refs" :key="node.key">
+                  <circle
+                    class="reactivity-node"
+                    :class="{ active: node.active }"
+                    :cx="node.x"
+                    :cy="node.y"
+                    r="7"
+                  ></circle>
+                  <text
+                    class="reactivity-label"
+                    :x="node.x + 12"
+                    :y="node.y + 4"
+                  >
+                    {{ node.label }}
+                  </text>
+                </g>
+                <g v-for="node in reactivityLayout.components" :key="node.key">
+                  <circle
+                    class="reactivity-node"
+                    :class="{ active: node.active }"
+                    :cx="node.x"
+                    :cy="node.y"
+                    r="7"
+                  ></circle>
+                  <text
+                    class="reactivity-label"
+                    :x="node.x - 12"
+                    :y="node.y + 4"
+                    text-anchor="end"
+                  >
+                    {{ node.label }}
+                  </text>
+                </g>
+              </svg>
+            </div>
+            <div class="reactivity-list">
+              <div v-for="edge in reactivityEdges" :key="edge.key">
+                {{ edge.label }}
+              </div>
+            </div>
+          </div>
         </section>
       </div>
     </div>
@@ -552,6 +669,11 @@
       const baseLineHeight = 1.25;
       const profilePending = [];
       let profileFlushTimer = null;
+      const reactivityStore = {
+        refs: new Map(),
+        components: new Map(),
+        edges: new Map(),
+      };
 
       function flattenTree(root) {
         const out = [];
@@ -1237,6 +1359,11 @@
             profileFps: "-",
             profileLast: null,
             profileStatus: "waiting",
+            reactivityRefs: [],
+            reactivityComponents: [],
+            reactivityEdges: [],
+            reactivityLayout: null,
+            reactivityStatus: "waiting",
             snapshotText: "(none)",
             selectedKey: null,
             selectedType: "(none)",
@@ -1258,11 +1385,17 @@
             if (this.profileFrames.length === 0) {
               this.profileStatus = "waiting";
             }
+            if (this.reactivityEdges.length === 0) {
+              this.reactivityStatus = "waiting";
+            }
           });
           this.socket.addEventListener("close", () => {
             this.status = "disconnected";
             if (this.profileFrames.length === 0) {
               this.profileStatus = "offline";
+            }
+            if (this.reactivityEdges.length === 0) {
+              this.reactivityStatus = "offline";
             }
           });
           this.socket.addEventListener("error", () => {
@@ -1315,6 +1448,171 @@
           },
         },
         methods: {
+          clearReactivity() {
+            reactivityStore.refs.clear();
+            reactivityStore.components.clear();
+            reactivityStore.edges.clear();
+            this.reactivityRefs = [];
+            this.reactivityComponents = [];
+            this.reactivityEdges = [];
+            this.reactivityLayout = null;
+            this.reactivityStatus = "waiting";
+          },
+          applyReactivityEvent(event) {
+            if (!event) return;
+            if (event.targetId === undefined) return;
+            if (event.componentId === undefined) return;
+            const refId = event.targetId;
+            const compId = event.componentId;
+            if (!reactivityStore.refs.has(refId)) {
+              reactivityStore.refs.set(refId, {
+                id: refId,
+                label: event.targetLabel,
+                tracks: 0,
+                triggers: 0,
+                last: 0,
+              });
+            }
+            if (!reactivityStore.components.has(compId)) {
+              reactivityStore.components.set(compId, {
+                id: compId,
+                label: event.componentName || `Component#${compId}`,
+              });
+            }
+            const refEntry = reactivityStore.refs.get(refId);
+            if (event.kind === "track") refEntry.tracks += 1;
+            if (event.kind === "trigger") refEntry.triggers += 1;
+            refEntry.last = event.time;
+
+            const edgeKey = `${refId}->${compId}`;
+            if (!reactivityStore.edges.has(edgeKey)) {
+              reactivityStore.edges.set(edgeKey, {
+                key: edgeKey,
+                refId,
+                compId,
+                tracks: 0,
+                triggers: 0,
+                last: 0,
+              });
+            }
+            const edge = reactivityStore.edges.get(edgeKey);
+            if (event.kind === "track") edge.tracks += 1;
+            if (event.kind === "trigger") edge.triggers += 1;
+            edge.last = event.time;
+
+            this.syncReactivityGraph();
+          },
+          syncReactivityGraph() {
+            const refs = Array.from(reactivityStore.refs.values()).sort(
+              (a, b) => b.tracks - a.tracks,
+            );
+            const components = Array.from(
+              reactivityStore.components.values(),
+            ).sort((a, b) => a.id - b.id);
+            const edges = Array.from(reactivityStore.edges.values())
+              .sort((a, b) => b.tracks - a.tracks)
+              .map((edge) => ({
+                ...edge,
+                label: `${this.lookupRefLabel(edge.refId)} → ${this.lookupComponentLabel(
+                  edge.compId,
+                )} (track ${edge.tracks}, trigger ${edge.triggers})`,
+              }));
+
+            this.reactivityRefs = refs.map((ref) => ({
+              ...ref,
+              label: ref.label,
+            }));
+            this.reactivityComponents = components;
+            this.reactivityEdges = edges;
+            this.reactivityLayout = this.buildReactivityLayout(
+              this.reactivityRefs,
+              this.reactivityComponents,
+              this.reactivityEdges,
+            );
+            this.reactivityStatus = "live";
+          },
+          lookupComponentLabel(id) {
+            const entry = reactivityStore.components.get(id);
+            return entry?.label ?? `Component#${id}`;
+          },
+          lookupRefLabel(id) {
+            const entry = reactivityStore.refs.get(id);
+            return entry?.label ?? `ref#${id}`;
+          },
+          buildReactivityLayout(refs, components, edges) {
+            const width = 800;
+            const leftX = 140;
+            const rightX = width - 140;
+            const rowHeight = 26;
+            const rows = Math.max(refs.length, components.length, 1);
+            const height = Math.max(220, rows * rowHeight + 40);
+            const refPositions = new Map();
+            const compPositions = new Map();
+            refs.forEach((ref, index) => {
+              refPositions.set(ref.id, {
+                x: leftX,
+                y: 30 + index * rowHeight,
+              });
+            });
+            components.forEach((comp, index) => {
+              compPositions.set(comp.id, {
+                x: rightX,
+                y: 30 + index * rowHeight,
+              });
+            });
+            const now = Date.now();
+            const layoutEdges = edges.map((edge) => {
+              const from = refPositions.get(edge.refId) ?? {
+                x: leftX,
+                y: 30,
+              };
+              const to = compPositions.get(edge.compId) ?? {
+                x: rightX,
+                y: 30,
+              };
+              const age = now - (edge.last || 0);
+              const active = age < 1500;
+              const strokeWidth = Math.min(4, 1 + Math.log10(edge.tracks + 1));
+              return {
+                key: edge.key,
+                x1: from.x + 8,
+                y1: from.y,
+                x2: to.x - 8,
+                y2: to.y,
+                strokeWidth,
+                active,
+                label: edge.label,
+              };
+            });
+            const layoutRefs = refs.map((ref) => {
+              const pos = refPositions.get(ref.id);
+              const active = Date.now() - (ref.last || 0) < 1500;
+              return {
+                key: `ref-${ref.id}`,
+                x: pos.x,
+                y: pos.y,
+                label: ref.label,
+                active,
+              };
+            });
+            const layoutComponents = components.map((comp) => {
+              const pos = compPositions.get(comp.id);
+              return {
+                key: `comp-${comp.id}`,
+                x: pos.x,
+                y: pos.y,
+                label: comp.label,
+                active: false,
+              };
+            });
+            return {
+              width,
+              height,
+              refs: layoutRefs,
+              components: layoutComponents,
+              edges: layoutEdges,
+            };
+          },
           formatMs(value) {
             if (!Number.isFinite(value)) return "-";
             return value.toFixed(2) + "ms";
@@ -1487,6 +1785,15 @@
                 profilePending.push(...msg.frames);
               } else if (msg.frame) {
                 profilePending.push(msg.frame);
+              }
+            }
+            if (msg.type === "reactivity") {
+              if (Array.isArray(msg.events)) {
+                for (const event of msg.events) {
+                  this.applyReactivityEvent(event);
+                }
+              } else if (msg.event) {
+                this.applyReactivityEvent(msg.event);
               }
             }
             if (msg.type === "snapshot" && msg.snapshot) {

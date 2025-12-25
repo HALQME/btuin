@@ -7,6 +7,7 @@
 
 import { reactive, isReactive, toRaw } from "./reactive";
 import { track, trigger } from "./effect";
+import { setRefLabel, trackRef, triggerRef } from "./devtools";
 
 const IS_REF_KEY = Symbol("__v_isRef");
 
@@ -33,8 +34,8 @@ export interface Ref<T = any> {
  * @param value - Initial value
  * @returns Ref object
  */
-export function ref<T>(value: T): Ref<T> {
-  return createRef(value, false);
+export function ref<T>(value: T, label?: string): Ref<T> {
+  return createRef(value, false, label);
 }
 
 /**
@@ -52,8 +53,8 @@ export function ref<T>(value: T): Ref<T> {
  * @param value - Initial value
  * @returns Shallow ref object
  */
-export function shallowRef<T>(value: T): Ref<T> {
-  return createRef(value, true);
+export function shallowRef<T>(value: T, label?: string): Ref<T> {
+  return createRef(value, true, label);
 }
 
 class RefImpl<T> {
@@ -71,6 +72,7 @@ class RefImpl<T> {
 
   get value() {
     track(this, "value");
+    trackRef(this, "value");
     return this._value;
   }
 
@@ -85,14 +87,22 @@ class RefImpl<T> {
     this._rawValue = newVal;
     this._value = useDirectValue ? newVal : convert(newVal);
     trigger(this, "value");
+    triggerRef(this, "value");
   }
 }
 
-function createRef<T>(rawValue: T, shallow: boolean): Ref<T> {
+function createRef<T>(rawValue: T, shallow: boolean, label?: string): Ref<T> {
   if (isRef(rawValue)) {
+    if (label) {
+      setRefLabel(rawValue as object, label);
+    }
     return rawValue as Ref<T>;
   }
-  return new RefImpl(rawValue, shallow) as unknown as Ref<T>;
+  const created = new RefImpl(rawValue, shallow) as unknown as Ref<T>;
+  if (label) {
+    setRefLabel(created as object, label);
+  }
+  return created;
 }
 
 /**
@@ -208,6 +218,11 @@ export function toRefs<T extends object>(
   return ret;
 }
 
+export function labelRef<T>(refValue: Ref<T>, label: string): Ref<T> {
+  setRefLabel(refValue as object, label);
+  return refValue;
+}
+
 /**
  * Creates a custom ref with explicit control over dependency tracking and trigger timing.
  *
@@ -261,8 +276,14 @@ class CustomRefImpl<T> {
     },
   ) {
     const { get, set } = factory(
-      () => track(this, "value"),
-      () => trigger(this, "value"),
+      () => {
+        track(this, "value");
+        trackRef(this, "value");
+      },
+      () => {
+        trigger(this, "value");
+        triggerRef(this, "value");
+      },
     );
     this._get = get;
     this._set = set;

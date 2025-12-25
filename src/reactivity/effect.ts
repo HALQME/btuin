@@ -77,6 +77,7 @@ export class ReactiveEffect {
   active = true;
   deps: Set<ReactiveEffect>[] = [];
   onStop?: () => void;
+  meta?: { type?: string; componentId?: number; componentName?: string };
 
   constructor(
     public fn: EffectFn,

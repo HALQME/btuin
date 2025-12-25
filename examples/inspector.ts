@@ -71,10 +71,10 @@ function Tag(label: string, bg: number, fg = 16) {
 const app = createApp({
   profile: { enabled: true },
   init({ onKey, onTick, runtime }) {
-    const counter = ref(0);
-    const selected = ref<"layout" | "style" | "text">("layout");
-    const sidebarWide = ref(true);
-    const logs = ref<string[]>([]);
+    const counter = ref(0, "counter");
+    const selected = ref<"layout" | "style" | "text">("layout", "selected page");
+    const sidebarWide = ref(true, "sidebar wide");
+    const logs = ref<string[]>([], "logs");
 
     const addLog = (line: string) => {
       const next = logs.value.slice(-LOG_LIMIT + 1);
