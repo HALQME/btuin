@@ -16,6 +16,35 @@ btuinは、状態・レイアウト・レンダリング・I/Oの4つの関心�
 
 - **`btuin` (ランタイム)**: 他のすべての部分を統合する最上位モジュール。`createApp`を提供し、アプリケーションのライフサイクルを管理し、コンポーネントAPIを公開します。
 
+## コンポーネントコンテキスト（Provide/Inject）
+
+btuin は、props のバケツリレーを避けて子孫コンポーネントへ値を渡すための、Vue 風のコンテキスト機構を提供します。
+
+- `provide(key, value)`: 現在のコンポーネントインスタンスに値を登録します。
+- `inject(key, defaultValue?)`: 親インスタンスを辿って値を解決します。見つからない場合は `defaultValue`（未指定なら `undefined`）を返します。
+
+キーは `string` または型付き `symbol`（`InjectionKey<T>`）を利用できます。`provide()` / `inject()` はコンポーネント初期化（`setup` / `init`）中に呼ぶことを想定しており、それ以外で呼ぶと警告を出してデフォルト値にフォールバックします。
+
+```ts
+import { defineComponent, inject, provide, ui } from "btuin";
+
+const Child = defineComponent({
+  setup() {
+    const theme = inject("theme", "dark");
+    return () => ui.Text(`theme=${theme}`);
+  },
+});
+
+const Parent = defineComponent({
+  setup() {
+    provide("theme", "light");
+    return () => ui.Block(/* ... */);
+  },
+});
+```
+
+![Provide/Inject の解決経路](./assets/context-provide-inject.svg)
+
 ## ヘッドレス実行
 
 I/Oが分離されているため、btuinはヘッドレス環境（例: CI）で実行できます。UIはTTYインターフェースに描画され、結果は`runtime.setExitOutput()`で`stdout`に送られます。`Bun.Terminal`はプログラムによるテストに使用できます。

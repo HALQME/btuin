@@ -1,0 +1,88 @@
+direction: down
+
+classes: {
+  step: {
+    style.fill: "#F8FAFC"
+    style.stroke: "#334155"
+  }
+  data: {
+    style.fill: "#ECFDF5"
+    style.stroke: "#10B981"
+  }
+  note: {
+    style.fill: "#FFF7ED"
+    style.stroke: "#F97316"
+  }
+}
+
+title: "Provide/Inject (Component Context)" {
+  class: step
+}
+
+instance_chain: "Instance chain (parent pointers)" {
+  class: step
+  direction: right
+
+  parent: "Parent instance\nprovides:\n- fromRoot: \"root\"" {
+    class: data
+  }
+
+  child: "Child instance\nprovides:\n- fromChild: \"root-child\"" {
+    class: data
+  }
+
+  grandchild: "Grandchild instance\nprovides:\n- (none)" {
+    class: data
+  }
+
+  grandchild -> child: "parent"
+  child -> parent: "parent"
+}
+
+resolution: "Resolution algorithm (inject)" {
+  class: step
+  direction: right
+
+  inject_call: "inject(key, default?)" {
+    class: step
+  }
+
+  lookup: "while (cursor)\n- if cursor.provides has key -> return\n- cursor = cursor.parent\nreturn default/undefined" {
+    class: note
+  }
+
+  inject_call -> lookup: "walk"
+}
+
+stack: "currentInstance stack (nested mount during setup)" {
+  class: step
+  direction: down
+
+  s1: "mountComponent(Parent)\nsetCurrentInstance(Parent)\nstack: [Parent]" {
+    class: step
+  }
+  s2: "Parent.setup():\nprovide(fromRoot)\nmountComponent(Child)" {
+    class: step
+  }
+  s3: "setCurrentInstance(Child)\nstack: [Parent, Child]" {
+    class: step
+  }
+  s4: "Child.setup():\ninject(fromRoot)\nprovide(fromChild)\nmountComponent(Grandchild)" {
+    class: step
+  }
+  s5: "setCurrentInstance(Grandchild)\nstack: [Parent, Child, Grandchild]" {
+    class: step
+  }
+  s6: "Grandchild.setup():\ninject(fromRoot/fromChild)" {
+    class: step
+  }
+  s7: "setup ends\nsetCurrentInstance(null)\nstack pops back to parent" {
+    class: note
+  }
+
+  s1 -> s2 -> s3 -> s4 -> s5 -> s6 -> s7
+}
+
+title -> instance_chain
+instance_chain -> resolution
+resolution -> stack

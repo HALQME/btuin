@@ -16,11 +16,14 @@ export type TickHook = () => void;
  * Set during component setup execution
  */
 let currentInstance: ComponentInstance | null = null;
+const instanceStack: ComponentInstance[] = [];
 
 export interface ComponentInstance {
   uid: number;
   isMounted: boolean;
   name?: string;
+  parent: ComponentInstance | null;
+  provides: Map<string | symbol, unknown>;
 
   mountedHooks: LifecycleHook[];
   unmountedHooks: LifecycleHook[];
@@ -47,6 +50,8 @@ export function createComponentInstance(): ComponentInstance {
   return {
     uid: uidGenerator.next(),
     isMounted: false,
+    parent: null,
+    provides: new Map(),
     mountedHooks: [],
     unmountedHooks: [],
     updatedHooks: [],
@@ -58,7 +63,15 @@ export function createComponentInstance(): ComponentInstance {
 }
 
 export function setCurrentInstance(instance: ComponentInstance | null) {
-  currentInstance = instance;
+  if (instance) {
+    instance.parent = currentInstance;
+    instanceStack.push(instance);
+    currentInstance = instance;
+    return;
+  }
+
+  instanceStack.pop();
+  currentInstance = instanceStack.length > 0 ? instanceStack[instanceStack.length - 1]! : null;
 }
 
 export function getCurrentInstance(): ComponentInstance | null {

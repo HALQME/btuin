@@ -16,6 +16,35 @@ btuin separates concerns into four distinct modules: state, layout, rendering, a
 
 - **`btuin` (Runtime)**: The top-level module that integrates all other parts. It provides `createApp`, manages the application lifecycle, and exposes the component API.
 
+## Component Context (Provide/Inject)
+
+btuin provides a lightweight, Vue-like context mechanism to share values down the component tree without prop drilling.
+
+- `provide(key, value)`: Registers a value on the current component instance.
+- `inject(key, defaultValue?)`: Resolves a value by walking up the parent instance chain. Returns `defaultValue` (or `undefined`) if not found.
+
+Keys can be `string` or typed `symbol` (`InjectionKey<T>`). `provide()`/`inject()` are intended to be called during component initialization (`setup`/`init`); calling them outside of component init will emit a warning and fall back to the default value.
+
+```ts
+import { defineComponent, inject, provide, ui } from "btuin";
+
+const Child = defineComponent({
+  setup() {
+    const theme = inject("theme", "dark");
+    return () => ui.Text(`theme=${theme}`);
+  },
+});
+
+const Parent = defineComponent({
+  setup() {
+    provide("theme", "light");
+    return () => ui.Block(/* ... */);
+  },
+});
+```
+
+![Provide/Inject context resolution](./assets/context-provide-inject.svg)
+
 ## Headless Execution
 
 The I/O separation allows btuin to run in headless environments (e.g., CI). The UI renders to a TTY interface, while results can be directed to `stdout` via `runtime.setExitOutput()`. `Bun.Terminal` can be used for programmatic testing.
