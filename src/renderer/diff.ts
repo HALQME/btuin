@@ -12,6 +12,15 @@ export interface DiffStats {
   ops: number;
 }
 
+export interface RenderDiffOptions {
+  /**
+   * When provided, DECSTBM scroll optimization is only attempted within this band
+   * (0-based inclusive rows). This prevents false-positive scrolling and reduces
+   * detection overhead for UIs that do not use scroll regions.
+   */
+  scrollRegion?: { top: number; bottom: number };
+}
+
 /**
  * Renders the difference between two buffers, only updating changed cells.
  * If buffer sizes differ (e.g., after terminal resize), forces a full redraw.
@@ -26,8 +35,14 @@ export interface DiffStats {
  * @param prev - Previous buffer state
  * @param next - New buffer state to render
  * @param stats - Optional stats collector
+ * @param options - Optional scroll/optimization hints
  */
-export function renderDiff(prev: Buffer2D, next: Buffer2D, stats?: DiffStats): string {
+export function renderDiff(
+  prev: Buffer2D,
+  next: Buffer2D,
+  stats?: DiffStats,
+  options?: RenderDiffOptions,
+): string {
   const rows = next.rows;
   const cols = next.cols;
   if (rows === 0 || cols === 0) return "";
@@ -49,9 +64,11 @@ export function renderDiff(prev: Buffer2D, next: Buffer2D, stats?: DiffStats): s
   }
 
   const asciiFastPath = prev.isAsciiOnly() && next.isAsciiOnly();
+  const hint = options?.scrollRegion;
+  const allowAuto = process.env.BTUIN_DECSTBM_AUTO === "1";
   const scroll =
-    !sizeChanged && process.env.BTUIN_DISABLE_DECSTBM !== "1"
-      ? detectVerticalScrollRegion(prev, next, asciiFastPath)
+    !sizeChanged && process.env.BTUIN_DISABLE_DECSTBM !== "1" && (hint || allowAuto)
+      ? detectVerticalScrollRegion(prev, next, asciiFastPath, hint)
       : null;
   const rowMap = scroll ? buildScrollRowMap(rows, scroll) : null;
   const scrollPrefix = scroll ? buildDecstbmScrollPrefix(scroll) : "";
@@ -300,10 +317,18 @@ function detectVerticalScrollRegion(
   prev: Buffer2D,
   next: Buffer2D,
   asciiFastPath: boolean,
+  hint?: { top: number; bottom: number },
 ): ScrollRegion | null {
   const rows = next.rows;
   const cols = next.cols;
   if (rows < 8) return null;
+
+  if (hint) {
+    const top = Math.max(0, Math.trunc(hint.top));
+    const bottom = Math.min(rows - 1, Math.trunc(hint.bottom));
+    if (bottom - top + 1 < 8) return null;
+    return detectVerticalScrollWithinBand(prev, next, asciiFastPath, { top, bottom }, cols);
+  }
 
   // Keep the search window small; typical scrolling moves a few lines at a time.
   const maxDelta = Math.min(5, rows - 1);
@@ -388,6 +413,61 @@ function detectVerticalScrollRegion(
   const regionHeight = region.bottom - region.top + 1;
   if (region.top === 0 && region.bottom === rows - 1 && regionHeight < rows - 1) return null;
   return region;
+}
+
+function detectVerticalScrollWithinBand(
+  prev: Buffer2D,
+  next: Buffer2D,
+  asciiFastPath: boolean,
+  band: { top: number; bottom: number },
+  cols: number,
+): ScrollRegion | null {
+  const bandHeight = band.bottom - band.top + 1;
+  const maxDelta = Math.min(5, bandHeight - 1);
+  if (maxDelta <= 0) return null;
+
+  let bestDelta = 0;
+  let bestMatches = 0;
+
+  const deltas: number[] = [];
+  for (let d = 1; d <= maxDelta; d++) deltas.push(d, -d);
+
+  for (const delta of deltas) {
+    const overlap = bandHeight - Math.abs(delta);
+    if (overlap < 6) continue;
+
+    let matched = 0;
+    if (delta > 0) {
+      for (let r = band.top; r <= band.bottom - delta; r++) {
+        const equal = asciiFastPath
+          ? rowsEqualAscii(prev, next, r + delta, r, cols)
+          : rowsEqual(prev, next, r + delta, r, cols);
+        if (equal) matched++;
+      }
+    } else {
+      for (let r = band.top - delta; r <= band.bottom; r++) {
+        const equal = asciiFastPath
+          ? rowsEqualAscii(prev, next, r + delta, r, cols)
+          : rowsEqual(prev, next, r + delta, r, cols);
+        if (equal) matched++;
+      }
+    }
+
+    const ratio = matched / overlap;
+    const minMatched = Math.max(6, Math.floor(overlap * 0.75));
+    if (matched < minMatched || ratio < 0.75) continue;
+
+    if (
+      matched > bestMatches ||
+      (matched === bestMatches && Math.abs(delta) < Math.abs(bestDelta))
+    ) {
+      bestMatches = matched;
+      bestDelta = delta;
+    }
+  }
+
+  if (bestDelta === 0) return null;
+  return { top: band.top, bottom: band.bottom, delta: bestDelta };
 }
 
 function rowsEqualAscii(

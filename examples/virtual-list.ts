@@ -14,7 +14,7 @@ const app = createApp({
     });
 
     const clamp = (value: number) => {
-      const viewportRows = Math.max(0, size.value.rows - 2);
+      const viewportRows = Math.max(0, size.value.rows - 4);
       const maxScroll = Math.max(0, items.length - viewportRows);
       return Math.max(0, Math.min(maxScroll, value));
     };
@@ -30,7 +30,8 @@ const app = createApp({
     return { scrollIndex, size };
   },
   render({ scrollIndex, size }) {
-    const viewportRows = Math.max(0, size.value.rows - 2);
+    // Reserve 2 rows for header+status and 2 rows for outline padding (1 top + 1 bottom).
+    const viewportRows = Math.max(0, size.value.rows - 4);
     const header = Text(`Windowed: ${items.length} items (q to quit)`).foreground("cyan").shrink(0);
     const status = Text(`startIndex=${scrollIndex.value}`).foreground("gray").shrink(0);
 

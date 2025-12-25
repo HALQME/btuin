@@ -177,6 +177,7 @@ export abstract class BaseView implements ViewProps {
   }
 
   setKey(value: string): this {
+    if (this.key === value && this.identifier === value) return this;
     this.key = value;
     this.identifier = value;
     markLayoutDirty();
@@ -184,6 +185,7 @@ export abstract class BaseView implements ViewProps {
   }
 
   setIdentifier(value: string): this {
+    if (this.key === value && this.identifier === value) return this;
     this.key = value;
     this.identifier = value;
     markLayoutDirty();

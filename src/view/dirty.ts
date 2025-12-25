@@ -22,3 +22,8 @@ export function getHasScrollRegion(): boolean {
 export function getDirtyVersions(): { layout: number; render: number } {
   return { layout: layoutVersion, render: renderVersion };
 }
+
+export function setDirtyVersions(versions: { layout: number; render: number }): void {
+  layoutVersion = versions.layout;
+  renderVersion = versions.render;
+}

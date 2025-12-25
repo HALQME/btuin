@@ -4,7 +4,8 @@ import { layout, renderElement } from "../layout";
 import type { DiffStats } from "../renderer/diff";
 import type { Buffer2D } from "../renderer/types";
 import { isBlock, type ViewElement } from "../view/types/elements";
-import { getDirtyVersions, getHasScrollRegion } from "../view/dirty";
+import { getDirtyVersions, getHasScrollRegion, setDirtyVersions } from "../view/dirty";
+import { reconcileTree } from "../view/reconcile";
 import { createErrorContext } from "./error-boundary";
 import type { Profiler } from "./profiler";
 import type { ComputedLayout } from "../layout-engine/types";
@@ -19,7 +20,12 @@ export interface BufferPoolLike {
 export interface RenderLoopDeps {
   FlatBuffer: typeof FlatBuffer;
   getGlobalBufferPool: (rows: number, cols: number) => BufferPoolLike;
-  renderDiff: (prev: Buffer2D, next: Buffer2D, stats?: DiffStats) => string;
+  renderDiff: (
+    prev: Buffer2D,
+    next: Buffer2D,
+    stats?: DiffStats,
+    options?: import("../renderer/diff").RenderDiffOptions,
+  ) => string;
   layout: (root: ViewElement, containerSize?: { width: number; height: number }) => ComputedLayout;
   renderElement: (
     element: ViewElement,
@@ -257,7 +263,16 @@ export function createRenderer<State>(config: RenderLoopConfig<State>) {
         state.prevBuffer = pool.acquire();
       }
 
-      const rootElement = config.view(config.getState());
+      const dirtyBeforeView = getDirtyVersions();
+      const nextRootElement = config.view(config.getState());
+      if (nextRootElement !== prevRootElement) {
+        // Immediate-mode render functions build new ViewElement instances every frame, and those
+        // constructors/method chains can trip dirty tracking. Roll back those "construction"
+        // marks and let reconciliation dirties reflect actual changes on the retained tree.
+        setDirtyVersions(dirtyBeforeView);
+      }
+
+      const rootElement = reconcileTree(prevRootElement, nextRootElement);
       const dirtyVersions = getDirtyVersions();
       const layoutSizeKey = `${state.currentSize.cols}x${state.currentSize.rows}`;
 
@@ -515,10 +530,17 @@ export function createRenderer<State>(config: RenderLoopConfig<State>) {
         ? new deps.FlatBuffer(state.currentSize.rows, state.currentSize.cols)
         : state.prevBuffer;
 
+      const diffOptions =
+        !sizeChanged && !localForceFullRedraw && scrollRegion?.fullWidth
+          ? ({
+              scrollRegion: scrollRegion.band,
+            } satisfies import("../renderer/diff").RenderDiffOptions)
+          : undefined;
+
       const output =
         config.profiler?.measure(frame, "diffMs", () =>
-          deps.renderDiff(prevForDiff, buf, diffStats),
-        ) ?? deps.renderDiff(prevForDiff, buf);
+          deps.renderDiff(prevForDiff, buf, diffStats, diffOptions),
+        ) ?? deps.renderDiff(prevForDiff, buf, undefined, diffOptions);
       if (frame && diffStats) {
         config.profiler?.recordDiffStats(frame, diffStats);
       }

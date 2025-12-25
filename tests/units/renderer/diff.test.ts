@@ -171,7 +171,7 @@ describe("renderDiff", () => {
     // Newly exposed line at the bottom of the region (row 8).
     next.set(8, 0, "Z");
 
-    const output = renderDiff(prev, next);
+    const output = renderDiff(prev, next, undefined, { scrollRegion: { top: 1, bottom: 8 } });
 
     // region is rows 2..9 (1-based) and scrolls up by 1.
     const expectedPrefix = "\x1b[0m\x1b[2;9r\x1b[2;1H\x1b[1S\x1b[r";

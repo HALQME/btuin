@@ -59,11 +59,9 @@ export function Windowed<T>(options: WindowedOptions<T>): BlockElement {
     // Windowed rendering relies on overflow+clipping; avoid flexbox shrinking items
     // when overscan makes total child height exceed the viewport.
     if (child.style?.flexShrink === undefined) {
-      child.style = child.style ?? {};
       child.style.flexShrink = 0;
     }
     if (safeItemHeight !== 1 && child.style?.height === undefined) {
-      child.style = child.style ?? {};
       child.style.height = safeItemHeight;
     }
     if (keyPrefix && !child.key && !child.identifier) {

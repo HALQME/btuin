@@ -1,74 +1,81 @@
 import { describe, expect, test } from "bun:test";
-import { existsSync } from "node:fs";
-import { Block, Text, createApp, ref } from "@/index";
-import { createNullTerminalAdapter, type ProfilerLog } from "./profiler-core";
+import { Block, Text } from "@/index";
+import { createNullTerminalAdapter } from "./profiler-core";
+import { createRenderer } from "@/runtime/render-loop";
+import { FlatBuffer } from "@/renderer";
+import { Profiler } from "@/runtime/profiler";
+import { setDirtyVersions } from "@/view/dirty";
+import { markLayoutDirty } from "@/view/dirty";
 
 // ----------------------------------------------------------------------------
 // Configuration
 // ----------------------------------------------------------------------------
-const FRAMES = 300; // Total frames per run
-const START_NODES = 0; // Initial nodes
-const STEP_NODES = 100; // Nodes added per frame
-const INTERVAL_MS = 2; // Update interval
 const ITERATIONS = 5; // Number of times to repeat the test
+const FRAMES = 160; // Total frames per run
+const START_NODES = 0; // Initial nodes
+const STEP_NODES = 200; // Nodes added per frame
 
-const OUTPUT_FILE = `${import.meta.dirname}/profiles/limit-${Date.now()}.json`;
+type LimitFrame = { frameMs: number; nodeCount: number };
 
-async function runSingleIteration(iterationIndex: number): Promise<ProfilerLog> {
-  const tick = ref(0);
-  let resolveFinished: (() => void) | null = null;
-  const finished = new Promise<void>((resolve) => {
-    resolveFinished = resolve;
+function runSingleIteration(iterationIndex: number): LimitFrame[] {
+  setDirtyVersions({ layout: 0, render: 0 });
+
+  const terminal = createNullTerminalAdapter({ rows: 40, cols: 120 });
+  const profiler = new Profiler({
+    enabled: true,
+    // +1 for the priming renderOnce(true) below.
+    maxFrames: FRAMES + 1,
+    nodeCount: true,
   });
 
-  const app = createApp({
-    init() {
-      let produced = 0;
-      const timer = setInterval(() => {
-        tick.value++;
-        produced++;
-        if (produced >= FRAMES) {
-          clearInterval(timer);
-          resolveFinished?.();
-        }
-      }, INTERVAL_MS);
-      return {};
-    },
-    render() {
-      const count = START_NODES + tick.value * STEP_NODES;
-      const root = Block().direction("column");
+  let tick = 0;
+  let nodeCount = START_NODES;
 
+  const renderer = createRenderer({
+    getSize: () => terminal.getTerminalSize(),
+    write: terminal.write,
+    view: () => {
+      const root = Block().direction("column");
       const children: ReturnType<typeof Text>[] = [];
-      children.length = count;
-      for (let i = 0; i < count; i++) {
+      children.length = nodeCount;
+      for (let i = 0; i < nodeCount; i++) {
         children[i] = Text(`item ${i}`).foreground(i % 2 === 0 ? "white" : "gray");
       }
-      root.children = children;
 
-      root.children.unshift(
-        Text(`Iter: ${iterationIndex} Frame: ${tick.value} | Nodes: ${count}`).foreground("cyan"),
-      );
+      root.children = children;
+      root.children.unshift(Text(`Iter: ${iterationIndex} Frame: ${tick}`).foreground("cyan"));
       return root;
     },
-    terminal: createNullTerminalAdapter({ rows: 40, cols: 120 }),
-    profile: {
-      enabled: true,
-      outputFile: OUTPUT_FILE,
-      maxFrames: FRAMES,
-      nodeCount: true,
+    getState: () => ({}),
+    handleError: (ctx) => {
+      throw ctx.error;
+    },
+    profiler,
+    deps: {
+      FlatBuffer,
     },
   });
 
-  await app.mount();
-  await finished;
-  app.unmount();
+  // Prime once to establish retained tree and buffers.
+  renderer.renderOnce(true);
 
-  if (!existsSync(OUTPUT_FILE)) {
-    throw new Error(`Profile output file not found: ${OUTPUT_FILE}`);
+  // Drive frames synchronously (no timer/coalescing artifacts).
+  for (let i = 0; i < FRAMES; i++) {
+    tick = i;
+    nodeCount = START_NODES + i * STEP_NODES;
+    // Ensure we actually measure layout + render + diff for scalability limits.
+    markLayoutDirty();
+    renderer.renderOnce(false);
   }
 
-  const fileContent = await Bun.file(OUTPUT_FILE).text();
-  return JSON.parse(fileContent) as ProfilerLog;
+  renderer.dispose();
+
+  // Drop the priming frame.
+  const frames = profiler.getFrames().slice(1);
+  return frames.map((f, idx) => ({
+    frameMs: f.frameMs,
+    nodeCount: START_NODES + idx * STEP_NODES,
+  }));
 }
 
 function calculateStats(values: number[]) {
@@ -104,23 +111,22 @@ describe("Scalability Limit Test (Statistical)", async () => {
 
     Bun.gc(true);
 
-    const log = await runSingleIteration(i);
-
-    const smoothedFrames = log.frames.map((frame, idx, all) => {
+    const frames = runSingleIteration(i);
+    const smoothedFrames = frames.map((frame, idx, all) => {
       const start = Math.max(0, idx - 2);
       const end = Math.min(all.length, idx + 3);
       const subset = all.slice(start, end);
       const avgMs = subset.reduce((sum, f) => sum + f.frameMs, 0) / subset.length;
-      return { ...frame, avgMs, nodeCount: START_NODES + idx * STEP_NODES };
+      return { ...frame, avgMs };
     });
 
     const validFrames = smoothedFrames.slice(5);
+    const maxNodes = START_NODES + (FRAMES - 1) * STEP_NODES;
 
     for (const t of thresholds) {
       expect(results[t.fps]).toBeDefined();
       const limitFrame = validFrames.find((f) => f.avgMs > t.ms);
-      const limitNodeCount = limitFrame ? limitFrame.nodeCount : START_NODES + FRAMES * STEP_NODES;
-
+      const limitNodeCount = limitFrame ? limitFrame.nodeCount : maxNodes;
       results[t.fps]!.push(limitNodeCount);
     }
     console.log(`Done.`);
@@ -137,7 +143,7 @@ describe("Scalability Limit Test (Statistical)", async () => {
   for (const t of thresholds) {
     expect(results[t.fps]).toBeDefined();
     const stats = calculateStats(results[t.fps]!);
-    const note = stats.avg >= START_NODES + FRAMES * STEP_NODES ? "+" : "";
+    const note = stats.avg >= START_NODES + (FRAMES - 1) * STEP_NODES ? "+" : "";
 
     console.log(
       `| ${t.fps.toString().padStart(3)} FPS    | ` +
