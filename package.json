@@ -1,13 +1,13 @@
 {
   "name": "btuin",
-  "version": "0.1.0-alpha.1",
+  "version": "0.1.0-alpha.2",
   "private": false,
   "repository": {
     "type": "git",
     "url": "git+https://github.com/HALQME/btuin.git"
   },
   "bin": {
-    "btuin": "./bin/btuin"
+    "btuin": "bin/btuin"
   },
   "files": [
     "bin",
