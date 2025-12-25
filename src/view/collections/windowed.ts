@@ -75,6 +75,7 @@ export function Windowed<T>(options: WindowedOptions<T>): BlockElement {
   }
 
   const container = Block(...children).direction("column");
+  container.style.scrollRegion = true;
   // Prevent overscan items from affecting parent flex layout sizing.
   // With no explicit height, the container's "base size" becomes children sum,
   // which can exceed the viewport and cause siblings (e.g. headers) to shrink to 0 rows.

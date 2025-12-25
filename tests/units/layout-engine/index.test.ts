@@ -96,4 +96,52 @@ describe("Layout Engine", () => {
     expect(layout.child2?.x).toBe(10 + 50 + 10); // root.padding + child1.width + gap
     expect(layout.child2?.y).toBe(10);
   });
+
+  it("should apply incremental updates and removals", () => {
+    const root1: LayoutInputNode = {
+      identifier: "root",
+      type: "block",
+      width: 10,
+      height: 10,
+      flexDirection: "column",
+      children: [
+        {
+          identifier: "a",
+          type: "block",
+          width: 10,
+          height: 1,
+        },
+        {
+          identifier: "b",
+          type: "block",
+          width: 10,
+          height: 1,
+        },
+      ],
+    };
+
+    const layout1 = computeLayout(root1);
+    expect(layout1.a).toBeDefined();
+    expect(layout1.b).toBeDefined();
+
+    const root2: LayoutInputNode = {
+      identifier: "root",
+      type: "block",
+      width: 10,
+      height: 10,
+      flexDirection: "column",
+      children: [
+        {
+          identifier: "a",
+          type: "block",
+          width: 10,
+          height: 2,
+        },
+      ],
+    };
+
+    const layout2 = computeLayout(root2);
+    expect(layout2.a?.height).toBe(2);
+    expect(layout2.b).toBeUndefined();
+  });
 });

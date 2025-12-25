@@ -22,6 +22,7 @@ export interface ViewProps {
     background?: string | number;
     outline?: OutlineOptions;
     stack?: "z";
+    scrollRegion?: boolean;
   };
 }
 
