@@ -66,9 +66,8 @@ describe("renderDiff", () => {
     const occurrences = (output.match(/b/g) || []).length;
     expect(occurrences).toBe(8);
 
-    // Check if it moves to each cell
-    expect(output).toContain("\x1b[1;1H");
-    expect(output).toContain("\x1b[3;2H");
+    // Starts from home for a fast full redraw
+    expect(output.startsWith("\x1b[0m\x1b[H")).toBe(true);
   });
 
   it("should batch color changes", () => {
@@ -84,9 +83,8 @@ describe("renderDiff", () => {
     const output = renderDiff(prev, next);
 
     // Expected:
-    // Move -> Set Green -> 'a' -> Move -> 'b' -> Move -> Set Blue -> 'c' -> Move -> 'd' -> Reset
-    const expected =
-      "\x1b[1;1H\x1b[32ma" + "\x1b[1;2Hb" + "\x1b[1;3H\x1b[34mc" + "\x1b[1;4Hd" + "\x1b[0m";
+    // Move -> Set Green -> 'ab' -> Set Blue -> 'cd' -> Reset
+    const expected = "\x1b[1;1H\x1b[32mab\x1b[34mcd\x1b[0m";
     expect(output).toBe(expected);
   });
 
@@ -102,7 +100,7 @@ describe("renderDiff", () => {
 
     const expected =
       "\x1b[1;1H\x1b[31ma" +
-      "\x1b[1;2H\x1b[39mb" + // After red 'a', resets to default fg for 'b'
+      "\x1b[39mb" + // After red 'a', resets to default fg for 'b'
       "\x1b[0m";
 
     expect(output).toBe(expected);
@@ -134,7 +132,8 @@ describe("renderDiff", () => {
 
     expect(output.length).toBeGreaterThan(0);
     expect(stats.changedCells).toBe(3);
-    expect(stats.cursorMoves).toBe(3);
+    // Two runs: row 1 col 1..2, then row 2 col 1.
+    expect(stats.cursorMoves).toBe(2);
     expect(stats.fgChanges).toBe(2);
     expect(stats.ops).toBe(stats.cursorMoves + stats.fgChanges + stats.bgChanges + stats.resets);
   });

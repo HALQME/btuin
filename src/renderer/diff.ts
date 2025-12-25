@@ -73,6 +73,26 @@ export function renderDiff(
   const rowMap = scroll ? buildScrollRowMap(rows, scroll) : null;
   const scrollPrefix = scroll ? buildDecstbmScrollPrefix(scroll) : "";
 
+  if (sizeChanged) {
+    const fullOutput = asciiFastPath
+      ? renderFullRedrawAscii(next, rows, cols, stats)
+      : renderFullRedraw(next, rows, cols, stats);
+    if (stats) {
+      stats.ops =
+        stats.cursorMoves +
+        stats.fgChanges +
+        stats.bgChanges +
+        stats.resets +
+        (stats.scrollOps ?? 0);
+    }
+    if (scrollPrefix) {
+      // Size changes never attempt DECSTBM; keep behavior consistent if caller
+      // passed an options object that would otherwise scroll.
+      return `${scrollPrefix}${fullOutput}`;
+    }
+    return fullOutput;
+  }
+
   if (asciiFastPath) {
     const asciiOutput = renderDiffAscii(
       prev,
@@ -98,26 +118,49 @@ export function renderDiff(
   let currentFg: string | undefined;
   let currentBg: string | undefined;
   let styleDirty = false;
+  let cursorRow = -1;
+  let cursorCol = -1;
+  let pendingText = "";
 
   // Local output buffer to batch terminal writes
   const out: string[] = [];
+  const flushText = () => {
+    if (!pendingText) return;
+    out.push(pendingText);
+    pendingText = "";
+  };
+  const pushCtl = (seq: string) => {
+    flushText();
+    out.push(seq);
+  };
   if (scrollPrefix) {
-    out.push(scrollPrefix);
+    pushCtl(scrollPrefix);
     if (stats) stats.scrollOps = (stats.scrollOps ?? 0) + 5;
   }
 
+  const moveTo = (r: number, c: number) => {
+    if (cursorRow === r && cursorCol === c) return;
+    pushCtl(`\x1b[${r + 1};${c + 1}H`);
+    cursorRow = r;
+    cursorCol = c;
+    if (stats) stats.cursorMoves++;
+  };
+
   for (let r = 0; r < rows; r++) {
+    let inRun = false;
     for (let c = 0; c < cols; c++) {
       // Avoid printing into the terminal's bottom-right cell, which can trigger
       // an implicit line wrap/scroll on some terminals.
-      if (r === rows - 1 && c === cols - 1) continue;
+      if (r === rows - 1 && c === cols - 1) {
+        inRun = false;
+        continue;
+      }
 
       const idx = r * cols + c;
-      const prevIdx = mapPrevIndex(rowMap, cols, r, c);
-
-      const nextWidth = next.widths[idx];
+      const nextWidth = next.widths[idx] ?? 1;
       if (nextWidth === 0) continue;
 
+      const prevIdx = mapPrevIndex(rowMap, cols, r, c);
       const prevWidth = prevIdx === -1 ? 1 : (prev.widths[prevIdx] ?? 0);
       const nextGlyphKey = next.glyphKeyAtIndex(idx);
       const prevGlyphKey = prevIdx === -1 ? 32 : prev.glyphKeyAtIndex(prevIdx);
@@ -128,46 +171,43 @@ export function renderDiff(
       const prevBg = prevIdx === -1 ? undefined : prev.bg[prevIdx];
 
       const needsDraw =
-        sizeChanged ||
         prevWidth !== nextWidth ||
         prevGlyphKey !== nextGlyphKey ||
         nextFg !== prevFg ||
         nextBg !== prevBg;
 
-      if (needsDraw) {
-        if (stats) {
-          stats.changedCells++;
-          stats.cursorMoves++;
-        }
-        // Move cursor: \x1b[row;colH
-        out.push(`\x1b[${r + 1};${c + 1}H`);
-
-        if (nextFg !== currentFg) {
-          if (nextFg === undefined) {
-            out.push("\x1b[39m");
-          } else {
-            out.push(nextFg);
-          }
-          currentFg = nextFg;
-          styleDirty = true;
-          if (stats) stats.fgChanges++;
-        }
-        if (nextBg !== currentBg) {
-          if (nextBg === undefined) {
-            out.push("\x1b[49m");
-          } else {
-            out.push(nextBg);
-          }
-          currentBg = nextBg;
-          styleDirty = true;
-          if (stats) stats.bgChanges++;
-        }
-
-        out.push(next.glyphStringAtIndex(idx));
+      if (!needsDraw) {
+        inRun = false;
+        continue;
       }
+
+      if (stats) stats.changedCells++;
+
+      if (!inRun) {
+        moveTo(r, c);
+        inRun = true;
+      }
+
+      if (nextFg !== currentFg) {
+        pushCtl(nextFg === undefined ? "\x1b[39m" : nextFg);
+        currentFg = nextFg;
+        styleDirty = true;
+        if (stats) stats.fgChanges++;
+      }
+      if (nextBg !== currentBg) {
+        pushCtl(nextBg === undefined ? "\x1b[49m" : nextBg);
+        currentBg = nextBg;
+        styleDirty = true;
+        if (stats) stats.bgChanges++;
+      }
+
+      pendingText += next.glyphStringAtIndex(idx);
+      cursorRow = r;
+      cursorCol = c + nextWidth;
     }
   }
 
+  flushText();
   if (styleDirty) {
     out.push("\x1b[0m");
     if (stats) stats.resets++;
@@ -199,15 +239,38 @@ function renderDiffAscii(
   let currentFg: string | undefined;
   let currentBg: string | undefined;
   let styleDirty = false;
+  let cursorRow = -1;
+  let cursorCol = -1;
+  let pendingText = "";
+
+  const flushText = () => {
+    if (!pendingText) return;
+    out.push(pendingText);
+    pendingText = "";
+  };
+  const pushCtl = (seq: string) => {
+    flushText();
+    out.push(seq);
+  };
+
+  const moveTo = (r: number, c: number) => {
+    if (cursorRow === r && cursorCol === c) return;
+    pushCtl(`\x1b[${r + 1};${c + 1}H`);
+    cursorRow = r;
+    cursorCol = c;
+    if (stats) stats.cursorMoves++;
+  };
 
   for (let r = 0; r < rows; r++) {
+    let inRun = false;
     for (let c = 0; c < cols; c++) {
       if (r === rows - 1 && c === cols - 1) {
+        inRun = false;
         continue;
       }
 
       const idx = r * cols + c;
-      const nextWidth = next.widths[idx];
+      const nextWidth = next.widths[idx] ?? 1;
       if (nextWidth === 0) continue;
 
       const prevIdx = mapPrevIndex(rowMap, cols, r, c);
@@ -220,51 +283,185 @@ function renderDiffAscii(
       const prevBg = prevIdx === -1 ? undefined : prev.bg[prevIdx];
 
       const needsDraw =
-        sizeChanged ||
-        prevWidth !== nextWidth ||
-        prevCode !== nextCode ||
-        nextFg !== prevFg ||
-        nextBg !== prevBg;
+        prevWidth !== nextWidth || prevCode !== nextCode || nextFg !== prevFg || nextBg !== prevBg;
 
-      if (!needsDraw) continue;
-
-      if (stats) {
-        stats.changedCells++;
-        stats.cursorMoves++;
+      if (!needsDraw) {
+        inRun = false;
+        continue;
       }
-      out.push(`\x1b[${r + 1};${c + 1}H`);
+
+      if (stats) stats.changedCells++;
+
+      if (!inRun) {
+        moveTo(r, c);
+        inRun = true;
+      }
 
       if (nextFg !== currentFg) {
-        if (nextFg === undefined) {
-          out.push("\x1b[39m");
-        } else {
-          out.push(nextFg);
-        }
+        pushCtl(nextFg === undefined ? "\x1b[39m" : nextFg);
         currentFg = nextFg;
         styleDirty = true;
         if (stats) stats.fgChanges++;
       }
       if (nextBg !== currentBg) {
-        if (nextBg === undefined) {
-          out.push("\x1b[49m");
-        } else {
-          out.push(nextBg);
-        }
+        pushCtl(nextBg === undefined ? "\x1b[49m" : nextBg);
         currentBg = nextBg;
         styleDirty = true;
         if (stats) stats.bgChanges++;
       }
 
-      out.push(String.fromCharCode(nextCode));
+      pendingText += String.fromCharCode(nextCode);
+      cursorRow = r;
+      cursorCol = c + 1;
     }
   }
 
+  flushText();
   if (styleDirty) {
     out.push("\x1b[0m");
     if (stats) stats.resets++;
   }
 
   return out.length > 0 ? out.join("") : "";
+}
+
+function renderFullRedraw(next: Buffer2D, rows: number, cols: number, stats?: DiffStats): string {
+  if (stats) {
+    stats.cursorMoves = 0;
+    stats.fgChanges = 0;
+    stats.bgChanges = 0;
+    stats.resets = 0;
+  }
+
+  const out: string[] = [];
+  out.push("\x1b[0m\x1b[H");
+  if (stats) {
+    stats.cursorMoves++;
+    stats.resets++;
+  }
+
+  let currentFg: string | undefined;
+  let currentBg: string | undefined;
+  let styleDirty = false;
+  let pendingText = "";
+  const flushText = () => {
+    if (!pendingText) return;
+    out.push(pendingText);
+    pendingText = "";
+  };
+  const pushCtl = (seq: string) => {
+    flushText();
+    out.push(seq);
+  };
+
+  for (let r = 0; r < rows; r++) {
+    const lastCol = r === rows - 1 ? cols - 1 : cols;
+    for (let c = 0; c < lastCol; c++) {
+      const idx = r * cols + c;
+      const width = next.widths[idx] ?? 1;
+      if (width === 0) continue;
+      if (stats) stats.changedCells++;
+
+      const nextFg = next.fg[idx];
+      const nextBg = next.bg[idx];
+      if (nextFg !== currentFg) {
+        pushCtl(nextFg === undefined ? "\x1b[39m" : nextFg);
+        currentFg = nextFg;
+        styleDirty = true;
+        if (stats) stats.fgChanges++;
+      }
+      if (nextBg !== currentBg) {
+        pushCtl(nextBg === undefined ? "\x1b[49m" : nextBg);
+        currentBg = nextBg;
+        styleDirty = true;
+        if (stats) stats.bgChanges++;
+      }
+
+      pendingText += next.glyphStringAtIndex(idx);
+    }
+    flushText();
+    if (r < rows - 1) out.push("\r\n");
+  }
+
+  flushText();
+  if (styleDirty) {
+    out.push("\x1b[0m");
+    if (stats) stats.resets++;
+  }
+
+  return out.join("");
+}
+
+function renderFullRedrawAscii(
+  next: Buffer2D,
+  rows: number,
+  cols: number,
+  stats?: DiffStats,
+): string {
+  if (stats) {
+    stats.cursorMoves = 0;
+    stats.fgChanges = 0;
+    stats.bgChanges = 0;
+    stats.resets = 0;
+  }
+
+  const out: string[] = [];
+  out.push("\x1b[0m\x1b[H");
+  if (stats) {
+    stats.cursorMoves++;
+    stats.resets++;
+  }
+
+  let currentFg: string | undefined;
+  let currentBg: string | undefined;
+  let styleDirty = false;
+  let pendingText = "";
+  const flushText = () => {
+    if (!pendingText) return;
+    out.push(pendingText);
+    pendingText = "";
+  };
+  const pushCtl = (seq: string) => {
+    flushText();
+    out.push(seq);
+  };
+
+  for (let r = 0; r < rows; r++) {
+    const lastCol = r === rows - 1 ? cols - 1 : cols;
+    for (let c = 0; c < lastCol; c++) {
+      const idx = r * cols + c;
+      const width = next.widths[idx] ?? 1;
+      if (width === 0) continue;
+      if (stats) stats.changedCells++;
+
+      const nextFg = next.fg[idx];
+      const nextBg = next.bg[idx];
+      if (nextFg !== currentFg) {
+        pushCtl(nextFg === undefined ? "\x1b[39m" : nextFg);
+        currentFg = nextFg;
+        styleDirty = true;
+        if (stats) stats.fgChanges++;
+      }
+      if (nextBg !== currentBg) {
+        pushCtl(nextBg === undefined ? "\x1b[49m" : nextBg);
+        currentBg = nextBg;
+        styleDirty = true;
+        if (stats) stats.bgChanges++;
+      }
+
+      pendingText += String.fromCharCode(next.codes[idx] ?? 32);
+    }
+    flushText();
+    if (r < rows - 1) out.push("\r\n");
+  }
+
+  flushText();
+  if (styleDirty) {
+    out.push("\x1b[0m");
+    if (stats) stats.resets++;
+  }
+
+  return out.join("");
 }
 
 type ScrollRegion = { top: number; bottom: number; delta: number };
