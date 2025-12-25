@@ -172,6 +172,16 @@
         overflow: auto;
         min-height: 240px;
         flex: 1 1 auto;
+        cursor: grab;
+      }
+      #previewScroll.is-panning {
+        cursor: grabbing;
+        user-select: none;
+      }
+      #previewScroll.is-3d {
+        perspective: 960px;
+        perspective-origin: top left;
+        padding: 120px 160px 180px 120px;
       }
       #previewPanel {
         display: flex;
@@ -181,7 +191,11 @@
       }
       #previewStage {
         position: relative;
-        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-family:
+          ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+          "Noto Sans Mono CJK JP", "Noto Sans Mono", "M PLUS 1 Code",
+          "BIZ UDGothic", "MS Gothic", "Osaka-Mono", Osaka, "Liberation Mono",
+          "Courier New", monospace;
         font-size: 12px;
         line-height: 1.25;
         background-color: var(--cell-bg);
@@ -197,6 +211,11 @@
             transparent 1px
           );
         background-size: var(--cellw, 9px) var(--cellh, 18px);
+      }
+      #previewStage.is-3d {
+        transform-style: preserve-3d;
+        transform-origin: top left;
+        transform: rotateX(38deg) rotateZ(-2deg);
       }
       .node {
         position: absolute;
@@ -300,12 +319,27 @@
               <label
                 ><input v-model="showPadding" type="checkbox" /> Padding</label
               >
+              <label><input v-model="showDepth" type="checkbox" /> 3D</label>
+              <label v-show="showDepth"
+                >Depth
+                <input v-model.number="depthStep" type="range" min="4" max="30"
+              /></label>
+              <span v-show="showDepth" class="pill">Mid/Right Drag</span>
               <span class="pill">{{ previewSize }}</span>
             </div>
-            <div id="previewScroll">
+            <div
+              id="previewScroll"
+              :class="{ 'is-3d': showDepth, 'is-panning': isPanning }"
+              @pointerdown="onPanStart"
+              @pointermove="onPanMove"
+              @pointerup="onPanEnd"
+              @pointercancel="onPanEnd"
+              @contextmenu.prevent
+            >
               <div
                 id="previewStage"
                 ref="previewStage"
+                :class="{ 'is-3d': showDepth }"
                 @click="onPreviewClick"
               ></div>
             </div>
@@ -741,12 +775,6 @@
 
         const frag = document.createDocumentFragment();
         let paintIndex = 0;
-        const pushLayer = (el) => {
-          if (!el) return;
-          paintIndex += 1;
-          el.style.zIndex = String(paintIndex);
-          frag.appendChild(el);
-        };
         const defaultBg =
           getComputedStyle(previewStage).backgroundColor || "transparent";
         const bgCache = new Map();
@@ -768,6 +796,58 @@
           return defaultBg;
         };
         const items = flattenTree(snapshot.tree);
+        const depthByKey = new Map();
+        for (const item of items) {
+          if (item?.node?.key) depthByKey.set(item.node.key, item.depth);
+        }
+        const applyDepth = (el, key) => {
+          if (!state.showDepth || !el) return;
+          const depth = depthByKey.get(key) ?? 0;
+          const z = depth * state.depthStep;
+          const shift = Math.round(depth * state.depthStep * 0.18);
+          el.style.transform =
+            "translateZ(" +
+            z +
+            "px) translateX(" +
+            shift +
+            "px) translateY(" +
+            shift +
+            "px)";
+          el.style.transformStyle = "preserve-3d";
+          const depthClamped = Math.min(10, depth);
+          if (!el.classList.contains("selection")) {
+            const opacity = Math.max(0.55, 1 - depthClamped * 0.05);
+            el.style.opacity = String(opacity);
+          }
+          if (
+            el.classList.contains("node") &&
+            !el.classList.contains("outline-text") &&
+            !el.classList.contains("text")
+          ) {
+            el.style.boxShadow =
+              "0 " +
+              depthClamped +
+              "px " +
+              depthClamped * 2 +
+              "px rgba(0, 0, 0, 0.35)";
+          }
+          if (el.classList.contains("text")) {
+            el.style.textShadow =
+              "0 " +
+              Math.max(1, depthClamped) +
+              "px " +
+              Math.max(2, depthClamped * 2) +
+              "px rgba(0, 0, 0, 0.45)";
+          }
+        };
+        const pushLayer = (el, key) => {
+          if (!el) return;
+          if (key) applyDepth(el, key);
+          paintIndex += 1;
+          el.style.zIndex = String(paintIndex);
+          frag.appendChild(el);
+        };
+        const pushLayerForKey = (key) => (el) => pushLayer(el, key);
         for (const item of items) {
           const node = item.node;
           const box =
@@ -786,7 +866,7 @@
           const viewStyle = node.viewStyle || null;
           if (state.showMargin && style && style.margin !== undefined) {
             appendMarginRings(
-              pushLayer,
+              pushLayerForKey(node.key),
               rbox,
               normalizeInsets(style.margin),
               state.cellW,
@@ -805,11 +885,11 @@
               state.cellW,
               state.cellH,
             );
-            if (bg) pushLayer(bg);
+            if (bg) pushLayer(bg, node.key);
           }
           if (state.showPadding && style && style.padding !== undefined) {
             appendPaddingRings(
-              pushLayer,
+              pushLayerForKey(node.key),
               rbox,
               normalizeInsets(style.padding),
               state.cellW,
@@ -820,7 +900,7 @@
             const outlineColor =
               colorToCss(viewStyle.outline.color) || "rgba(148, 163, 184, 0.8)";
             appendOutlineText(
-              pushLayer,
+              pushLayerForKey(node.key),
               rbox,
               viewStyle.outline.style,
               outlineColor,
@@ -862,7 +942,7 @@
               boxEl.style.width = rbox.width * state.cellW + "px";
               boxEl.style.height = rbox.height * state.cellH + "px";
               boxEl.title = title;
-              pushLayer(boxEl);
+              pushLayer(boxEl, node.key);
             }
             for (let i = 0; i < lineCount; i += 1) {
               const raw = lines[i] ?? "";
@@ -880,7 +960,7 @@
               if (fg) el.style.color = fg;
               el.textContent = clipped.text;
               el.title = title;
-              pushLayer(el);
+              pushLayer(el, node.key);
             }
           } else {
             const el = document.createElement("div");
@@ -891,7 +971,7 @@
             el.style.width = rbox.width * state.cellW + "px";
             el.style.height = rbox.height * state.cellH + "px";
             el.title = title;
-            pushLayer(el);
+            pushLayer(el, node.key);
           }
         }
         if (state.selectedKey && snapshot.layout?.[state.selectedKey]) {
@@ -914,7 +994,7 @@
           );
           if (sel) {
             sel.style.pointerEvents = "none";
-            pushLayer(sel);
+            pushLayer(sel, state.selectedKey);
           }
         }
         previewStage.appendChild(frag);
@@ -957,7 +1037,17 @@
             showBoxes: true,
             showMargin: true,
             showPadding: true,
+            showDepth: false,
+            depthStep: 14,
             previewSize: "(none)",
+            isPanning: false,
+            panMoved: false,
+            panStartX: 0,
+            panStartY: 0,
+            panScrollLeft: 0,
+            panScrollTop: 0,
+            panPointerId: null,
+            panModifierActive: false,
             logs: [],
             logSeq: 0,
             snapshotText: "(none)",
@@ -988,9 +1078,15 @@
           this.socket.addEventListener("message", (ev) => {
             this.onSocketMessage(ev);
           });
+          window.addEventListener("keydown", this.onKeyDown);
+          window.addEventListener("keyup", this.onKeyUp);
 
           this.applyZoom();
           this.updateInspector();
+        },
+        beforeUnmount() {
+          window.removeEventListener("keydown", this.onKeyDown);
+          window.removeEventListener("keyup", this.onKeyUp);
         },
         watch: {
           zoom() {
@@ -1007,10 +1103,59 @@
             this.updateInspector();
             renderPreview(this, this.latestSnapshot);
           },
+          showDepth() {
+            renderPreview(this, this.latestSnapshot);
+          },
+          depthStep() {
+            if (this.showDepth) {
+              renderPreview(this, this.latestSnapshot);
+            }
+          },
         },
         methods: {
           setTab(tab) {
             this.tab = tab;
+          },
+          onPanStart(ev) {
+            if (!this.showDepth) return;
+            const isLeft = ev.button === 0;
+            const isAltButton = ev.button === 1 || ev.button === 2;
+            if (isLeft && !this.panModifierActive) return;
+            if (!isLeft && !isAltButton) return;
+            const scrollEl = ev.currentTarget;
+            if (!(scrollEl instanceof HTMLElement)) return;
+            this.isPanning = true;
+            this.panMoved = true;
+            this.panStartX = ev.clientX;
+            this.panStartY = ev.clientY;
+            this.panScrollLeft = scrollEl.scrollLeft;
+            this.panScrollTop = scrollEl.scrollTop;
+            ev.preventDefault();
+            this.panPointerId = ev.pointerId;
+            scrollEl.setPointerCapture(ev.pointerId);
+          },
+          onPanMove(ev) {
+            if (!this.isPanning || ev.pointerId !== this.panPointerId) return;
+            const scrollEl = ev.currentTarget;
+            if (!(scrollEl instanceof HTMLElement)) return;
+            if (!scrollEl) return;
+            const dx = ev.clientX - this.panStartX;
+            const dy = ev.clientY - this.panStartY;
+            if (Math.abs(dx) > 3 || Math.abs(dy) > 3) this.panMoved = true;
+            scrollEl.scrollLeft = this.panScrollLeft - dx;
+            scrollEl.scrollTop = this.panScrollTop - dy;
+          },
+          onPanEnd(ev) {
+            if (!this.isPanning) return;
+            const scrollEl = ev.currentTarget;
+            if (scrollEl instanceof HTMLElement && this.panPointerId !== null) {
+              scrollEl.releasePointerCapture(this.panPointerId);
+            }
+            this.panPointerId = null;
+            this.isPanning = false;
+            setTimeout(() => {
+              this.panMoved = false;
+            }, 0);
           },
           requestSnapshot() {
             try {
@@ -1024,6 +1169,10 @@
             }
           },
           onPreviewClick(ev) {
+            if (this.panMoved) {
+              this.panMoved = false;
+              return;
+            }
             const target = ev.target;
             if (!(target instanceof Element)) return;
             const nodeEl = target.closest(".node");
