@@ -1,0 +1,54 @@
+direction: down
+
+classes: {
+  step: {
+    style.fill: "#F8FAFC"
+    style.stroke: "#334155"
+  }
+  data: {
+    style.fill: "#ECFDF5"
+    style.stroke: "#10B981"
+  }
+  note: {
+    style.fill: "#FEF9C3"
+    style.stroke: "#CA8A04"
+  }
+}
+
+title: "Fine-grained Reactivity (track/trigger)" {
+  class: step
+}
+
+signals: "Signals\nref()/reactive()" {
+  class: data
+}
+
+computed: "Derived\ncomputed(() => ...)" {
+  class: data
+}
+
+effect: "Effect\ncreateRenderer().render()\n(effect(() => renderOnce()))" {
+  class: step
+}
+
+track: "track(target, key)\n- called on read\n- registers active effect" {
+  class: note
+}
+
+trigger: "trigger(target, key)\n- called on write\n- schedules dependent effects" {
+  class: note
+}
+
+render: "renderOnce()\n- calls view()\n- produces View tree\n- continues into layout/render/diff" {
+  class: step
+}
+
+title -> signals
+signals -> track: "read"
+computed -> track: "read"
+track -> effect: "collect deps"
+signals -> trigger: "write"
+trigger -> effect: "re-run"
+effect -> render: "exec"
+render -> computed: "reads"
+render -> signals: "reads"

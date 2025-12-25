@@ -16,6 +16,12 @@ btuin separates concerns into four distinct modules: state, layout, rendering, a
 
 - **`btuin` (Runtime)**: The top-level module that integrates all other parts. It provides `createApp`, manages the application lifecycle, and exposes the component API.
 
+![Rendering pipeline](./assets/rendering-pipeline.svg)
+
+![Fine-grained reactivity](./assets/reactivity-deps.svg)
+
+![Key event propagation](./assets/key-event-propagation.svg)
+
 ## Component Context (Provide/Inject)
 
 btuin provides a lightweight, Vue-like context mechanism to share values down the component tree without prop drilling.
@@ -89,6 +95,8 @@ createApp({ terminal: myMockTerminalAdapter /* ... */ });
 
 Inline mode renders the UI in-place (without clearing the whole terminal screen), making it suitable for prompts, progress indicators, or tools that should leave scrollback intact.
 
+![Inline mode stdout/stderr passthrough](./assets/inline-stdout-stderr-passthrough.svg)
+
 ## Basic usage
 
 ```ts
@@ -114,3 +122,7 @@ await app.mount({ inline: true, inlineCleanupOnExit: true });
 ## stdout/stderr passthrough
 
 When mounted in inline mode with the default terminal adapter, `process.stdout`/`process.stderr` output (including `console.log`) is printed above the inline UI and the UI is re-rendered afterwards.
+
+## Exit / Unmount
+
+![Exit lifecycle](./assets/exit-lifecycle.svg)

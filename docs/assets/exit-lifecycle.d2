@@ -1,0 +1,54 @@
+direction: down
+
+classes: {
+  step: {
+    style.fill: "#F8FAFC"
+    style.stroke: "#334155"
+  }
+  io: {
+    style.fill: "#FFF7ED"
+    style.stroke: "#F97316"
+  }
+  note: {
+    style.fill: "#FEF9C3"
+    style.stroke: "#CA8A04"
+  }
+}
+
+title: "Exit / Unmount Lifecycle" {
+  class: step
+}
+
+triggers: "Exit triggers\n- runtime.exit(code)\n- Ctrl+C/SIGINT\n- SIGTERM\n- platform.onExit" {
+  class: step
+}
+
+manager: "LifecycleManager.exit()\n- sets state.isExiting\n- runs app.onExit handlers" {
+  class: step
+}
+
+unmount: "LifecycleManager.unmount()\n- stop render effect\n- unmountComponent()\n- cleanup terminal/capture" {
+  class: step
+}
+
+ui_cleanup: "UI cleanup to TTY\n- fullscreen: moveCursor + clearScreen\n- inline: optional cleanup sequence" {
+  class: io
+}
+
+exit_output: "exitOutput -> stdout only\n(runtime.setExitOutput)" {
+  class: io
+}
+
+platform_exit: "platform.exit(code)" {
+  class: step
+}
+
+note_order: "Order notes\n- unmount is idempotent\n- exitOutput does not go to TTY\n- inlineCleanupOnExit controls UI cleanup" {
+  class: note
+}
+
+title -> triggers -> manager -> unmount
+unmount -> ui_cleanup: "TTY"
+unmount -> exit_output: "stdout"
+unmount -> platform_exit: "final"
+manager -> note_order

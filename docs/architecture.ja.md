@@ -16,6 +16,12 @@ btuinは、状態・レイアウト・レンダリング・I/Oの4つの関心�
 
 - **`btuin` (ランタイム)**: 他のすべての部分を統合する最上位モジュール。`createApp`を提供し、アプリケーションのライフサイクルを管理し、コンポーネントAPIを公開します。
 
+![レンダリングパイプライン](./assets/rendering-pipeline.svg)
+
+![きめ細かなリアクティビティ](./assets/reactivity-deps.svg)
+
+![キーイベントの伝播](./assets/key-event-propagation.svg)
+
 ## コンポーネントコンテキスト（Provide/Inject）
 
 btuin は、props のバケツリレーを避けて子孫コンポーネントへ値を渡すための、Vue 風のコンテキスト機構を提供します。
@@ -89,6 +95,8 @@ createApp({ terminal: myMockTerminalAdapter /* ... */ });
 
 Inline モードは、ターミナル全体を `clear` せずに現在のカーソル位置から UI を描画します。プロンプトや進捗表示など、スクロールバックを残したい用途に向いています。
 
+![Inlineモードのstdout/stderrパススルー](./assets/inline-stdout-stderr-passthrough.svg)
+
 ## 基本
 
 ```ts
@@ -114,3 +122,7 @@ await app.mount({ inline: true, inlineCleanupOnExit: true });
 ## stdout/stderr のパススルー
 
 デフォルトのターミナルアダプタで inline モードを使う場合、`process.stdout` / `process.stderr`（`console.log` 等）への出力は inline UI の上に表示され、出力後に UI が再描画されます。
+
+## 終了 / アンマウント
+
+![終了ライフサイクル](./assets/exit-lifecycle.svg)

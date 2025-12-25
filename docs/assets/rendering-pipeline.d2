@@ -1,0 +1,81 @@
+direction: down
+
+classes: {
+  step: {
+    style.fill: "#F8FAFC"
+    style.stroke: "#334155"
+  }
+  file: {
+    style.fill: "#E8F3FF"
+    style.stroke: "#3B82F6"
+  }
+  io: {
+    style.fill: "#FFF7ED"
+    style.stroke: "#F97316"
+  }
+  data: {
+    style.fill: "#ECFDF5"
+    style.stroke: "#10B981"
+  }
+  note: {
+    style.fill: "#FEF9C3"
+    style.stroke: "#CA8A04"
+  }
+}
+
+title: "Rendering Pipeline (view -> layout -> buffer -> diff -> write)" {
+  class: step
+}
+
+view: "Component render()\n-> ViewElement tree" {
+  class: step
+}
+
+layout: "layout(root)\n(layout-engine via FFI)\n-> ComputedLayout" {
+  class: step
+}
+
+buffer: "renderElement(root, buffer, layout)\n-> next buffer" {
+  class: step
+}
+
+diff: "renderDiff(prev, next)\n-> minimal ANSI" {
+  class: step
+}
+
+terminal: "terminal.write(ANSI)" {
+  class: io
+}
+
+caches: "Cache points" {
+  class: note
+  direction: right
+  c1: "Layout cache\n(reuse when root === prevRoot\nand size unchanged)" {
+    class: note
+  }
+  c2: "Double buffer\n(prevBuffer vs nextBuffer)\n(diff requires different instances)" {
+    class: note
+  }
+}
+
+resize: "Resize path" {
+  class: note
+  direction: right
+  r1: "terminal size changed\n-> new buffer pool" {
+    class: note
+  }
+  r2: "forceFullRedraw\n(prevForDiff = blank buffer)" {
+    class: note
+  }
+}
+
+title -> view
+view -> layout: "layout(view)"
+layout -> buffer: "render to buffer"
+buffer -> diff: "diff"
+diff -> terminal: "write"
+
+layout -> caches.c1: "memoization"
+buffer -> caches.c2: "pooling"
+layout -> resize.r1: "when sizeChanged"
+diff -> resize.r2: "when forceFullRedraw"

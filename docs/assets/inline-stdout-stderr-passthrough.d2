@@ -1,0 +1,50 @@
+direction: down
+
+classes: {
+  step: {
+    style.fill: "#F8FAFC"
+    style.stroke: "#334155"
+  }
+  io: {
+    style.fill: "#FFF7ED"
+    style.stroke: "#F97316"
+  }
+  note: {
+    style.fill: "#FEF9C3"
+    style.stroke: "#CA8A04"
+  }
+}
+
+title: "Inline Mode: stdout/stderr passthrough" {
+  class: step
+}
+
+capture: "terminal.startCapture()\nstdout/stderr are intercepted" {
+  class: step
+}
+
+on_out: "terminal.onStdout(text)\nterminal.onStderr(text)" {
+  class: step
+}
+
+clear_ui: "inline.cleanup()\n(clear inline UI once)" {
+  class: step
+}
+
+write_real: "terminal.writeStdout(text)\nterminal.writeStderr(text)\n(bypass capture)" {
+  class: io
+}
+
+rerender: "queueMicrotask()\n-> renderer.renderOnce(false)\n(re-draw UI after output)" {
+  class: step
+}
+
+guards: "Guards\n- only when mounted\n- only when renderMode === inline\n- coalesce multiple writes" {
+  class: note
+}
+
+title -> capture -> on_out
+on_out -> clear_ui: "suspend UI"
+clear_ui -> write_real: "print real output"
+write_real -> rerender: "schedule"
+on_out -> guards: "checks"

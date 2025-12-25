@@ -1,0 +1,54 @@
+direction: down
+
+classes: {
+  step: {
+    style.fill: "#F8FAFC"
+    style.stroke: "#334155"
+  }
+  note: {
+    style.fill: "#FEF9C3"
+    style.stroke: "#CA8A04"
+  }
+  io: {
+    style.fill: "#FFF7ED"
+    style.stroke: "#F97316"
+  }
+  data: {
+    style.fill: "#ECFDF5"
+    style.stroke: "#10B981"
+  }
+}
+
+title: "Key Event Propagation" {
+  class: step
+}
+
+tty: "TTY input\n(key presses)" {
+  class: io
+}
+
+terminal: "terminal.onKey(event)\n(LoopManager.start)" {
+  class: step
+}
+
+devtools: "devtools.handleKey(event)\n(optional)\nif true -> stop" {
+  class: note
+}
+
+component: "handleComponentKey(mounted, event)\n- traverse View tree\n- invoke element keyHooks\n- return true to stop" {
+  class: step
+}
+
+view: "ViewElement tree\n(Block/Text/Input)\n+ BaseView.keyHooks" {
+  class: data
+}
+
+fallback: "Fallback\nCtrl+C / SIGINT\n-> app.exit()" {
+  class: note
+}
+
+tty -> terminal
+terminal -> devtools: "first"
+devtools -> component: "if not handled"
+component -> view: "traverse"
+component -> fallback: "if unhandled and Ctrl+C"
