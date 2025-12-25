@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { getTerminalSize } from "@/terminal";
-import { VStack } from "@/view/layout";
+import { VStack } from "@/view/collections";
 import { Text } from "@/view/primitives";
 import { layout } from "@/layout";
 

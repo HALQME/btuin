@@ -24,6 +24,7 @@ export interface RenderLoopDeps {
     layoutMap: ComputedLayout,
     parentX?: number,
     parentY?: number,
+    clipRect?: { x: number; y: number; width: number; height: number },
   ) => void;
 }
 
@@ -169,10 +170,20 @@ export function createRenderer<State>(config: RenderLoopConfig<State>) {
       }
       if (config.profiler && frame) {
         config.profiler.measure(frame, "renderMs", () => {
-          deps.renderElement(rootElement, buf, layoutResult, 0, 0);
+          deps.renderElement(rootElement, buf, layoutResult, 0, 0, {
+            x: 0,
+            y: 0,
+            width: state.currentSize.cols,
+            height: state.currentSize.rows,
+          });
         });
       } else {
-        deps.renderElement(rootElement, buf, layoutResult, 0, 0);
+        deps.renderElement(rootElement, buf, layoutResult, 0, 0, {
+          x: 0,
+          y: 0,
+          width: state.currentSize.cols,
+          height: state.currentSize.rows,
+        });
       }
 
       config.profiler?.drawHud(buf);
