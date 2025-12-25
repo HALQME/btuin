@@ -175,6 +175,39 @@ export function renderElement(
     );
   }
 
+  if (isText(element)) {
+    const fg = element.style?.foreground;
+    const bg = element.style?.background;
+    const style: { fg?: string | number; bg?: string | number } = {};
+    if (fg !== undefined) style.fg = fg;
+    if (bg !== undefined) style.bg = bg;
+    drawTextClipped(buffer, absY, absX, element.content, style, elementClip);
+  }
+
+  if (isBlock(element)) {
+    const pad = resolvePadding(element.style?.padding);
+    const contentRect: Rect = {
+      x: elementRect.x + Math.floor(pad.left),
+      y: elementRect.y + Math.floor(pad.top),
+      width: Math.max(0, elementRect.width - Math.floor(pad.left) - Math.floor(pad.right)),
+      height: Math.max(0, elementRect.height - Math.floor(pad.top) - Math.floor(pad.bottom)),
+    };
+    const childClip = intersectRect(elementClip, contentRect);
+    if (!childClip) return;
+
+    const stack = element.style?.stack;
+    if (stack === "z") {
+      for (const child of element.children) {
+        renderElement(child, buffer, layoutMap, absX, absY, childClip);
+      }
+    } else {
+      for (const child of element.children) {
+        renderElement(child, buffer, layoutMap, absX, absY, childClip);
+      }
+    }
+  }
+
+  // Draw outline last so it always stays visible above contents.
   const outline = element.style?.outline;
   if (outline) {
     const { color, style = "single" } = outline;
@@ -212,39 +245,5 @@ export function renderElement(
     drawTextClipped(buffer, y, x + w - 1, chars.tr, borderStyle, elementClip);
     drawTextClipped(buffer, y + h - 1, x, chars.bl, borderStyle, elementClip);
     drawTextClipped(buffer, y + h - 1, x + w - 1, chars.br, borderStyle, elementClip);
-  }
-
-  if (isText(element)) {
-    const fg = element.style?.foreground;
-    const bg = element.style?.background;
-    const style: { fg?: string | number; bg?: string | number } = {};
-    if (fg !== undefined) style.fg = fg;
-    if (bg !== undefined) style.bg = bg;
-    drawTextClipped(buffer, absY, absX, element.content, style, elementClip);
-  }
-
-  if (isBlock(element)) {
-    const pad = resolvePadding(element.style?.padding);
-    const contentRect: Rect = {
-      x: elementRect.x + Math.floor(pad.left),
-      y: elementRect.y + Math.floor(pad.top),
-      width: Math.max(0, elementRect.width - Math.floor(pad.left) - Math.floor(pad.right)),
-      height: Math.max(0, elementRect.height - Math.floor(pad.top) - Math.floor(pad.bottom)),
-    };
-    const childClip = intersectRect(elementClip, contentRect);
-    if (!childClip) return;
-
-    const stack = element.style?.stack;
-    if (stack === "z") {
-      // Layout engine already overlays children (absolute positioning).
-      // Keep normal render recursion so child layout positions are respected.
-      for (const child of element.children) {
-        renderElement(child, buffer, layoutMap, absX, absY, childClip);
-      }
-    } else {
-      for (const child of element.children) {
-        renderElement(child, buffer, layoutMap, absX, absY, childClip);
-      }
-    }
   }
 }
