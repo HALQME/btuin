@@ -7,7 +7,8 @@ import {
   renderComponent,
   handleComponentKey,
 } from "@/components/component";
-import { onKey } from "@/components/lifecycle";
+import { onKey, onMounted } from "@/components/lifecycle";
+import { inject, provide, type InjectionKey } from "@/components/provide-inject";
 import { Block, Text } from "@/view/primitives";
 
 describe("defineComponent", () => {
@@ -36,6 +37,85 @@ describe("defineComponent", () => {
     expect(element.type).toBe("text");
     if (element.type === "text") {
       expect(element.content).toBe("Hello");
+    }
+  });
+});
+
+describe("provide/inject", () => {
+  it("should provide values to nested components (string key)", () => {
+    const Child = defineComponent({
+      setup() {
+        const value = inject<number>("foo");
+        return () => Text(String(value));
+      },
+    });
+
+    let didMount = false;
+    const Parent = defineComponent({
+      setup() {
+        provide("foo", 42);
+        const mountedChild = mountComponent(Child);
+
+        // This should still work even though we mounted a child during setup.
+        // (Requires currentInstance stack behavior.)
+        onMounted(() => {
+          didMount = true;
+        });
+
+        return () => renderComponent(mountedChild);
+      },
+    });
+
+    const mountedParent = mountComponent(Parent);
+    const element = renderComponent(mountedParent);
+    expect(didMount).toBe(true);
+
+    expect(element.type).toBe("text");
+    if (element.type === "text") {
+      expect(element.content).toBe("42");
+    }
+  });
+
+  it("should provide values to nested components (symbol key)", () => {
+    const key = Symbol("answer") as InjectionKey<number>;
+
+    const Child = defineComponent({
+      setup() {
+        const value = inject(key);
+        return () => Text(String(value));
+      },
+    });
+
+    const Parent = defineComponent({
+      setup() {
+        provide(key, 123);
+        const mountedChild = mountComponent(Child);
+        return () => renderComponent(mountedChild);
+      },
+    });
+
+    const mountedParent = mountComponent(Parent);
+    const element = renderComponent(mountedParent);
+
+    expect(element.type).toBe("text");
+    if (element.type === "text") {
+      expect(element.content).toBe("123");
+    }
+  });
+
+  it("should return default values when injection is missing", () => {
+    const Comp = defineComponent({
+      setup() {
+        const value = inject("missing", "default");
+        return () => Text(value);
+      },
+    });
+
+    const mounted = mountComponent(Comp);
+    const element = renderComponent(mounted);
+    expect(element.type).toBe("text");
+    if (element.type === "text") {
+      expect(element.content).toBe("default");
     }
   });
 });

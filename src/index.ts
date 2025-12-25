@@ -8,5 +8,6 @@ export * from "./view";
 export * from "./hooks/";
 
 export { onBeforeUpdate, onKey, onMounted, onTick, onUnmounted, onUpdated } from "./components";
+export { inject, provide, type InjectionKey } from "./components";
 
 export * from "./reactivity";
