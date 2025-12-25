@@ -15,6 +15,8 @@ Bunランタイム向けの宣言的なTUIフレームワーク。
 bun add btuin
 ```
 
+公開/インストール詳細: `docs/github-packages.md`
+
 ## 使い方
 
 ```ts

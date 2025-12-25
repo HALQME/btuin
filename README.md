@@ -15,6 +15,8 @@ Declarative TUI framework for the Bun runtime.
 bun add btuin
 ```
 
+Publishing/install details: `docs/github-packages.md`
+
 ## Usage
 
 ```ts
