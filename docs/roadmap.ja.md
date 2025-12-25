@@ -13,8 +13,8 @@
   - [x] シェル統合（stdout/stderr capture, `useLog`）
   - [x] デバッグ基盤（インスペクターモード, ホットリロード）
   - [ ] **レイアウトエンジンの詳細可視化**
-    - [ ] Flexbox プロパティのインスペクト（`flex-grow`, `padding` 等の表示）
-    - [ ] 計算済みボックスモデルのカラー表示（Margin/Padding の視覚化）
+    - [x] Flexbox プロパティのインスペクト（`flex-grow`, `padding` 等の表示）
+    - [x] 計算済みボックスモデルのカラー表示（Margin/Padding の視覚化）
     - [ ] Z-Index / 階層構造の 3D 可視化
   - [ ] **パフォーマンス・プロファイリング**
     - [ ] レンダリング・タイムライン（FFI境界・レイアウト計算・Diff生成の計測）
