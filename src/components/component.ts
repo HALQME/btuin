@@ -148,6 +148,9 @@ export function mountComponent<State>(
   if (existing) return existing;
 
   const instance = createComponentInstance();
+  if (maybeOptions?.name) {
+    instance.name = maybeOptions.name;
+  }
   const safeRuntime =
     runtime ??
     ({

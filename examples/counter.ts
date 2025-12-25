@@ -1,17 +1,14 @@
-import { createApp, ref, watchEffect } from "@/index";
+import { createApp, ref } from "@/index";
 import { Text, VStack } from "@/view";
 
 const app = createApp({
   init({ onKey, setExitOutput, runtime }) {
     const count = ref(0);
     onKey((k) => {
+      setExitOutput(count.value.toString());
       if (k.name === "up") count.value++;
       if (k.name === "down") count.value--;
       if (k.name === "q") runtime.exit(0);
-    });
-
-    watchEffect(() => {
-      setExitOutput(count.value.toString());
     });
 
     return { count };

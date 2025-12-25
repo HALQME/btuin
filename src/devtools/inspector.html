@@ -1,0 +1,1881 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>btuin DevTools</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+      body {
+        margin: 0;
+        font-family: ui-sans-serif, system-ui;
+        background: #0b0f14;
+        color: #e6edf3;
+      }
+      header {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        padding: 10px 12px;
+        border-bottom: 1px solid #1f2937;
+      }
+      .pill {
+        font-size: 12px;
+        padding: 2px 8px;
+        border: 1px solid #334155;
+        border-radius: 999px;
+        color: #cbd5e1;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        height: calc(100vh - 44px);
+      }
+      section {
+        padding: 10px;
+        overflow: auto;
+      }
+      h2 {
+        font-size: 13px;
+        font-weight: 600;
+        color: #93c5fd;
+        margin: 0 0 10px;
+      }
+      pre {
+        margin: 0;
+        font-size: 12px;
+        line-height: 1.3;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+      .logline {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 12px;
+        padding: 2px 0;
+        border-bottom: 1px dashed #1f2937;
+      }
+      .stderr {
+        color: #fca5a5;
+      }
+      .stdout {
+        color: #e5e7eb;
+      }
+      button {
+        background: #111827;
+        color: #e5e7eb;
+        border: 1px solid #334155;
+        padding: 6px 10px;
+        border-radius: 8px;
+        cursor: pointer;
+      }
+      button:hover {
+        background: #0b1220;
+      }
+      button[aria-pressed="true"] {
+        border-color: #93c5fd;
+      }
+      a {
+        color: #93c5fd;
+        text-decoration: none;
+      }
+      a:hover {
+        text-decoration: underline;
+      }
+      .row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+      }
+      .tabs {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+      .controls {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        font-size: 12px;
+        color: #cbd5e1;
+        margin-bottom: 10px;
+      }
+      .controls label {
+        display: inline-flex;
+        gap: 6px;
+        align-items: center;
+      }
+      input[type="range"] {
+        width: 120px;
+      }
+      .panel {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        height: 100%;
+      }
+      .panel-stack {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        height: 100%;
+        min-height: 0;
+      }
+      .panel-section {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        min-height: 0;
+        border: 1px solid #1f2937;
+        border-radius: 8px;
+        padding: 8px;
+        background: #0b1118;
+      }
+      .panel-section.logs {
+        flex: 1.2 1 0;
+      }
+      .panel-section.profiler {
+        flex: 0.8 1 0;
+      }
+      .inspect {
+        border: 1px solid #1f2937;
+        border-radius: 8px;
+        padding: 8px;
+        overflow: auto;
+        max-height: 260px;
+      }
+      .inspect .row {
+        margin-bottom: 6px;
+      }
+      .style-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12px;
+        line-height: 1.35;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+      .style-table th,
+      .style-table td {
+        border-top: 1px dashed #1f2937;
+        padding: 4px 6px;
+        vertical-align: top;
+      }
+      .style-table th {
+        text-align: left;
+        width: 140px;
+        color: #cbd5e1;
+        font-weight: 600;
+      }
+      .style-table td {
+        color: #e5e7eb;
+        word-break: break-word;
+      }
+      details summary {
+        cursor: pointer;
+        list-style: none;
+        font-size: 12px;
+        color: #93c5fd;
+        margin-bottom: 6px;
+      }
+      details[open] summary {
+        margin-bottom: 6px;
+      }
+      .style-table .section {
+        color: #93c5fd;
+        font-weight: 700;
+      }
+      .loglist {
+        overflow: auto;
+        min-height: 0;
+        flex: 1 1 auto;
+      }
+      .profile-summary {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        align-items: center;
+        font-size: 12px;
+        color: #cbd5e1;
+      }
+      .profile-summary .pill {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+      .profile-legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        font-size: 11px;
+        color: #94a3b8;
+      }
+      .profile-legend .legend-item {
+        display: inline-flex;
+        gap: 6px;
+        align-items: center;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+      .profile-legend .swatch {
+        width: 10px;
+        height: 10px;
+        border-radius: 3px;
+      }
+      .profile-legend .swatch.layout {
+        background: #38bdf8;
+      }
+      .profile-legend .swatch.render {
+        background: #34d399;
+      }
+      .profile-legend .swatch.diff {
+        background: #f59e0b;
+      }
+      .profile-legend .swatch.write {
+        background: #f472b6;
+      }
+      .profile-list {
+        flex: 1 1 auto;
+        overflow: auto;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        padding-right: 4px;
+      }
+      .profile-row {
+        display: grid;
+        grid-template-columns: 52px 1fr 56px;
+        align-items: center;
+        gap: 8px;
+        font-size: 11px;
+        color: #cbd5e1;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+      .profile-meta {
+        opacity: 0.7;
+      }
+      .profile-bar {
+        display: flex;
+        height: 10px;
+        background: #0b1220;
+        border: 1px solid #1f2937;
+        border-radius: 6px;
+        overflow: hidden;
+      }
+      .profile-seg.layout {
+        background: #38bdf8;
+      }
+      .profile-seg.render {
+        background: #34d399;
+      }
+      .profile-seg.diff {
+        background: #f59e0b;
+      }
+      .profile-seg.write {
+        background: #f472b6;
+      }
+      .profile-ms {
+        text-align: right;
+        color: #e5e7eb;
+      }
+      #reactivityPanel {
+        min-height: 0;
+      }
+      .reactivity-canvas {
+        border: 1px solid #1f2937;
+        border-radius: 8px;
+        background: #0b0f14;
+        min-height: 220px;
+        overflow: auto;
+      }
+      .reactivity-canvas svg {
+        display: block;
+        width: 100%;
+        height: auto;
+      }
+      .reactivity-node {
+        fill: #1f2937;
+        stroke: #94a3b8;
+        stroke-width: 1;
+      }
+      .reactivity-node.active {
+        stroke: #38bdf8;
+      }
+      .reactivity-label {
+        font-size: 11px;
+        fill: #e5e7eb;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+      .reactivity-edge {
+        stroke: rgba(148, 163, 184, 0.4);
+        stroke-width: 1.2;
+      }
+      .reactivity-edge.active {
+        stroke: rgba(56, 189, 248, 0.8);
+      }
+      .reactivity-list {
+        border-top: 1px dashed #1f2937;
+        padding-top: 6px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        font-size: 12px;
+        color: #cbd5e1;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+      #previewScroll {
+        border: 1px solid #1f2937;
+        border-radius: 8px;
+        --cell-bg: #0b0f14;
+        background-color: var(--cell-bg);
+        overflow: auto;
+        min-height: 240px;
+        flex: 1 1 auto;
+        cursor: grab;
+      }
+      #previewScroll.is-panning {
+        cursor: grabbing;
+        user-select: none;
+      }
+      #previewScroll.is-3d {
+        perspective: 960px;
+        perspective-origin: top left;
+        padding: 120px 160px 180px 120px;
+      }
+      #previewPanel {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        min-height: 0;
+      }
+      #previewStage {
+        position: relative;
+        font-family:
+          ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+          "Noto Sans Mono CJK JP", "Noto Sans Mono", "M PLUS 1 Code",
+          "BIZ UDGothic", "MS Gothic", "Osaka-Mono", Osaka, "Liberation Mono",
+          "Courier New", monospace;
+        font-size: 12px;
+        line-height: 1.25;
+        background-color: var(--cell-bg);
+        background-image:
+          linear-gradient(
+            to right,
+            rgba(148, 163, 184, 0.08) 1px,
+            transparent 1px
+          ),
+          linear-gradient(
+            to bottom,
+            rgba(148, 163, 184, 0.08) 1px,
+            transparent 1px
+          );
+        background-size: var(--cellw, 9px) var(--cellh, 18px);
+      }
+      #previewStage.is-3d {
+        transform-style: preserve-3d;
+        transform-origin: top left;
+        transform: rotateX(38deg) rotateZ(-2deg);
+      }
+      .node {
+        position: absolute;
+        box-sizing: border-box;
+        border: none;
+        outline: none;
+        background: transparent;
+        font-family: inherit;
+        font-size: inherit;
+        line-height: inherit;
+        color: #e5e7eb;
+        padding: 0;
+        white-space: pre;
+        overflow: hidden;
+        text-overflow: clip;
+      }
+      .node.boxes {
+        outline: 1px dotted rgba(148, 163, 184, 0.2);
+        outline-offset: -1px;
+      }
+      .node.boxes:hover {
+        outline: 1px dotted rgba(148, 163, 184, 0.45);
+        outline-offset: -1px;
+      }
+      .node.outline-text {
+        opacity: 0.6;
+      }
+      .node.outline-text.double {
+        opacity: 0.8;
+      }
+      .selection {
+        position: absolute;
+        box-sizing: border-box;
+        pointer-events: none;
+        outline: 2px solid rgba(244, 114, 182, 0.9);
+        outline-offset: -2px;
+      }
+      .ring {
+        position: absolute;
+        pointer-events: none;
+        box-sizing: border-box;
+      }
+      .ring.margin {
+        background: rgba(250, 204, 21, 0.16);
+      }
+      .ring.padding {
+        background: rgba(74, 222, 128, 0.14);
+      }
+      .ring.bg {
+        background: transparent;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <header>
+        <div style="font-weight: 600">btuin DevTools</div>
+        <span class="pill">{{ status }}</span>
+        <button @click="requestSnapshot">Request snapshot</button>
+        <span class="pill">WS: <span>{{ wsUrl }}</span></span>
+      </header>
+      <div class="grid">
+        <section class="panel-stack">
+          <div class="panel-section logs">
+            <div class="row">
+              <h2 style="margin: 0">Logs</h2>
+              <span class="pill">{{ logs.length }} lines</span>
+            </div>
+            <div ref="logsEl" class="loglist">
+              <div
+                v-for="line in logs"
+                :key="line.id"
+                class="logline"
+                :class="line.type === 'stderr' ? 'stderr' : 'stdout'"
+              >
+                {{ line.display }}
+              </div>
+            </div>
+          </div>
+          <div class="panel-section profiler">
+            <div class="row">
+              <h2 style="margin: 0">Profiler</h2>
+              <span class="pill">{{ profileStatus }}</span>
+            </div>
+            <div class="profile-summary">
+              <span class="pill">Avg {{ formatMs(profileAvgMs) }}</span>
+              <span class="pill">Max {{ formatMs(profileMaxMs) }}</span>
+              <span class="pill">FPS {{ profileFps }}</span>
+              <span class="pill">Nodes {{ profileLast?.nodeCount ?? "-" }}</span>
+              <span class="pill">Bytes {{ profileLast?.outputBytes ?? "-" }}</span>
+            </div>
+            <div class="profile-legend">
+              <span class="legend-item"><span class="swatch layout"></span>Layout</span>
+              <span class="legend-item"><span class="swatch render"></span>Render</span>
+              <span class="legend-item"><span class="swatch diff"></span>Diff</span>
+              <span class="legend-item"><span class="swatch write"></span>Write</span>
+            </div>
+            <div class="profile-list" ref="profileListEl">
+              <div v-for="frame in profileFrames" :key="frame.id" class="profile-row">
+                <span class="profile-meta">#{{ frame.id }}</span>
+                <div class="profile-bar" :title="formatFrameTooltip(frame)">
+                  <span
+                    class="profile-seg layout"
+                    :style="{ width: barWidth(frame.layoutMs) }"
+                  ></span>
+                  <span
+                    class="profile-seg render"
+                    :style="{ width: barWidth(frame.renderMs) }"
+                  ></span>
+                  <span class="profile-seg diff" :style="{ width: barWidth(frame.diffMs) }"></span>
+                  <span
+                    class="profile-seg write"
+                    :style="{ width: barWidth(frame.writeMs) }"
+                  ></span>
+                </div>
+                <span class="profile-ms">{{ formatMs(frame.frameMs) }}</span>
+              </div>
+            </div>
+          </div>
+        </section>
+        <section class="panel">
+          <div class="row" style="margin-bottom: 6px">
+            <h2 style="margin: 0">Snapshot</h2>
+            <div class="tabs">
+              <button :aria-pressed="tab === 'preview'" @click="setTab('preview')">Preview</button>
+              <button :aria-pressed="tab === 'json'" @click="setTab('json')">JSON</button>
+              <button :aria-pressed="tab === 'reactivity'" @click="setTab('reactivity')">
+                Reactivity
+              </button>
+            </div>
+          </div>
+          <div v-show="tab === 'preview'" class="panel" id="previewPanel">
+            <div class="controls">
+              <label>Zoom <input v-model.number="zoom" type="range" min="60" max="200" /></label>
+              <label><input v-model="showBoxes" type="checkbox" /> Boxes</label>
+              <label><input v-model="showMargin" type="checkbox" /> Margin</label>
+              <label><input v-model="showPadding" type="checkbox" /> Padding</label>
+              <label><input v-model="showDepth" type="checkbox" /> 3D</label>
+              <label v-show="showDepth"
+                >Depth <input v-model.number="depthStep" type="range" min="4" max="30"
+              /></label>
+              <span v-show="showDepth" class="pill">Mid/Right Drag</span>
+              <span class="pill">{{ previewSize }}</span>
+            </div>
+            <div
+              id="previewScroll"
+              :class="{ 'is-3d': showDepth, 'is-panning': isPanning }"
+              @pointerdown="onPanStart"
+              @pointermove="onPanMove"
+              @pointerup="onPanEnd"
+              @pointercancel="onPanEnd"
+              @contextmenu.prevent
+            >
+              <div
+                id="previewStage"
+                ref="previewStage"
+                :class="{ 'is-3d': showDepth }"
+                @click="onPreviewClick"
+              ></div>
+            </div>
+            <div class="inspect">
+              <div class="row">
+                <span class="pill">Selected: {{ selectedKey || "(none)" }}</span>
+                <span class="pill">Type: {{ selectedType }}</span>
+              </div>
+              <details :open="styleDetailsOpen" ref="styleDetails" @toggle="onStyleDetailsToggle">
+                <summary>Styles</summary>
+                <table class="style-table">
+                  <tr v-for="row in styleRows" :key="row.id">
+                    <th :class="{ section: row.section }">{{ row.key }}</th>
+                    <td>{{ row.section ? "" : row.value }}</td>
+                  </tr>
+                </table>
+              </details>
+            </div>
+          </div>
+          <pre v-show="tab === 'json'">{{ snapshotText }}</pre>
+          <div v-show="tab === 'reactivity'" class="panel" id="reactivityPanel">
+            <div class="controls">
+              <span class="pill">{{ reactivityStatus }}</span>
+              <span class="pill">Refs {{ reactivityRefs.length }}</span>
+              <span class="pill">Edges {{ reactivityEdges.length }}</span>
+              <button @click="clearReactivity">Clear</button>
+            </div>
+            <div class="reactivity-canvas">
+              <svg
+                v-if="reactivityLayout"
+                :viewBox="`0 0 ${reactivityLayout.width} ${reactivityLayout.height}`"
+              >
+                <line
+                  v-for="edge in reactivityLayout.edges"
+                  :key="edge.key"
+                  class="reactivity-edge"
+                  :class="{ active: edge.active }"
+                  :x1="edge.x1"
+                  :y1="edge.y1"
+                  :x2="edge.x2"
+                  :y2="edge.y2"
+                  :style="{ strokeWidth: edge.strokeWidth }"
+                >
+                  <title>{{ edge.label }}</title>
+                </line>
+                <g v-for="node in reactivityLayout.refs" :key="node.key">
+                  <circle
+                    class="reactivity-node"
+                    :class="{ active: node.active }"
+                    :cx="node.x"
+                    :cy="node.y"
+                    r="7"
+                  ></circle>
+                  <text class="reactivity-label" :x="node.x + 12" :y="node.y + 4">
+                    {{ node.label }}
+                  </text>
+                </g>
+                <g v-for="node in reactivityLayout.components" :key="node.key">
+                  <circle
+                    class="reactivity-node"
+                    :class="{ active: node.active }"
+                    :cx="node.x"
+                    :cy="node.y"
+                    r="7"
+                  ></circle>
+                  <text class="reactivity-label" :x="node.x - 12" :y="node.y + 4" text-anchor="end">
+                    {{ node.label }}
+                  </text>
+                </g>
+              </svg>
+            </div>
+            <div class="reactivity-list">
+              <div v-for="edge in reactivityEdges" :key="edge.key">{{ edge.label }}</div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+    <script>
+      const baseFontSizePx = 12;
+      const baseLineHeight = 1.25;
+      const profilePending = [];
+      let profileFlushTimer = null;
+      const reactivityStore = {
+        refs: new Map(),
+        components: new Map(),
+        edges: new Map(),
+      };
+
+      function flattenTree(root) {
+        const out = [];
+        const walk = (node, depth) => {
+          out.push({ node, depth });
+          if (node && node.children && Array.isArray(node.children)) {
+            for (const child of node.children) walk(child, depth + 1);
+          }
+        };
+        walk(root, 0);
+        return out;
+      }
+
+      function indexTree(root) {
+        const nodes = new Map();
+        const parents = new Map();
+        const children = new Map();
+
+        const walk = (node, parentKey) => {
+          if (node && typeof node.key === "string") {
+            nodes.set(node.key, node);
+            if (parentKey) parents.set(node.key, parentKey);
+            if (!children.has(node.key)) children.set(node.key, []);
+          }
+          if (node && node.children && Array.isArray(node.children)) {
+            for (const child of node.children) {
+              if (node && typeof node.key === "string" && child?.key) {
+                const list = children.get(node.key) || [];
+                list.push(child.key);
+                children.set(node.key, list);
+              }
+              walk(child, node?.key);
+            }
+          }
+        };
+
+        walk(root, null);
+        return { nodes, parents, children };
+      }
+
+      function normalizeInsets(value) {
+        if (typeof value === "number" && Number.isFinite(value)) {
+          return { top: value, right: value, bottom: value, left: value };
+        }
+        if (Array.isArray(value) && value.length === 4) {
+          const top = Number(value[0]);
+          const right = Number(value[1]);
+          const bottom = Number(value[2]);
+          const left = Number(value[3]);
+          return {
+            top: Number.isFinite(top) ? top : 0,
+            right: Number.isFinite(right) ? right : 0,
+            bottom: Number.isFinite(bottom) ? bottom : 0,
+            left: Number.isFinite(left) ? left : 0,
+          };
+        }
+        return { top: 0, right: 0, bottom: 0, left: 0 };
+      }
+
+      function fmt(value) {
+        if (value === undefined || value === null) return "(none)";
+        if (typeof value === "string") return value;
+        if (typeof value === "number") return String(value);
+        return JSON.stringify(value);
+      }
+
+      function addRow(rows, key, value) {
+        rows.push({ key, value });
+      }
+
+      function addRowIf(rows, key, value) {
+        if (value === undefined || value === null || value === "(none)") return;
+        rows.push({ key, value });
+      }
+
+      function addSection(rows, label) {
+        rows.push({ key: label, value: "", section: true });
+      }
+
+      function makeRectDiv(className, x, y, w, h, color, cellW, cellH) {
+        if (
+          !Number.isFinite(x) ||
+          !Number.isFinite(y) ||
+          !Number.isFinite(w) ||
+          !Number.isFinite(h)
+        )
+          return null;
+        if (w <= 0 || h <= 0) return null;
+        const el = document.createElement("div");
+        el.className = className;
+        el.style.left = x * cellW + "px";
+        el.style.top = y * cellH + "px";
+        el.style.width = w * cellW + "px";
+        el.style.height = h * cellH + "px";
+        if (color) el.style.backgroundColor = color;
+        return el;
+      }
+
+      function appendMarginRings(pushLayer, box, inset, cellW, cellH) {
+        const top = inset.top;
+        const right = inset.right;
+        const bottom = inset.bottom;
+        const left = inset.left;
+        if (top > 0) {
+          const el = makeRectDiv(
+            "ring margin",
+            box.x - left,
+            box.y - top,
+            box.width + left + right,
+            top,
+            undefined,
+            cellW,
+            cellH,
+          );
+          if (el) pushLayer(el);
+        }
+        if (bottom > 0) {
+          const el = makeRectDiv(
+            "ring margin",
+            box.x - left,
+            box.y + box.height,
+            box.width + left + right,
+            bottom,
+            undefined,
+            cellW,
+            cellH,
+          );
+          if (el) pushLayer(el);
+        }
+        if (left > 0) {
+          const el = makeRectDiv(
+            "ring margin",
+            box.x - left,
+            box.y,
+            left,
+            box.height,
+            undefined,
+            cellW,
+            cellH,
+          );
+          if (el) pushLayer(el);
+        }
+        if (right > 0) {
+          const el = makeRectDiv(
+            "ring margin",
+            box.x + box.width,
+            box.y,
+            right,
+            box.height,
+            undefined,
+            cellW,
+            cellH,
+          );
+          if (el) pushLayer(el);
+        }
+      }
+
+      function appendOutlineText(
+        pushLayer,
+        box,
+        outlineStyle,
+        color,
+        cellW,
+        cellH,
+      ) {
+        if (!box || box.width <= 0 || box.height <= 0) return;
+        const chars =
+          outlineStyle === "double"
+            ? { h: "═", v: "║", tl: "╔", tr: "╗", bl: "╚", br: "╝" }
+            : { h: "─", v: "│", tl: "┌", tr: "┐", bl: "└", br: "┘" };
+
+        const width = Math.max(1, Math.floor(box.width));
+        const height = Math.max(1, Math.floor(box.height));
+
+        const mkLine = (text, x, y, w, h) => {
+          const el = document.createElement("div");
+          el.className =
+            "node outline-text" + (outlineStyle === "double" ? " double" : "");
+          el.style.left = x * cellW + "px";
+          el.style.top = y * cellH + "px";
+          el.style.width = w * cellW + "px";
+          el.style.height = h * cellH + "px";
+          el.style.whiteSpace = "pre";
+          el.style.pointerEvents = "none";
+          if (color) el.style.color = color;
+          el.textContent = text;
+          return el;
+        };
+
+        if (height === 1) {
+          const line =
+            width === 1
+              ? chars.v
+              : chars.tl + chars.h.repeat(width - 2) + chars.tr;
+          pushLayer(mkLine(line, box.x, box.y, width, 1));
+          return;
+        }
+
+        const topLine =
+          width === 1
+            ? chars.v
+            : chars.tl + chars.h.repeat(width - 2) + chars.tr;
+        const bottomLine =
+          width === 1
+            ? chars.v
+            : chars.bl + chars.h.repeat(width - 2) + chars.br;
+        pushLayer(mkLine(topLine, box.x, box.y, width, 1));
+        pushLayer(mkLine(bottomLine, box.x, box.y + height - 1, width, 1));
+
+        if (height > 2) {
+          const midCount = height - 2;
+          const leftCol = Array.from({ length: midCount }, () => chars.v).join(
+            "\n",
+          );
+          const rightCol = leftCol;
+          pushLayer(mkLine(leftCol, box.x, box.y + 1, 1, midCount));
+          if (width > 1) {
+            pushLayer(
+              mkLine(rightCol, box.x + width - 1, box.y + 1, 1, midCount),
+            );
+          }
+        }
+      }
+
+      function appendPaddingRings(pushLayer, box, inset, cellW, cellH) {
+        const top = inset.top;
+        const right = inset.right;
+        const bottom = inset.bottom;
+        const left = inset.left;
+        if (top > 0) {
+          const el = makeRectDiv(
+            "ring padding",
+            box.x,
+            box.y,
+            box.width,
+            top,
+            undefined,
+            cellW,
+            cellH,
+          );
+          if (el) pushLayer(el);
+        }
+        if (bottom > 0) {
+          const el = makeRectDiv(
+            "ring padding",
+            box.x,
+            box.y + box.height - bottom,
+            box.width,
+            bottom,
+            undefined,
+            cellW,
+            cellH,
+          );
+          if (el) pushLayer(el);
+        }
+        const midH = box.height - top - bottom;
+        if (midH > 0 && left > 0) {
+          const el = makeRectDiv(
+            "ring padding",
+            box.x,
+            box.y + top,
+            left,
+            midH,
+            undefined,
+            cellW,
+            cellH,
+          );
+          if (el) pushLayer(el);
+        }
+        if (midH > 0 && right > 0) {
+          const el = makeRectDiv(
+            "ring padding",
+            box.x + box.width - right,
+            box.y + top,
+            right,
+            midH,
+            undefined,
+            cellW,
+            cellH,
+          );
+          if (el) pushLayer(el);
+        }
+      }
+
+      function xtermToRgb(n) {
+        const base = [
+          [0, 0, 0],
+          [128, 0, 0],
+          [0, 128, 0],
+          [128, 128, 0],
+          [0, 0, 128],
+          [128, 0, 128],
+          [0, 128, 128],
+          [192, 192, 192],
+          [128, 128, 128],
+          [255, 0, 0],
+          [0, 255, 0],
+          [255, 255, 0],
+          [0, 0, 255],
+          [255, 0, 255],
+          [0, 255, 255],
+          [255, 255, 255],
+        ];
+        if (!Number.isFinite(n)) return null;
+        const i = Math.max(0, Math.min(255, Math.floor(n)));
+        if (i < 16) return base[i];
+        if (i >= 16 && i <= 231) {
+          const idx = i - 16;
+          const r = Math.floor(idx / 36);
+          const g = Math.floor((idx % 36) / 6);
+          const b = idx % 6;
+          const steps = [0, 95, 135, 175, 215, 255];
+          return [steps[r], steps[g], steps[b]];
+        }
+        const v = 8 + (i - 232) * 10;
+        return [v, v, v];
+      }
+
+      function colorToCss(value) {
+        if (typeof value === "string") return value;
+        if (typeof value === "number") {
+          const rgb = xtermToRgb(value);
+          if (!rgb) return null;
+          return "rgb(" + rgb[0] + "," + rgb[1] + "," + rgb[2] + ")";
+        }
+        return null;
+      }
+
+      const graphemeSegmenter =
+        typeof Intl !== "undefined" && Intl.Segmenter
+          ? new Intl.Segmenter(undefined, { granularity: "grapheme" })
+          : null;
+
+      function splitGraphemes(text) {
+        if (!text) return [];
+        if (!graphemeSegmenter) return Array.from(text);
+        return Array.from(graphemeSegmenter.segment(text), (s) => s.segment);
+      }
+
+      function isWideCodePoint(ucs) {
+        return (
+          (ucs >= 0x1100 && ucs <= 0x115f) ||
+          ucs === 0x2329 ||
+          ucs === 0x232a ||
+          (ucs >= 0x2e80 && ucs <= 0xa4cf && ucs !== 0x303f) ||
+          (ucs >= 0xac00 && ucs <= 0xd7a3) ||
+          (ucs >= 0xf900 && ucs <= 0xfaff) ||
+          (ucs >= 0xfe10 && ucs <= 0xfe19) ||
+          (ucs >= 0xfe30 && ucs <= 0xfe6f) ||
+          (ucs >= 0xff00 && ucs <= 0xff60) ||
+          (ucs >= 0xffe0 && ucs <= 0xffe6) ||
+          (ucs >= 0x20000 && ucs <= 0x2fffd) ||
+          (ucs >= 0x30000 && ucs <= 0x3fffd)
+        );
+      }
+
+      function graphemeWidth(grapheme) {
+        if (!grapheme) return 0;
+        let width = 0;
+        for (const ch of Array.from(grapheme)) {
+          const code = ch.codePointAt(0) || 0;
+          if (code === 0) continue;
+          if (code < 32 || (code >= 0x7f && code < 0xa0)) continue;
+          const w = isWideCodePoint(code) ? 2 : 1;
+          if (w > width) width = w;
+        }
+        return width || 0;
+      }
+
+      function clipToWidth(text, maxCols) {
+        if (!text) return { text: "", width: 0 };
+        if (maxCols <= 0) return { text: "", width: 0 };
+        const segments = splitGraphemes(text);
+        let width = 0;
+        let out = "";
+        for (const seg of segments) {
+          const w = graphemeWidth(seg);
+          if (width + w > maxCols) break;
+          width += w;
+          out += seg;
+        }
+        return { text: out, width };
+      }
+
+      function renderPreview(state, snapshot) {
+        const previewStage = state.$refs.previewStage;
+        if (!previewStage) return;
+        previewStage.textContent = "";
+        if (!snapshot) {
+          state.previewSize = "(none)";
+          return;
+        }
+        const rows = snapshot.size?.rows ?? 0;
+        const cols = snapshot.size?.cols ?? 0;
+        state.previewSize = cols + "x" + rows;
+
+        previewStage.style.setProperty("--cellw", state.cellW + "px");
+        previewStage.style.setProperty("--cellh", state.cellH + "px");
+        previewStage.style.width = cols * state.cellW + "px";
+        previewStage.style.height = rows * state.cellH + "px";
+
+        const frag = document.createDocumentFragment();
+        let paintIndex = 0;
+        const defaultBg =
+          getComputedStyle(previewStage).backgroundColor || "transparent";
+        const bgCache = new Map();
+        const resolveBgForKey = (key) => {
+          if (bgCache.has(key)) return bgCache.get(key);
+          const node = state.nodeByKey.get(key);
+          const own = colorToCss(node?.viewStyle?.background);
+          if (own) {
+            bgCache.set(key, own);
+            return own;
+          }
+          const parent = state.parentByKey.get(key);
+          if (parent) {
+            const resolved = resolveBgForKey(parent);
+            bgCache.set(key, resolved);
+            return resolved;
+          }
+          bgCache.set(key, defaultBg);
+          return defaultBg;
+        };
+        const items = flattenTree(snapshot.tree);
+        const depthByKey = new Map();
+        for (const item of items) {
+          if (item?.node?.key) depthByKey.set(item.node.key, item.depth);
+        }
+        const applyDepth = (el, key) => {
+          if (!state.showDepth || !el) return;
+          const depth = depthByKey.get(key) ?? 0;
+          const z = depth * state.depthStep;
+          const shift = Math.round(depth * state.depthStep * 0.18);
+          el.style.transform =
+            "translateZ(" +
+            z +
+            "px) translateX(" +
+            shift +
+            "px) translateY(" +
+            shift +
+            "px)";
+          el.style.transformStyle = "preserve-3d";
+          const depthClamped = Math.min(10, depth);
+          if (!el.classList.contains("selection")) {
+            const opacity = Math.max(0.55, 1 - depthClamped * 0.05);
+            el.style.opacity = String(opacity);
+          }
+          if (
+            el.classList.contains("node") &&
+            !el.classList.contains("outline-text") &&
+            !el.classList.contains("text")
+          ) {
+            el.style.boxShadow =
+              "0 " +
+              depthClamped +
+              "px " +
+              depthClamped * 2 +
+              "px rgba(0, 0, 0, 0.35)";
+          }
+          if (el.classList.contains("text")) {
+            el.style.textShadow =
+              "0 " +
+              Math.max(1, depthClamped) +
+              "px " +
+              Math.max(2, depthClamped * 2) +
+              "px rgba(0, 0, 0, 0.45)";
+          }
+        };
+        const pushLayer = (el, key) => {
+          if (!el) return;
+          if (key) applyDepth(el, key);
+          paintIndex += 1;
+          el.style.zIndex = String(paintIndex);
+          frag.appendChild(el);
+        };
+        const pushLayerForKey = (key) => (el) => pushLayer(el, key);
+        for (const item of items) {
+          const node = item.node;
+          const box =
+            snapshot.layout && node && node.key
+              ? snapshot.layout[node.key]
+              : null;
+          if (!box) continue;
+          const rbox = {
+            x: Math.floor(box.x),
+            y: Math.floor(box.y),
+            width: Math.floor(box.width),
+            height: Math.floor(box.height),
+          };
+
+          const style = node.layoutStyle || null;
+          const viewStyle = node.viewStyle || null;
+          if (state.showMargin && style && style.margin !== undefined) {
+            appendMarginRings(
+              pushLayerForKey(node.key),
+              rbox,
+              normalizeInsets(style.margin),
+              state.cellW,
+              state.cellH,
+            );
+          }
+          const bgColor = colorToCss(viewStyle?.background);
+          if (bgColor) {
+            const bg = makeRectDiv(
+              "ring bg",
+              rbox.x,
+              rbox.y,
+              rbox.width,
+              rbox.height,
+              bgColor,
+              state.cellW,
+              state.cellH,
+            );
+            if (bg) pushLayer(bg, node.key);
+          }
+          if (state.showPadding && style && style.padding !== undefined) {
+            appendPaddingRings(
+              pushLayerForKey(node.key),
+              rbox,
+              normalizeInsets(style.padding),
+              state.cellW,
+              state.cellH,
+            );
+          }
+          if (viewStyle && viewStyle.outline) {
+            const outlineColor =
+              colorToCss(viewStyle.outline.color) || "rgba(148, 163, 184, 0.8)";
+            appendOutlineText(
+              pushLayerForKey(node.key),
+              rbox,
+              viewStyle.outline.style,
+              outlineColor,
+              state.cellW,
+              state.cellH,
+            );
+          }
+
+          const shouldBox =
+            state.showBoxes && !viewStyle?.outline && item.depth > 0;
+          const fg = colorToCss(viewStyle?.foreground);
+          const outline = viewStyle?.outline || null;
+          const title =
+            (node.type || "node") +
+            " key=" +
+            (node.key || "(none)") +
+            " (" +
+            box.x +
+            "," +
+            box.y +
+            ") " +
+            box.width +
+            "x" +
+            box.height +
+            (outline && outline.title ? " title=" + outline.title : "");
+
+          if (typeof node.text === "string") {
+            const maxCols = Math.max(0, Math.floor(rbox.width));
+            const maxRows = Math.max(0, Math.floor(rbox.height));
+            const lines = node.text.split("\n");
+            const lineCount = Math.min(lines.length, maxRows);
+            const textBg = resolveBgForKey(node.key);
+            if (shouldBox) {
+              const boxEl = document.createElement("div");
+              boxEl.className = "node boxes";
+              boxEl.dataset.key = node.key;
+              boxEl.style.left = rbox.x * state.cellW + "px";
+              boxEl.style.top = rbox.y * state.cellH + "px";
+              boxEl.style.width = rbox.width * state.cellW + "px";
+              boxEl.style.height = rbox.height * state.cellH + "px";
+              boxEl.title = title;
+              pushLayer(boxEl, node.key);
+            }
+            for (let i = 0; i < lineCount; i += 1) {
+              const raw = lines[i] ?? "";
+              const clipped = clipToWidth(raw, maxCols);
+              if (!clipped.text && clipped.width === 0) continue;
+              const el = document.createElement("div");
+              el.className = "node text";
+              el.dataset.key = node.key;
+              el.style.left = rbox.x * state.cellW + "px";
+              el.style.top = (rbox.y + i) * state.cellH + "px";
+              el.style.width = clipped.width * state.cellW + "px";
+              el.style.height = state.cellH + "px";
+              el.style.whiteSpace = "pre";
+              if (textBg) el.style.backgroundColor = textBg;
+              if (fg) el.style.color = fg;
+              el.textContent = clipped.text;
+              el.title = title;
+              pushLayer(el, node.key);
+            }
+          } else {
+            const el = document.createElement("div");
+            el.className = "node" + (shouldBox ? " boxes" : "");
+            el.dataset.key = node.key;
+            el.style.left = rbox.x * state.cellW + "px";
+            el.style.top = rbox.y * state.cellH + "px";
+            el.style.width = rbox.width * state.cellW + "px";
+            el.style.height = rbox.height * state.cellH + "px";
+            el.title = title;
+            pushLayer(el, node.key);
+          }
+        }
+        if (state.selectedKey && snapshot.layout?.[state.selectedKey]) {
+          const raw = snapshot.layout[state.selectedKey];
+          const selBox = {
+            x: Math.floor(raw.x),
+            y: Math.floor(raw.y),
+            width: Math.floor(raw.width),
+            height: Math.floor(raw.height),
+          };
+          const sel = makeRectDiv(
+            "selection",
+            selBox.x,
+            selBox.y,
+            selBox.width,
+            selBox.height,
+            undefined,
+            state.cellW,
+            state.cellH,
+          );
+          if (sel) {
+            sel.style.pointerEvents = "none";
+            pushLayer(sel, state.selectedKey);
+          }
+        }
+        previewStage.appendChild(frag);
+      }
+
+      function measureCell(previewStage) {
+        if (!previewStage) return null;
+        const probe = document.createElement("span");
+        probe.textContent = "0000000000";
+        probe.style.position = "absolute";
+        probe.style.visibility = "hidden";
+        probe.style.whiteSpace = "pre";
+        probe.style.padding = "0";
+        probe.style.border = "0";
+        probe.style.margin = "0";
+        probe.style.font = "inherit";
+        previewStage.appendChild(probe);
+        const rect = probe.getBoundingClientRect();
+        previewStage.removeChild(probe);
+
+        const w = rect.width / 10;
+        const h = rect.height;
+        if (!Number.isFinite(w) || !Number.isFinite(h) || w <= 0 || h <= 0)
+          return null;
+        return { w, h };
+      }
+
+      const { createApp } = Vue;
+
+      createApp({
+        data() {
+          return {
+            wsUrl:
+              (location.protocol === "https:" ? "wss://" : "ws://") +
+              location.host +
+              "/ws",
+            status: "connecting…",
+            tab: "preview",
+            zoom: 100,
+            showBoxes: true,
+            showMargin: true,
+            showPadding: true,
+            showDepth: false,
+            depthStep: 14,
+            previewSize: "(none)",
+            isPanning: false,
+            panMoved: false,
+            panStartX: 0,
+            panStartY: 0,
+            panScrollLeft: 0,
+            panScrollTop: 0,
+            panPointerId: null,
+            panModifierActive: false,
+            logs: [],
+            logSeq: 0,
+            profileFrames: [],
+            profileFlushMs: 250,
+            profileMaxMs: 0,
+            profileAvgMs: 0,
+            profileFps: "-",
+            profileLast: null,
+            profileStatus: "waiting",
+            reactivityRefs: [],
+            reactivityComponents: [],
+            reactivityEdges: [],
+            reactivityLayout: null,
+            reactivityStatus: "waiting",
+            snapshotText: "(none)",
+            selectedKey: null,
+            selectedType: "(none)",
+            styleRows: [{ id: 0, key: "hint", value: "click a node" }],
+            styleDetailsOpen: false,
+            latestSnapshot: null,
+            nodeByKey: new Map(),
+            parentByKey: new Map(),
+            childrenByKey: new Map(),
+            cellW: 9,
+            cellH: 18,
+            socket: null,
+          };
+        },
+        mounted() {
+          this.socket = new WebSocket(this.wsUrl);
+          this.socket.addEventListener("open", () => {
+            this.status = "connected";
+            if (this.profileFrames.length === 0) {
+              this.profileStatus = "waiting";
+            }
+            if (this.reactivityEdges.length === 0) {
+              this.reactivityStatus = "waiting";
+            }
+          });
+          this.socket.addEventListener("close", () => {
+            this.status = "disconnected";
+            if (this.profileFrames.length === 0) {
+              this.profileStatus = "offline";
+            }
+            if (this.reactivityEdges.length === 0) {
+              this.reactivityStatus = "offline";
+            }
+          });
+          this.socket.addEventListener("error", () => {
+            this.status = "error";
+          });
+          this.socket.addEventListener("message", (ev) => {
+            this.onSocketMessage(ev);
+          });
+          window.addEventListener("keydown", this.onKeyDown);
+          window.addEventListener("keyup", this.onKeyUp);
+
+          profileFlushTimer = setInterval(
+            () => this.flushProfileFrames(),
+            this.profileFlushMs,
+          );
+
+          this.applyZoom();
+          this.updateInspector();
+        },
+        beforeUnmount() {
+          window.removeEventListener("keydown", this.onKeyDown);
+          window.removeEventListener("keyup", this.onKeyUp);
+          if (profileFlushTimer) {
+            clearInterval(profileFlushTimer);
+            profileFlushTimer = null;
+          }
+        },
+        watch: {
+          zoom() {
+            this.applyZoom();
+          },
+          showBoxes() {
+            renderPreview(this, this.latestSnapshot);
+          },
+          showMargin() {
+            this.updateInspector();
+            renderPreview(this, this.latestSnapshot);
+          },
+          showPadding() {
+            this.updateInspector();
+            renderPreview(this, this.latestSnapshot);
+          },
+          showDepth() {
+            renderPreview(this, this.latestSnapshot);
+          },
+          depthStep() {
+            if (this.showDepth) {
+              renderPreview(this, this.latestSnapshot);
+            }
+          },
+        },
+        methods: {
+          clearReactivity() {
+            reactivityStore.refs.clear();
+            reactivityStore.components.clear();
+            reactivityStore.edges.clear();
+            this.reactivityRefs = [];
+            this.reactivityComponents = [];
+            this.reactivityEdges = [];
+            this.reactivityLayout = null;
+            this.reactivityStatus = "waiting";
+          },
+          applyReactivityEvent(event) {
+            if (!event) return;
+            if (event.targetId === undefined) return;
+            if (event.componentId === undefined) return;
+            const refId = event.targetId;
+            const compId = event.componentId;
+            if (!reactivityStore.refs.has(refId)) {
+              reactivityStore.refs.set(refId, {
+                id: refId,
+                label: event.targetLabel,
+                tracks: 0,
+                triggers: 0,
+                last: 0,
+              });
+            }
+            if (!reactivityStore.components.has(compId)) {
+              reactivityStore.components.set(compId, {
+                id: compId,
+                label: event.componentName || `Component#${compId}`,
+              });
+            }
+            const refEntry = reactivityStore.refs.get(refId);
+            if (event.kind === "track") refEntry.tracks += 1;
+            if (event.kind === "trigger") refEntry.triggers += 1;
+            refEntry.last = event.time;
+
+            const edgeKey = `${refId}->${compId}`;
+            if (!reactivityStore.edges.has(edgeKey)) {
+              reactivityStore.edges.set(edgeKey, {
+                key: edgeKey,
+                refId,
+                compId,
+                tracks: 0,
+                triggers: 0,
+                last: 0,
+              });
+            }
+            const edge = reactivityStore.edges.get(edgeKey);
+            if (event.kind === "track") edge.tracks += 1;
+            if (event.kind === "trigger") edge.triggers += 1;
+            edge.last = event.time;
+
+            this.syncReactivityGraph();
+          },
+          syncReactivityGraph() {
+            const refs = Array.from(reactivityStore.refs.values()).sort(
+              (a, b) => b.tracks - a.tracks,
+            );
+            const components = Array.from(
+              reactivityStore.components.values(),
+            ).sort((a, b) => a.id - b.id);
+            const edges = Array.from(reactivityStore.edges.values())
+              .sort((a, b) => b.tracks - a.tracks)
+              .map((edge) => ({
+                ...edge,
+                label: `${this.lookupRefLabel(edge.refId)} → ${this.lookupComponentLabel(
+                  edge.compId,
+                )} (track ${edge.tracks}, trigger ${edge.triggers})`,
+              }));
+
+            this.reactivityRefs = refs.map((ref) => ({
+              ...ref,
+              label: ref.label,
+            }));
+            this.reactivityComponents = components;
+            this.reactivityEdges = edges;
+            this.reactivityLayout = this.buildReactivityLayout(
+              this.reactivityRefs,
+              this.reactivityComponents,
+              this.reactivityEdges,
+            );
+            this.reactivityStatus = "live";
+          },
+          lookupComponentLabel(id) {
+            const entry = reactivityStore.components.get(id);
+            return entry?.label ?? `Component#${id}`;
+          },
+          lookupRefLabel(id) {
+            const entry = reactivityStore.refs.get(id);
+            return entry?.label ?? `ref#${id}`;
+          },
+          buildReactivityLayout(refs, components, edges) {
+            const width = 800;
+            const leftX = 140;
+            const rightX = width - 140;
+            const rowHeight = 26;
+            const rows = Math.max(refs.length, components.length, 1);
+            const height = Math.max(220, rows * rowHeight + 40);
+            const refPositions = new Map();
+            const compPositions = new Map();
+            refs.forEach((ref, index) => {
+              refPositions.set(ref.id, {
+                x: leftX,
+                y: 30 + index * rowHeight,
+              });
+            });
+            components.forEach((comp, index) => {
+              compPositions.set(comp.id, {
+                x: rightX,
+                y: 30 + index * rowHeight,
+              });
+            });
+            const now = Date.now();
+            const layoutEdges = edges.map((edge) => {
+              const from = refPositions.get(edge.refId) ?? {
+                x: leftX,
+                y: 30,
+              };
+              const to = compPositions.get(edge.compId) ?? {
+                x: rightX,
+                y: 30,
+              };
+              const age = now - (edge.last || 0);
+              const active = age < 1500;
+              const strokeWidth = Math.min(4, 1 + Math.log10(edge.tracks + 1));
+              return {
+                key: edge.key,
+                x1: from.x + 8,
+                y1: from.y,
+                x2: to.x - 8,
+                y2: to.y,
+                strokeWidth,
+                active,
+                label: edge.label,
+              };
+            });
+            const layoutRefs = refs.map((ref) => {
+              const pos = refPositions.get(ref.id);
+              const active = Date.now() - (ref.last || 0) < 1500;
+              return {
+                key: `ref-${ref.id}`,
+                x: pos.x,
+                y: pos.y,
+                label: ref.label,
+                active,
+              };
+            });
+            const layoutComponents = components.map((comp) => {
+              const pos = compPositions.get(comp.id);
+              return {
+                key: `comp-${comp.id}`,
+                x: pos.x,
+                y: pos.y,
+                label: comp.label,
+                active: false,
+              };
+            });
+            return {
+              width,
+              height,
+              refs: layoutRefs,
+              components: layoutComponents,
+              edges: layoutEdges,
+            };
+          },
+          formatMs(value) {
+            if (!Number.isFinite(value)) return "-";
+            return value.toFixed(2) + "ms";
+          },
+          barWidth(value) {
+            const max = this.profileMaxMs > 0 ? this.profileMaxMs : 1;
+            const pct = Math.max(0, Math.min(100, (value / max) * 100));
+            return pct.toFixed(1) + "%";
+          },
+          recalcProfileStats() {
+            if (this.profileFrames.length === 0) {
+              this.profileMaxMs = 0;
+              this.profileAvgMs = 0;
+              this.profileFps = "-";
+              this.profileLast = null;
+              this.profileStatus = "waiting";
+              return;
+            }
+            let total = 0;
+            let max = 0;
+            for (const frame of this.profileFrames) {
+              total += frame.frameMs;
+              if (frame.frameMs > max) max = frame.frameMs;
+            }
+            const avg = total / this.profileFrames.length;
+            this.profileMaxMs = max;
+            this.profileAvgMs = avg;
+            this.profileFps = avg > 0 ? Math.round(1000 / avg) : "-";
+            this.profileLast =
+              this.profileFrames[this.profileFrames.length - 1];
+            this.profileStatus = "live";
+          },
+          pushProfileFrame(frame) {
+            const maxFrames = 120;
+            this.profileFrames.push(frame);
+            if (this.profileFrames.length > maxFrames) {
+              this.profileFrames.splice(
+                0,
+                this.profileFrames.length - maxFrames,
+              );
+            }
+            this.recalcProfileStats();
+            this.$nextTick(() => {
+              const el = this.$refs.profileListEl;
+              if (el) el.scrollTop = el.scrollHeight;
+            });
+          },
+          flushProfileFrames() {
+            if (profilePending.length === 0) return;
+            const frames = profilePending.splice(0);
+            const maxFrames = 120;
+            this.profileFrames.push(...frames);
+            if (this.profileFrames.length > maxFrames) {
+              this.profileFrames.splice(
+                0,
+                this.profileFrames.length - maxFrames,
+              );
+            }
+            this.recalcProfileStats();
+            this.$nextTick(() => {
+              const el = this.$refs.profileListEl;
+              if (el) el.scrollTop = el.scrollHeight;
+            });
+          },
+          formatFrameTooltip(frame) {
+            return [
+              `frame ${frame.frameMs.toFixed(2)}ms`,
+              `layout ${frame.layoutMs.toFixed(2)}ms`,
+              `render ${frame.renderMs.toFixed(2)}ms`,
+              `diff ${frame.diffMs.toFixed(2)}ms`,
+              `write ${frame.writeMs.toFixed(2)}ms`,
+            ].join(" | ");
+          },
+          setTab(tab) {
+            this.tab = tab;
+          },
+          onPanStart(ev) {
+            if (!this.showDepth) return;
+            const isLeft = ev.button === 0;
+            const isAltButton = ev.button === 1 || ev.button === 2;
+            if (isLeft && !this.panModifierActive) return;
+            if (!isLeft && !isAltButton) return;
+            const scrollEl = ev.currentTarget;
+            if (!(scrollEl instanceof HTMLElement)) return;
+            this.isPanning = true;
+            this.panMoved = true;
+            this.panStartX = ev.clientX;
+            this.panStartY = ev.clientY;
+            this.panScrollLeft = scrollEl.scrollLeft;
+            this.panScrollTop = scrollEl.scrollTop;
+            ev.preventDefault();
+            this.panPointerId = ev.pointerId;
+            scrollEl.setPointerCapture(ev.pointerId);
+          },
+          onPanMove(ev) {
+            if (!this.isPanning || ev.pointerId !== this.panPointerId) return;
+            const scrollEl = ev.currentTarget;
+            if (!(scrollEl instanceof HTMLElement)) return;
+            if (!scrollEl) return;
+            const dx = ev.clientX - this.panStartX;
+            const dy = ev.clientY - this.panStartY;
+            if (Math.abs(dx) > 3 || Math.abs(dy) > 3) this.panMoved = true;
+            scrollEl.scrollLeft = this.panScrollLeft - dx;
+            scrollEl.scrollTop = this.panScrollTop - dy;
+          },
+          onPanEnd(ev) {
+            if (!this.isPanning) return;
+            const scrollEl = ev.currentTarget;
+            if (scrollEl instanceof HTMLElement && this.panPointerId !== null) {
+              scrollEl.releasePointerCapture(this.panPointerId);
+            }
+            this.panPointerId = null;
+            this.isPanning = false;
+            setTimeout(() => {
+              this.panMoved = false;
+            }, 0);
+          },
+          requestSnapshot() {
+            try {
+              this.socket?.send(JSON.stringify({ type: "requestSnapshot" }));
+            } catch {}
+          },
+          onStyleDetailsToggle(ev) {
+            const target = ev?.target;
+            if (target instanceof HTMLDetailsElement) {
+              this.styleDetailsOpen = target.open;
+            }
+          },
+          onPreviewClick(ev) {
+            if (this.panMoved) {
+              this.panMoved = false;
+              return;
+            }
+            const target = ev.target;
+            if (!(target instanceof Element)) return;
+            const nodeEl = target.closest(".node");
+            if (!nodeEl) return;
+            const k = nodeEl.dataset.key;
+            this.selectedKey = typeof k === "string" ? k : null;
+            this.updateInspector();
+            renderPreview(this, this.latestSnapshot);
+          },
+          appendLog(line) {
+            const ts = new Date(line.timestamp).toISOString().slice(11, 19);
+            this.logs.push({
+              id: (this.logSeq += 1),
+              type: line.type === "stderr" ? "stderr" : "stdout",
+              display: "[" + ts + "] " + line.text,
+            });
+            const max = 400;
+            while (this.logs.length > max) this.logs.shift();
+            this.$nextTick(() => {
+              const el = this.$refs.logsEl;
+              if (el) el.scrollTop = el.scrollHeight;
+            });
+          },
+          onSocketMessage(ev) {
+            let msg;
+            try {
+              msg = JSON.parse(ev.data);
+            } catch {
+              return;
+            }
+            if (!msg || typeof msg !== "object") return;
+            if (msg.type === "log" && msg.line) this.appendLog(msg.line);
+            if (msg.type === "logs" && Array.isArray(msg.lines))
+              msg.lines.forEach((line) => this.appendLog(line));
+            if (msg.type === "profile") {
+              if (Array.isArray(msg.frames)) {
+                profilePending.push(...msg.frames);
+              } else if (msg.frame) {
+                profilePending.push(msg.frame);
+              }
+            }
+            if (msg.type === "reactivity") {
+              if (Array.isArray(msg.events)) {
+                for (const event of msg.events) {
+                  this.applyReactivityEvent(event);
+                }
+              } else if (msg.event) {
+                this.applyReactivityEvent(msg.event);
+              }
+            }
+            if (msg.type === "snapshot" && msg.snapshot) {
+              this.latestSnapshot = msg.snapshot;
+              const indexed = indexTree(this.latestSnapshot.tree);
+              this.nodeByKey = indexed.nodes;
+              this.parentByKey = indexed.parents;
+              this.childrenByKey = indexed.children;
+              this.snapshotText = JSON.stringify(msg.snapshot, null, 2);
+              if (
+                this.selectedKey &&
+                !this.latestSnapshot.layout?.[this.selectedKey]
+              ) {
+                this.selectedKey = null;
+              }
+              this.updateInspector();
+              renderPreview(this, this.latestSnapshot);
+            }
+          },
+          updateInspector() {
+            const key = this.selectedKey;
+            if (!this.latestSnapshot || !key) {
+              this.selectedType = "(none)";
+              this.styleRows = [{ id: 0, key: "hint", value: "click a node" }];
+              this.styleDetailsOpen = false;
+              return;
+            }
+
+            const node = this.nodeByKey.get(key);
+            const box = this.latestSnapshot.layout?.[key];
+            const style = node?.layoutStyle ?? null;
+            const viewStyle = node?.viewStyle ?? null;
+            const margin = normalizeInsets(style?.margin);
+            const padding = normalizeInsets(style?.padding);
+            const parentKey = this.parentByKey.get(key);
+            const parentNode = parentKey ? this.nodeByKey.get(parentKey) : null;
+            const childKeys = this.childrenByKey.get(key) || [];
+
+            this.selectedType = String(node?.type ?? "(unknown)");
+
+            const rows = [];
+            addSection(rows, "node");
+            addRow(rows, "key", fmt(key));
+            addRow(rows, "type", fmt(node?.type));
+            addRow(
+              rows,
+              "parent",
+              parentKey
+                ? `${parentKey} (${parentNode?.type ?? "?"})`
+                : "(none)",
+            );
+            addRow(
+              rows,
+              "children",
+              childKeys.length ? childKeys.join(", ") : "(none)",
+            );
+
+            const layoutRows = [];
+            addRowIf(
+              layoutRows,
+              "box",
+              box ? `${box.x},${box.y} ${box.width}x${box.height}` : "(none)",
+            );
+            addRowIf(layoutRows, "display", fmt(style?.display));
+            addRowIf(layoutRows, "position", fmt(style?.position));
+            addRowIf(layoutRows, "flexDirection", fmt(style?.flexDirection));
+            addRowIf(layoutRows, "flexWrap", fmt(style?.flexWrap));
+            addRowIf(layoutRows, "flexGrow", fmt(style?.flexGrow));
+            addRowIf(layoutRows, "flexShrink", fmt(style?.flexShrink));
+            addRowIf(layoutRows, "flexBasis", fmt(style?.flexBasis));
+            addRowIf(layoutRows, "justifyContent", fmt(style?.justifyContent));
+            addRowIf(layoutRows, "alignItems", fmt(style?.alignItems));
+            addRowIf(layoutRows, "alignSelf", fmt(style?.alignSelf));
+            addRowIf(layoutRows, "gap", fmt(style?.gap));
+            addRowIf(layoutRows, "width", fmt(style?.width));
+            addRowIf(layoutRows, "height", fmt(style?.height));
+            addRowIf(layoutRows, "minWidth", fmt(style?.minWidth));
+            addRowIf(layoutRows, "minHeight", fmt(style?.minHeight));
+            addRowIf(layoutRows, "maxWidth", fmt(style?.maxWidth));
+            addRowIf(layoutRows, "maxHeight", fmt(style?.maxHeight));
+            const hasMargin =
+              margin.top || margin.right || margin.bottom || margin.left;
+            const hasPadding =
+              padding.top || padding.right || padding.bottom || padding.left;
+            if (this.showMargin && hasMargin) {
+              addRowIf(layoutRows, "margin", JSON.stringify(margin));
+            }
+            if (this.showPadding && hasPadding) {
+              addRowIf(layoutRows, "padding", JSON.stringify(padding));
+            }
+            if (style?.layoutBoundary !== undefined) {
+              addRowIf(
+                layoutRows,
+                "layoutBoundary",
+                fmt(style?.layoutBoundary),
+              );
+            }
+            if (layoutRows.length > 0) {
+              addSection(rows, "layout");
+              rows.push(...layoutRows);
+            }
+
+            const styleRows = [];
+            addRowIf(styleRows, "foreground", fmt(viewStyle?.foreground));
+            addRowIf(styleRows, "background", fmt(viewStyle?.background));
+            addRowIf(styleRows, "outline", fmt(viewStyle?.outline));
+            addRowIf(styleRows, "stack", fmt(viewStyle?.stack));
+            if (styleRows.length > 0) {
+              addSection(rows, "style");
+              rows.push(...styleRows);
+            }
+
+            this.styleRows = rows.map((row, index) => ({
+              id: index,
+              ...row,
+            }));
+            this.styleDetailsOpen =
+              layoutRows.length > 0 || styleRows.length > 0;
+          },
+          applyZoom() {
+            const previewStage = this.$refs.previewStage;
+            if (!previewStage) return;
+            const scale = Math.max(0.6, Math.min(2, Number(this.zoom) / 100));
+
+            previewStage.style.fontSize = baseFontSizePx * scale + "px";
+            previewStage.style.lineHeight = String(baseLineHeight);
+
+            const measured = measureCell(previewStage);
+            if (measured) {
+              this.cellW = measured.w;
+              this.cellH = measured.h;
+            }
+            renderPreview(this, this.latestSnapshot);
+          },
+        },
+      }).mount("#app");
+    </script>
+  </body>
+</html>

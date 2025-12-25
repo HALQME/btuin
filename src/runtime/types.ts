@@ -10,6 +10,11 @@ export interface ILoopManager {
   start(rows: number, cols: number): void;
   stop(): void;
   cleanupTerminal?(): void;
+  /**
+   * Optional async preparation step (used by dev tooling to initialize
+   * sidecar servers before the TUI begins rendering).
+   */
+  prepare?(): Promise<void>;
 }
 
 export type RenderMode = "fullscreen" | "inline";
@@ -22,6 +27,11 @@ export type AppConfig<State> = {
   onExit?: () => void;
   profile?: ProfileOptions;
   inputParser?: InputParser;
+  /**
+   * Internal/optional: dev runners may set this (e.g. via env) to enable extra tooling.
+   * The core runtime treats it as opaque.
+   */
+  devtools?: unknown;
   init: (ctx: ComponentInitContext) => State;
   render: (state: State) => ViewElement;
 };
@@ -53,4 +63,9 @@ export type CreateAppOptions = {
   platform?: PlatformAdapter;
   profile?: ProfileOptions;
   inputParser?: InputParser;
+  /**
+   * Internal/optional: dev runners may set this (e.g. via env) to enable extra tooling.
+   * The core runtime treats it as opaque.
+   */
+  devtools?: unknown;
 };

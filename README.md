@@ -70,6 +70,8 @@ await app.mount({ inline: true, inlineCleanupOnExit: true });
 
 - [**Documentation**](./docs/) (Architecture, Roadmap)
 - [**Inline Mode**](./docs/inline-mode.md)
+- [**DevTools**](./docs/devtools.md)
+- [**Hot Reload**](./docs/hot-reload.md)
 - [**GitHub**](https://github.com/HALQME/btuin) (Source Code, Issues)
 
 ## Language

@@ -17,12 +17,14 @@ import { expect, describe, it, beforeEach, afterEach } from "bun:test";
 
 describe("Output Capture", () => {
   // Mock process.stdout.write and process.stderr.write
-  const originalStdoutWrite = process.stdout.write;
-  const originalStderrWrite = process.stderr.write;
+  let originalStdoutWrite: typeof process.stdout.write;
+  let originalStderrWrite: typeof process.stderr.write;
   let stdoutOutput = "";
   let stderrOutput = "";
 
   beforeEach(() => {
+    originalStdoutWrite = process.stdout.write;
+    originalStderrWrite = process.stderr.write;
     stdoutOutput = "";
     stderrOutput = "";
     process.stdout.write = ((str: string) => {
@@ -145,6 +147,19 @@ describe("Output Capture", () => {
       expect(capture.getLines()[1]?.text).toBe("3");
 
       capture.dispose();
+    });
+
+    it("should notify subscribers for new lines", (done) => {
+      const capture = createConsoleCapture({ maxLines: 10 });
+      const dispose = capture.subscribe((line) => {
+        expect(line.text).toBe("hello");
+        expect(line.type).toBe("stdout");
+        dispose();
+        capture.dispose();
+        done();
+      });
+
+      process.stdout.write("hello\n");
     });
   });
 

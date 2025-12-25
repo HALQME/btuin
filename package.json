@@ -1,12 +1,16 @@
 {
   "name": "btuin",
-  "version": "0.1.0-alpha.1",
+  "version": "0.1.0-alpha.2",
   "private": false,
   "repository": {
     "type": "git",
     "url": "git+https://github.com/HALQME/btuin.git"
   },
+  "bin": {
+    "btuin": "bin/btuin"
+  },
   "files": [
+    "bin",
     "README.md",
     "src",
     "tsconfig.json"
@@ -15,6 +19,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./components": "./src/components/index.ts",
+    "./dev": "./src/dev/index.ts",
+    "./hooks": "./src/hooks/index.ts",
     "./layout": "./src/layout/index.ts",
     "./layout-engine": "./src/layout-engine/index.ts",
     "./reactivity": "./src/reactivity/index.ts",

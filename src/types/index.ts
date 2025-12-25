@@ -28,11 +28,13 @@ export type {
 export type { PlatformAdapter } from "../runtime/platform-adapter";
 export type { TerminalAdapter } from "../runtime/terminal-adapter";
 export type { FrameMetrics, ProfileOptions, ProfileOutput } from "../runtime/profiler";
+export type * from "../hooks/types";
 
 export type { Buffer2D, ColorValue, OutlineOptions } from "../renderer/types";
 
 export type { InputParser } from "../terminal/parser/types";
 export type { KeyEvent, KeyHandler as TerminalKeyHandler } from "../terminal/types/key-event";
+export type { ConsoleLine } from "../terminal/capture";
 
 export type { BaseView, ViewProps } from "../view/base";
 export type { FocusContext, FocusHandler, FocusTarget } from "../view/types/focus";

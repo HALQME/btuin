@@ -20,6 +20,7 @@ let currentInstance: ComponentInstance | null = null;
 export interface ComponentInstance {
   uid: number;
   isMounted: boolean;
+  name?: string;
 
   mountedHooks: LifecycleHook[];
   unmountedHooks: LifecycleHook[];

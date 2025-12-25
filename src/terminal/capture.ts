@@ -341,6 +341,12 @@ export interface ConsoleCaptureHandle {
    * Stop capturing and clean up listeners.
    */
   dispose(): void;
+
+  /**
+   * Subscribe to newly captured console lines.
+   * Returns a cleanup function.
+   */
+  subscribe(listener: (line: ConsoleLine) => void): () => void;
 }
 
 /**
@@ -358,22 +364,36 @@ export interface ConsoleCaptureHandle {
 export function createConsoleCapture(options?: { maxLines?: number }): ConsoleCaptureHandle {
   const maxLines = options?.maxLines ?? 1000;
   const lines: ConsoleLine[] = [];
+  const subscribers = new Set<(line: ConsoleLine) => void>();
+
+  const notify = (line: ConsoleLine) => {
+    for (const listener of subscribers) {
+      try {
+        listener(line);
+      } catch {
+        // ignore subscriber errors
+      }
+    }
+  };
 
   // Capture stdout
   const cleanupStdout = onStdout((text) => {
     const textLines = text.split("\n");
     for (const line of textLines) {
       if (line) {
-        lines.push({
+        const entry: ConsoleLine = {
           text: line,
           type: "stdout",
           timestamp: Date.now(),
-        });
+        };
+        lines.push(entry);
 
         // Limit buffer size
         if (lines.length > maxLines) {
           lines.shift();
         }
+
+        notify(entry);
       }
     }
   });
@@ -383,16 +403,19 @@ export function createConsoleCapture(options?: { maxLines?: number }): ConsoleCa
     const textLines = text.split("\n");
     for (const line of textLines) {
       if (line) {
-        lines.push({
+        const entry: ConsoleLine = {
           text: line,
           type: "stderr",
           timestamp: Date.now(),
-        });
+        };
+        lines.push(entry);
 
         // Limit buffer size
         if (lines.length > maxLines) {
           lines.shift();
         }
+
+        notify(entry);
       }
     }
   });
@@ -411,7 +434,13 @@ export function createConsoleCapture(options?: { maxLines?: number }): ConsoleCa
     dispose: () => {
       cleanupStdout();
       cleanupStderr();
+      subscribers.clear();
       lines.length = 0;
+    },
+
+    subscribe: (listener) => {
+      subscribers.add(listener);
+      return () => subscribers.delete(listener);
     },
   };
 }

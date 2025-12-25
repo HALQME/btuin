@@ -28,7 +28,9 @@ This repo uses `mise` to pin toolchains (see `mise.toml`).
 - TypeScript (ESM) with strict type-checking (`tsconfig.json`).
 - Prefer small, composable modules and re-export via `src/**/index.ts`.
 - Use lowercase filenames; use `kebab-case` for multi-word files (e.g., `render-loop.ts`).
+- Run `mise run test && mise run precommit` after any edit.
 - Run `mise run format` before opening a PR; let `oxfmt` decide whitespace.
+- This project targets Bun-native development; optimizing to remove Bun dependencies from the core package is not a goal.
 
 ## Testing Guidelines
 
