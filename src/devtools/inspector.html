@@ -463,33 +463,17 @@
               <span class="pill">Avg {{ formatMs(profileAvgMs) }}</span>
               <span class="pill">Max {{ formatMs(profileMaxMs) }}</span>
               <span class="pill">FPS {{ profileFps }}</span>
-              <span class="pill"
-                >Nodes {{ profileLast?.nodeCount ?? "-" }}</span
-              >
-              <span class="pill"
-                >Bytes {{ profileLast?.outputBytes ?? "-" }}</span
-              >
+              <span class="pill">Nodes {{ profileLast?.nodeCount ?? "-" }}</span>
+              <span class="pill">Bytes {{ profileLast?.outputBytes ?? "-" }}</span>
             </div>
             <div class="profile-legend">
-              <span class="legend-item"
-                ><span class="swatch layout"></span>Layout</span
-              >
-              <span class="legend-item"
-                ><span class="swatch render"></span>Render</span
-              >
-              <span class="legend-item"
-                ><span class="swatch diff"></span>Diff</span
-              >
-              <span class="legend-item"
-                ><span class="swatch write"></span>Write</span
-              >
+              <span class="legend-item"><span class="swatch layout"></span>Layout</span>
+              <span class="legend-item"><span class="swatch render"></span>Render</span>
+              <span class="legend-item"><span class="swatch diff"></span>Diff</span>
+              <span class="legend-item"><span class="swatch write"></span>Write</span>
             </div>
             <div class="profile-list" ref="profileListEl">
-              <div
-                v-for="frame in profileFrames"
-                :key="frame.id"
-                class="profile-row"
-              >
+              <div v-for="frame in profileFrames" :key="frame.id" class="profile-row">
                 <span class="profile-meta">#{{ frame.id }}</span>
                 <div class="profile-bar" :title="formatFrameTooltip(frame)">
                   <span
@@ -500,10 +484,7 @@
                     class="profile-seg render"
                     :style="{ width: barWidth(frame.renderMs) }"
                   ></span>
-                  <span
-                    class="profile-seg diff"
-                    :style="{ width: barWidth(frame.diffMs) }"
-                  ></span>
+                  <span class="profile-seg diff" :style="{ width: barWidth(frame.diffMs) }"></span>
                   <span
                     class="profile-seg write"
                     :style="{ width: barWidth(frame.writeMs) }"
@@ -518,40 +499,22 @@
           <div class="row" style="margin-bottom: 6px">
             <h2 style="margin: 0">Snapshot</h2>
             <div class="tabs">
-              <button
-                :aria-pressed="tab === 'preview'"
-                @click="setTab('preview')"
-              >
-                Preview
-              </button>
-              <button :aria-pressed="tab === 'json'" @click="setTab('json')">
-                JSON
-              </button>
-              <button
-                :aria-pressed="tab === 'reactivity'"
-                @click="setTab('reactivity')"
-              >
+              <button :aria-pressed="tab === 'preview'" @click="setTab('preview')">Preview</button>
+              <button :aria-pressed="tab === 'json'" @click="setTab('json')">JSON</button>
+              <button :aria-pressed="tab === 'reactivity'" @click="setTab('reactivity')">
                 Reactivity
               </button>
             </div>
           </div>
           <div v-show="tab === 'preview'" class="panel" id="previewPanel">
             <div class="controls">
-              <label
-                >Zoom
-                <input v-model.number="zoom" type="range" min="60" max="200"
-              /></label>
+              <label>Zoom <input v-model.number="zoom" type="range" min="60" max="200" /></label>
               <label><input v-model="showBoxes" type="checkbox" /> Boxes</label>
-              <label
-                ><input v-model="showMargin" type="checkbox" /> Margin</label
-              >
-              <label
-                ><input v-model="showPadding" type="checkbox" /> Padding</label
-              >
+              <label><input v-model="showMargin" type="checkbox" /> Margin</label>
+              <label><input v-model="showPadding" type="checkbox" /> Padding</label>
               <label><input v-model="showDepth" type="checkbox" /> 3D</label>
               <label v-show="showDepth"
-                >Depth
-                <input v-model.number="depthStep" type="range" min="4" max="30"
+                >Depth <input v-model.number="depthStep" type="range" min="4" max="30"
               /></label>
               <span v-show="showDepth" class="pill">Mid/Right Drag</span>
               <span class="pill">{{ previewSize }}</span>
@@ -574,16 +537,10 @@
             </div>
             <div class="inspect">
               <div class="row">
-                <span class="pill"
-                  >Selected: {{ selectedKey || "(none)" }}</span
-                >
+                <span class="pill">Selected: {{ selectedKey || "(none)" }}</span>
                 <span class="pill">Type: {{ selectedType }}</span>
               </div>
-              <details
-                :open="styleDetailsOpen"
-                ref="styleDetails"
-                @toggle="onStyleDetailsToggle"
-              >
+              <details :open="styleDetailsOpen" ref="styleDetails" @toggle="onStyleDetailsToggle">
                 <summary>Styles</summary>
                 <table class="style-table">
                   <tr v-for="row in styleRows" :key="row.id">
@@ -628,11 +585,7 @@
                     :cy="node.y"
                     r="7"
                   ></circle>
-                  <text
-                    class="reactivity-label"
-                    :x="node.x + 12"
-                    :y="node.y + 4"
-                  >
+                  <text class="reactivity-label" :x="node.x + 12" :y="node.y + 4">
                     {{ node.label }}
                   </text>
                 </g>
@@ -644,21 +597,14 @@
                     :cy="node.y"
                     r="7"
                   ></circle>
-                  <text
-                    class="reactivity-label"
-                    :x="node.x - 12"
-                    :y="node.y + 4"
-                    text-anchor="end"
-                  >
+                  <text class="reactivity-label" :x="node.x - 12" :y="node.y + 4" text-anchor="end">
                     {{ node.label }}
                   </text>
                 </g>
               </svg>
             </div>
             <div class="reactivity-list">
-              <div v-for="edge in reactivityEdges" :key="edge.key">
-                {{ edge.label }}
-              </div>
+              <div v-for="edge in reactivityEdges" :key="edge.key">{{ edge.label }}</div>
             </div>
           </div>
         </section>

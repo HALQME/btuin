@@ -247,9 +247,7 @@ export function setupDevtoolsServer(
           }
           if (reactivityEvents.length > 0) {
             try {
-              ws.send(
-                safeJson({ type: "reactivity", events: reactivityEvents }),
-              );
+              ws.send(safeJson({ type: "reactivity", events: reactivityEvents }));
             } catch {
               // ignore
             }
@@ -337,10 +335,7 @@ export function setupDevtoolsServer(
     setReactivityEvent: (event) => {
       reactivityEvents.push(event);
       if (reactivityEvents.length > maxReactivityEvents) {
-        reactivityEvents.splice(
-          0,
-          reactivityEvents.length - maxReactivityEvents,
-        );
+        reactivityEvents.splice(0, reactivityEvents.length - maxReactivityEvents);
       }
       broadcast({ type: "reactivity", event });
     },

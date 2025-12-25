@@ -36,9 +36,7 @@ function emit(kind: ReactivityEvent["kind"], target: object, key: string) {
   const targetId = getTargetId(target);
   const targetLabel = refLabels.get(target) || `ref#${targetId}`;
   const componentName =
-    meta.componentName && String(meta.componentName).trim().length > 0
-      ? meta.componentName
-      : "App";
+    meta.componentName && String(meta.componentName).trim().length > 0 ? meta.componentName : "App";
 
   const event: ReactivityEvent = {
     kind,
