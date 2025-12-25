@@ -170,6 +170,7 @@ export class LoopManager implements ILoopManager {
         uiSuspended = true;
         const seq = inline.cleanup();
         if (seq) terminal.write(seq);
+        renderer.invalidate();
       };
 
       if (terminal.onStdout && terminal.writeStdout) {

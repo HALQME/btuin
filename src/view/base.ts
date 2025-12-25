@@ -2,6 +2,79 @@ import type { KeyEventHook } from "../components/lifecycle";
 import type { Dimension, LayoutStyle } from "../layout-engine/types";
 import type { OutlineOptions } from "../renderer/types";
 import type { KeyEvent } from "../terminal/types/key-event";
+import { markHasScrollRegion, markLayoutDirty, markRenderDirty } from "./dirty";
+
+const layoutStyleKeys = new Set<string>([
+  "display",
+  "position",
+  "width",
+  "height",
+  "minWidth",
+  "minHeight",
+  "maxWidth",
+  "maxHeight",
+  "layoutBoundary",
+  "padding",
+  "margin",
+  "flexDirection",
+  "flexWrap",
+  "flexGrow",
+  "flexShrink",
+  "flexBasis",
+  "justifyContent",
+  "alignItems",
+  "alignSelf",
+  "gap",
+  "stack",
+]);
+
+const renderStyleKeys = new Set<string>(["foreground", "background", "outline", "scrollRegion"]);
+
+function createDirtyStyleProxy<T extends object>(style: T): T {
+  return new Proxy(style, {
+    set(target, prop, value) {
+      if (typeof prop === "string") {
+        // Avoid dirtying on idempotent writes.
+        const prev = (target as any)[prop];
+        if (prev === value) return true;
+        (target as any)[prop] = value;
+
+        if (layoutStyleKeys.has(prop)) {
+          markLayoutDirty();
+        } else if (renderStyleKeys.has(prop)) {
+          if (prop === "scrollRegion" && value) markHasScrollRegion();
+          markRenderDirty();
+        } else {
+          // Unknown style keys are treated as layout-affecting for safety.
+          markLayoutDirty();
+        }
+        return true;
+      }
+
+      // Symbol keys: be conservative.
+      (target as any)[prop as any] = value;
+      markLayoutDirty();
+      return true;
+    },
+    deleteProperty(target, prop) {
+      if (typeof prop === "string") {
+        if (!Object.prototype.hasOwnProperty.call(target, prop)) return true;
+        delete (target as any)[prop];
+        if (layoutStyleKeys.has(prop)) {
+          markLayoutDirty();
+        } else if (renderStyleKeys.has(prop)) {
+          markRenderDirty();
+        } else {
+          markLayoutDirty();
+        }
+        return true;
+      }
+      delete (target as any)[prop as any];
+      markLayoutDirty();
+      return true;
+    },
+  });
+}
 
 // 1. 基本的なプロパティ定義（スタイリング以外）
 export interface ViewProps {
@@ -30,14 +103,14 @@ export interface ViewProps {
 // 名前を ViewElement から BaseView に変更して衝突回避
 export abstract class BaseView implements ViewProps {
   // 実際のデータ保持場所
-  public style: NonNullable<ViewProps["style"]> = {};
+  public style: NonNullable<ViewProps["style"]> = createDirtyStyleProxy({});
   public key?: string;
   public identifier?: string;
   public focusKey?: string;
   public keyHooks: KeyEventHook[] = [];
 
   constructor(props: ViewProps = {}) {
-    this.style = { ...props.style };
+    this.style = createDirtyStyleProxy({ ...props.style });
     const key = props.key ?? props.identifier;
     if (key) {
       this.key = key;
@@ -106,12 +179,14 @@ export abstract class BaseView implements ViewProps {
   setKey(value: string): this {
     this.key = value;
     this.identifier = value;
+    markLayoutDirty();
     return this;
   }
 
   setIdentifier(value: string): this {
     this.key = value;
     this.identifier = value;
+    markLayoutDirty();
     return this;
   }
 

@@ -4,6 +4,7 @@ import { layout, renderElement } from "../layout";
 import type { DiffStats } from "../renderer/diff";
 import type { Buffer2D } from "../renderer/types";
 import { isBlock, type ViewElement } from "../view/types/elements";
+import { getDirtyVersions, getHasScrollRegion } from "../view/dirty";
 import { createErrorContext } from "./error-boundary";
 import type { Profiler } from "./profiler";
 import type { ComputedLayout } from "../layout-engine/types";
@@ -103,9 +104,16 @@ export function createRenderer<State>(config: RenderLoopConfig<State>) {
   let prevRootElement: ViewElement | null = null;
   let prevLayoutResult: ComputedLayout | null = null;
   let prevLayoutSizeKey: string | null = null;
+  let prevLayoutAtLayoutVersion: number | null = null;
   let prevAbsRects: Map<string, Rect> | null = null;
   let prevRenderSigs: Map<string, string> | null = null;
+  let prevDirtyVersions: { layout: number; render: number } | null = null;
   let renderEffect: ReactiveEffect | null = null;
+  let invalidated = false;
+
+  function invalidate() {
+    invalidated = true;
+  }
 
   function resolvePadding(padding: unknown): {
     top: number;
@@ -233,11 +241,13 @@ export function createRenderer<State>(config: RenderLoopConfig<State>) {
    */
   function renderOnce(forceFullRedraw = false): void {
     try {
+      const localForceFullRedraw = forceFullRedraw || invalidated;
+      invalidated = false;
       const newSize = config.getSize();
       const sizeChanged =
         newSize.rows !== state.currentSize.rows || newSize.cols !== state.currentSize.cols;
 
-      if (sizeChanged || forceFullRedraw) {
+      if (sizeChanged || localForceFullRedraw) {
         // When size changes, re-create a pool bound to the new dimensions
         state.currentSize = newSize;
         pool = deps.getGlobalBufferPool(state.currentSize.rows, state.currentSize.cols);
@@ -248,6 +258,7 @@ export function createRenderer<State>(config: RenderLoopConfig<State>) {
       }
 
       const rootElement = config.view(config.getState());
+      const dirtyVersions = getDirtyVersions();
       const layoutSizeKey = `${state.currentSize.cols}x${state.currentSize.rows}`;
 
       const nodeCount =
@@ -256,11 +267,26 @@ export function createRenderer<State>(config: RenderLoopConfig<State>) {
           : undefined;
       const frame = config.profiler?.beginFrame(state.currentSize, { nodeCount }) ?? null;
 
+      if (
+        !sizeChanged &&
+        !localForceFullRedraw &&
+        prevRootElement &&
+        rootElement === prevRootElement &&
+        prevDirtyVersions &&
+        prevLayoutSizeKey === layoutSizeKey &&
+        dirtyVersions.layout === prevDirtyVersions.layout &&
+        dirtyVersions.render === prevDirtyVersions.render
+      ) {
+        config.profiler?.endFrame(frame);
+        return;
+      }
+
       const layoutResult =
         rootElement === prevRootElement &&
         prevLayoutResult &&
         prevLayoutSizeKey === layoutSizeKey &&
-        !sizeChanged
+        !sizeChanged &&
+        prevLayoutAtLayoutVersion === dirtyVersions.layout
           ? prevLayoutResult
           : (config.profiler?.measure(frame, "layoutMs", () =>
               deps.layout(rootElement, {
@@ -276,17 +302,8 @@ export function createRenderer<State>(config: RenderLoopConfig<State>) {
       prevRootElement = rootElement;
       prevLayoutResult = layoutResult;
       prevLayoutSizeKey = layoutSizeKey;
-
-      const previousRects = prevAbsRects;
-      const previousSigs = prevRenderSigs;
-      const {
-        rects: absRects,
-        sigs,
-        scrollRegion,
-      } = collectAbsRectsAndFindScrollRegion(rootElement, layoutResult);
-
-      prevAbsRects = absRects;
-      prevRenderSigs = sigs;
+      prevDirtyVersions = dirtyVersions;
+      prevLayoutAtLayoutVersion = dirtyVersions.layout;
 
       try {
         config.onLayout?.({ size: state.currentSize, rootElement, layoutMap: layoutResult });
@@ -309,9 +326,28 @@ export function createRenderer<State>(config: RenderLoopConfig<State>) {
         height: state.currentSize.rows,
       };
 
+      const previousRects = prevAbsRects;
+      const previousSigs = prevRenderSigs;
+      let absRects: Map<string, Rect> | null = null;
+      let sigs: Map<string, string> | null = null;
+      let scrollRegion: { band: { top: number; bottom: number }; fullWidth: boolean } | null = null;
+      if (!sizeChanged && !localForceFullRedraw && getHasScrollRegion()) {
+        const collected = collectAbsRectsAndFindScrollRegion(rootElement, layoutResult);
+        absRects = collected.rects;
+        sigs = collected.sigs;
+        scrollRegion = collected.scrollRegion;
+        prevAbsRects = absRects;
+        prevRenderSigs = sigs;
+      } else {
+        // Avoid carrying stale maps across resizes/full redraws and don't pay the traversal cost
+        // when scroll regions are not used.
+        prevAbsRects = null;
+        prevRenderSigs = null;
+      }
+
       const tryScrollFastPath = (): { clips: Rect[] } | null => {
         if (process.env.BTUIN_DISABLE_SCROLL_FASTPATH === "1") return null;
-        if (sizeChanged || forceFullRedraw) return null;
+        if (sizeChanged || localForceFullRedraw) return null;
         if (!previousRects || !absRects || !scrollRegion) return null;
         if (!scrollRegion.fullWidth) return null;
 
@@ -475,7 +511,7 @@ export function createRenderer<State>(config: RenderLoopConfig<State>) {
           }
         : undefined;
 
-      const prevForDiff = forceFullRedraw
+      const prevForDiff = localForceFullRedraw
         ? new deps.FlatBuffer(state.currentSize.rows, state.currentSize.cols)
         : state.prevBuffer;
 
@@ -483,22 +519,15 @@ export function createRenderer<State>(config: RenderLoopConfig<State>) {
         config.profiler?.measure(frame, "diffMs", () =>
           deps.renderDiff(prevForDiff, buf, diffStats),
         ) ?? deps.renderDiff(prevForDiff, buf);
-      const safeOutput =
-        output === ""
-          ? deps.renderDiff(
-              new deps.FlatBuffer(state.currentSize.rows, state.currentSize.cols),
-              buf,
-            )
-          : output;
       if (frame && diffStats) {
         config.profiler?.recordDiffStats(frame, diffStats);
       }
-      if (safeOutput) {
-        config.profiler?.recordOutput(frame, safeOutput);
+      if (output) {
+        config.profiler?.recordOutput(frame, output);
         if (config.profiler && frame) {
-          config.profiler.measure(frame, "writeMs", () => config.write(safeOutput));
+          config.profiler.measure(frame, "writeMs", () => config.write(output));
         } else {
-          config.write(safeOutput);
+          config.write(output);
         }
       }
 
@@ -536,6 +565,7 @@ export function createRenderer<State>(config: RenderLoopConfig<State>) {
   return {
     render,
     renderOnce,
+    invalidate,
     dispose,
     getState,
   };
