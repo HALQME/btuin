@@ -8,6 +8,7 @@ export interface DiffStats {
   fgChanges: number;
   bgChanges: number;
   resets: number;
+  scrollOps?: number;
   ops: number;
 }
 
@@ -43,14 +44,36 @@ export function renderDiff(prev: Buffer2D, next: Buffer2D, stats?: DiffStats): s
     stats.fgChanges = 0;
     stats.bgChanges = 0;
     stats.resets = 0;
+    stats.scrollOps = 0;
     stats.ops = 0;
   }
 
   const asciiFastPath = prev.isAsciiOnly() && next.isAsciiOnly();
+  const scroll =
+    !sizeChanged && process.env.BTUIN_DISABLE_DECSTBM !== "1"
+      ? detectVerticalScrollRegion(prev, next, asciiFastPath)
+      : null;
+  const rowMap = scroll ? buildScrollRowMap(rows, scroll) : null;
+  const scrollPrefix = scroll ? buildDecstbmScrollPrefix(scroll) : "";
+
   if (asciiFastPath) {
-    const asciiOutput = renderDiffAscii(prev, next, rows, cols, sizeChanged, stats);
+    const asciiOutput = renderDiffAscii(
+      prev,
+      next,
+      rows,
+      cols,
+      sizeChanged,
+      stats,
+      rowMap,
+      scrollPrefix,
+    );
     if (stats) {
-      stats.ops = stats.cursorMoves + stats.fgChanges + stats.bgChanges + stats.resets;
+      stats.ops =
+        stats.cursorMoves +
+        stats.fgChanges +
+        stats.bgChanges +
+        stats.resets +
+        (stats.scrollOps ?? 0);
     }
     return asciiOutput;
   }
@@ -61,6 +84,10 @@ export function renderDiff(prev: Buffer2D, next: Buffer2D, stats?: DiffStats): s
 
   // Local output buffer to batch terminal writes
   const out: string[] = [];
+  if (scrollPrefix) {
+    out.push(scrollPrefix);
+    if (stats) stats.scrollOps = (stats.scrollOps ?? 0) + 5;
+  }
 
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
@@ -69,18 +96,19 @@ export function renderDiff(prev: Buffer2D, next: Buffer2D, stats?: DiffStats): s
       if (r === rows - 1 && c === cols - 1) continue;
 
       const idx = r * cols + c;
+      const prevIdx = mapPrevIndex(rowMap, cols, r, c);
 
       const nextWidth = next.widths[idx];
       if (nextWidth === 0) continue;
 
-      const prevWidth = prev.widths[idx] ?? 0;
+      const prevWidth = prevIdx === -1 ? 1 : (prev.widths[prevIdx] ?? 0);
       const nextGlyphKey = next.glyphKeyAtIndex(idx);
-      const prevGlyphKey = prev.glyphKeyAtIndex(idx);
+      const prevGlyphKey = prevIdx === -1 ? 32 : prev.glyphKeyAtIndex(prevIdx);
 
       const nextFg = next.fg[idx];
       const nextBg = next.bg[idx];
-      const prevFg = prev.fg[idx];
-      const prevBg = prev.bg[idx];
+      const prevFg = prevIdx === -1 ? undefined : prev.fg[prevIdx];
+      const prevBg = prevIdx === -1 ? undefined : prev.bg[prevIdx];
 
       const needsDraw =
         sizeChanged ||
@@ -129,7 +157,8 @@ export function renderDiff(prev: Buffer2D, next: Buffer2D, stats?: DiffStats): s
   }
 
   if (stats) {
-    stats.ops = stats.cursorMoves + stats.fgChanges + stats.bgChanges + stats.resets;
+    stats.ops =
+      stats.cursorMoves + stats.fgChanges + stats.bgChanges + stats.resets + (stats.scrollOps ?? 0);
   }
 
   return out.length > 0 ? out.join("") : "";
@@ -142,8 +171,14 @@ function renderDiffAscii(
   cols: number,
   sizeChanged: boolean,
   stats?: DiffStats,
+  rowMap?: Int32Array | null,
+  scrollPrefix = "",
 ): string {
   const out: string[] = [];
+  if (scrollPrefix) {
+    out.push(scrollPrefix);
+    if (stats) stats.scrollOps = (stats.scrollOps ?? 0) + 5;
+  }
   let currentFg: string | undefined;
   let currentBg: string | undefined;
   let styleDirty = false;
@@ -158,13 +193,14 @@ function renderDiffAscii(
       const nextWidth = next.widths[idx];
       if (nextWidth === 0) continue;
 
-      const prevWidth = prev.widths[idx] ?? 0;
-      const prevCode = prev.codes[idx] ?? 32;
+      const prevIdx = mapPrevIndex(rowMap, cols, r, c);
+      const prevWidth = prevIdx === -1 ? 1 : (prev.widths[prevIdx] ?? 0);
+      const prevCode = prevIdx === -1 ? 32 : (prev.codes[prevIdx] ?? 32);
       const nextCode = next.codes[idx] ?? 32;
       const nextFg = next.fg[idx];
       const nextBg = next.bg[idx];
-      const prevFg = prev.fg[idx];
-      const prevBg = prev.bg[idx];
+      const prevFg = prevIdx === -1 ? undefined : prev.fg[prevIdx];
+      const prevBg = prevIdx === -1 ? undefined : prev.bg[prevIdx];
 
       const needsDraw =
         sizeChanged ||
@@ -212,4 +248,192 @@ function renderDiffAscii(
   }
 
   return out.length > 0 ? out.join("") : "";
+}
+
+type ScrollRegion = { top: number; bottom: number; delta: number };
+
+function buildDecstbmScrollPrefix(region: ScrollRegion): string {
+  const top = region.top + 1;
+  const bottom = region.bottom + 1;
+  const delta = region.delta;
+  const scrollCmd = delta > 0 ? `\x1b[${delta}S` : `\x1b[${-delta}T`;
+  // Reset SGR before scrolling so newly exposed lines are blank with default style.
+  // Place the cursor inside the scroll region to maximize terminal compatibility.
+  return `\x1b[0m\x1b[${top};${bottom}r\x1b[${top};1H${scrollCmd}\x1b[r`;
+}
+
+function buildScrollRowMap(rows: number, region: ScrollRegion): Int32Array {
+  const map = new Int32Array(rows);
+  for (let r = 0; r < rows; r++) map[r] = r;
+  const top = region.top;
+  const bottom = region.bottom;
+  const delta = region.delta;
+
+  if (delta > 0) {
+    for (let r = top; r <= bottom; r++) {
+      const source = r + delta;
+      map[r] = source <= bottom ? source : -1;
+    }
+  } else {
+    for (let r = top; r <= bottom; r++) {
+      const source = r + delta;
+      map[r] = source >= top ? source : -1;
+    }
+  }
+
+  return map;
+}
+
+function mapPrevIndex(
+  rowMap: Int32Array | null | undefined,
+  cols: number,
+  r: number,
+  c: number,
+): number {
+  if (!rowMap) return r * cols + c;
+  const sourceRow = rowMap[r] ?? -1;
+  if (sourceRow < 0) return -1;
+  return sourceRow * cols + c;
+}
+
+function detectVerticalScrollRegion(
+  prev: Buffer2D,
+  next: Buffer2D,
+  asciiFastPath: boolean,
+): ScrollRegion | null {
+  const rows = next.rows;
+  const cols = next.cols;
+  if (rows < 8) return null;
+
+  // Keep the search window small; typical scrolling moves a few lines at a time.
+  const maxDelta = Math.min(5, rows - 1);
+  const deltas: number[] = [];
+  for (let d = 1; d <= maxDelta; d++) {
+    deltas.push(d, -d);
+  }
+
+  const minMatchedRows = Math.max(6, Math.floor(rows * 0.35));
+  const minRegionHeight = Math.max(7, Math.floor(rows * 0.4));
+
+  let best:
+    | {
+        delta: number;
+        matchStart: number;
+        matchLen: number;
+        regionTop: number;
+        regionBottom: number;
+      }
+    | undefined;
+
+  for (const delta of deltas) {
+    let currentStart = -1;
+    let currentLen = 0;
+
+    const flush = () => {
+      if (currentLen <= 0) return;
+      if (currentLen < minMatchedRows) {
+        currentStart = -1;
+        currentLen = 0;
+        return;
+      }
+      const matchStart = currentStart;
+      const matchEnd = currentStart + currentLen - 1;
+      const regionTop = delta > 0 ? matchStart : matchStart + delta;
+      const regionBottom = delta > 0 ? matchEnd + delta : matchEnd;
+      const regionHeight = regionBottom - regionTop + 1;
+      if (regionTop < 0 || regionBottom >= rows) {
+        currentStart = -1;
+        currentLen = 0;
+        return;
+      }
+      if (regionHeight < minRegionHeight) {
+        currentStart = -1;
+        currentLen = 0;
+        return;
+      }
+      if (
+        !best ||
+        currentLen > best.matchLen ||
+        (currentLen === best.matchLen && Math.abs(delta) < Math.abs(best.delta))
+      ) {
+        best = { delta, matchStart, matchLen: currentLen, regionTop, regionBottom };
+      }
+      currentStart = -1;
+      currentLen = 0;
+    };
+
+    for (let r = 0; r < rows; r++) {
+      const prevRow = r + delta;
+      if (prevRow < 0 || prevRow >= rows) {
+        flush();
+        continue;
+      }
+      const equal = asciiFastPath
+        ? rowsEqualAscii(prev, next, prevRow, r, cols)
+        : rowsEqual(prev, next, prevRow, r, cols);
+      if (equal) {
+        if (currentStart === -1) currentStart = r;
+        currentLen++;
+      } else {
+        flush();
+      }
+    }
+    flush();
+  }
+
+  if (!best) return null;
+  const region = { top: best.regionTop, bottom: best.regionBottom, delta: best.delta };
+  // Avoid scrolling the entire screen unless it looks extremely confident;
+  // full-screen scroll can be surprising with multiplexers or nonstandard terminals.
+  const regionHeight = region.bottom - region.top + 1;
+  if (region.top === 0 && region.bottom === rows - 1 && regionHeight < rows - 1) return null;
+  return region;
+}
+
+function rowsEqualAscii(
+  prev: Buffer2D,
+  next: Buffer2D,
+  prevRow: number,
+  nextRow: number,
+  cols: number,
+): boolean {
+  const prevBase = prevRow * cols;
+  const nextBase = nextRow * cols;
+  for (let c = 0; c < cols; c++) {
+    const pi = prevBase + c;
+    const ni = nextBase + c;
+    if ((prev.widths[pi] ?? 0) !== (next.widths[ni] ?? 0)) return false;
+    if ((prev.codes[pi] ?? 32) !== (next.codes[ni] ?? 32)) return false;
+    if (prev.fg[pi] !== next.fg[ni]) return false;
+    if (prev.bg[pi] !== next.bg[ni]) return false;
+  }
+  return true;
+}
+
+function rowsEqual(
+  prev: Buffer2D,
+  next: Buffer2D,
+  prevRow: number,
+  nextRow: number,
+  cols: number,
+): boolean {
+  const prevBase = prevRow * cols;
+  const nextBase = nextRow * cols;
+  for (let c = 0; c < cols; c++) {
+    const pi = prevBase + c;
+    const ni = nextBase + c;
+    const pw = prev.widths[pi] ?? 0;
+    const nw = next.widths[ni] ?? 0;
+    if (pw !== nw) return false;
+    if (prev.fg[pi] !== next.fg[ni]) return false;
+    if (prev.bg[pi] !== next.bg[ni]) return false;
+    if (nw === 0) {
+      if ((prev.codes[pi] ?? 0) !== (next.codes[ni] ?? 0)) return false;
+      continue;
+    }
+    const pk = prev.glyphKeyAtIndex(pi);
+    const nk = next.glyphKeyAtIndex(ni);
+    if (pk !== nk) return false;
+  }
+  return true;
 }

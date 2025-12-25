@@ -138,4 +138,46 @@ describe("renderDiff", () => {
     expect(stats.fgChanges).toBe(2);
     expect(stats.ops).toBe(stats.cursorMoves + stats.fgChanges + stats.bgChanges + stats.resets);
   });
+
+  it("should use DECSTBM scroll region when content shifts vertically", () => {
+    const rows = 10;
+    const cols = 5;
+    const prev = createMockBuffer(rows, cols, " ");
+    const next = createMockBuffer(rows, cols, " ");
+
+    // Header + footer stay fixed, middle region scrolls up by 1.
+    for (let c = 0; c < cols; c++) {
+      prev.set(0, c, "H");
+      next.set(0, c, "H");
+      prev.set(rows - 1, c, "F");
+      next.set(rows - 1, c, "F");
+    }
+
+    // Fill prev region rows 1..8 with per-row letters.
+    for (let r = 1; r <= 8; r++) {
+      const ch = String.fromCharCode("A".charCodeAt(0) + r);
+      for (let c = 0; c < cols; c++) {
+        prev.set(r, c, ch);
+      }
+    }
+
+    // Next region rows 1..7 are shifted from prev 2..8.
+    for (let r = 1; r <= 7; r++) {
+      const ch = String.fromCharCode("A".charCodeAt(0) + (r + 1));
+      for (let c = 0; c < cols; c++) {
+        next.set(r, c, ch);
+      }
+    }
+    // Newly exposed line at the bottom of the region (row 8).
+    next.set(8, 0, "Z");
+
+    const output = renderDiff(prev, next);
+
+    // region is rows 2..9 (1-based) and scrolls up by 1.
+    const expectedPrefix = "\x1b[0m\x1b[2;9r\x1b[2;1H\x1b[1S\x1b[r";
+    expect(output.startsWith(expectedPrefix)).toBe(true);
+
+    // Only the new cell should be drawn after the scroll.
+    expect(output).toContain("\x1b[9;1HZ");
+  });
 });
