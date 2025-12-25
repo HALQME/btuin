@@ -2,6 +2,7 @@ import type { ServerWebSocket } from "bun";
 import type { ComputedLayout, LayoutStyle } from "../layout-engine/types";
 import type { OutlineOptions } from "../renderer/types";
 import type { ConsoleCaptureHandle, ConsoleLine } from "../terminal/capture";
+import type { FrameMetrics } from "../runtime/profiler";
 import { isBlock, isText, type ViewElement } from "../view/types/elements";
 import type { DevtoolsOptions } from "./types";
 import htmlDocument from "./inspector.html" with { type: "text" };
@@ -86,6 +87,7 @@ type BrowserSnapshot = {
 export interface DevtoolsServerHandle {
   getInfo(): { host: string; port: number; url: string } | null;
   setSnapshot(snapshot: DevtoolsSnapshot): void;
+  setProfileFrame(frame: FrameMetrics): void;
   dispose(): void;
 }
 
@@ -186,7 +188,9 @@ export function setupDevtoolsServer(
   let nextClientId = 1;
   let cleanupSubscribe: (() => void) | null = null;
   let snapshot: BrowserSnapshot | null = null;
+  let profileFrames: FrameMetrics[] = [];
   let info: { host: string; port: number; url: string } | null = null;
+  const maxProfileFrames = 240;
 
   let server: ReturnType<typeof Bun.serve> | null = null;
   try {
@@ -226,6 +230,13 @@ export function setupDevtoolsServer(
           if (snapshot) {
             try {
               ws.send(safeJson({ type: "snapshot", snapshot }));
+            } catch {
+              // ignore
+            }
+          }
+          if (profileFrames.length > 0) {
+            try {
+              ws.send(safeJson({ type: "profile", frames: profileFrames }));
             } catch {
               // ignore
             }
@@ -303,6 +314,13 @@ export function setupDevtoolsServer(
       broadcast({ type: "snapshot", snapshot });
       ensureSubscribed();
     },
+    setProfileFrame: (frame) => {
+      profileFrames.push(frame);
+      if (profileFrames.length > maxProfileFrames) {
+        profileFrames.splice(0, profileFrames.length - maxProfileFrames);
+      }
+      broadcast({ type: "profile", frame });
+    },
     dispose: () => {
       try {
         cleanupSubscribe?.();
@@ -327,6 +345,7 @@ export function setupDevtoolsServer(
       }
       server = null;
       snapshot = null;
+      profileFrames = [];
       info = null;
     },
   };

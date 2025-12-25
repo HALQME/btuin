@@ -117,6 +117,29 @@
         gap: 8px;
         height: 100%;
       }
+      .panel-stack {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        height: 100%;
+        min-height: 0;
+      }
+      .panel-section {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        min-height: 0;
+        border: 1px solid #1f2937;
+        border-radius: 8px;
+        padding: 8px;
+        background: #0b1118;
+      }
+      .panel-section.logs {
+        flex: 1.2 1 0;
+      }
+      .panel-section.profiler {
+        flex: 0.8 1 0;
+      }
       .inspect {
         border: 1px solid #1f2937;
         border-radius: 8px;
@@ -163,6 +186,97 @@
       .style-table .section {
         color: #93c5fd;
         font-weight: 700;
+      }
+      .loglist {
+        overflow: auto;
+        min-height: 0;
+        flex: 1 1 auto;
+      }
+      .profile-summary {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        align-items: center;
+        font-size: 12px;
+        color: #cbd5e1;
+      }
+      .profile-summary .pill {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+      .profile-legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        font-size: 11px;
+        color: #94a3b8;
+      }
+      .profile-legend .legend-item {
+        display: inline-flex;
+        gap: 6px;
+        align-items: center;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+      .profile-legend .swatch {
+        width: 10px;
+        height: 10px;
+        border-radius: 3px;
+      }
+      .profile-legend .swatch.layout {
+        background: #38bdf8;
+      }
+      .profile-legend .swatch.render {
+        background: #34d399;
+      }
+      .profile-legend .swatch.diff {
+        background: #f59e0b;
+      }
+      .profile-legend .swatch.write {
+        background: #f472b6;
+      }
+      .profile-list {
+        flex: 1 1 auto;
+        overflow: auto;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        padding-right: 4px;
+      }
+      .profile-row {
+        display: grid;
+        grid-template-columns: 52px 1fr 56px;
+        align-items: center;
+        gap: 8px;
+        font-size: 11px;
+        color: #cbd5e1;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+      .profile-meta {
+        opacity: 0.7;
+      }
+      .profile-bar {
+        display: flex;
+        height: 10px;
+        background: #0b1220;
+        border: 1px solid #1f2937;
+        border-radius: 6px;
+        overflow: hidden;
+      }
+      .profile-seg.layout {
+        background: #38bdf8;
+      }
+      .profile-seg.render {
+        background: #34d399;
+      }
+      .profile-seg.diff {
+        background: #f59e0b;
+      }
+      .profile-seg.write {
+        background: #f472b6;
+      }
+      .profile-ms {
+        text-align: right;
+        color: #e5e7eb;
       }
       #previewScroll {
         border: 1px solid #1f2937;
@@ -278,16 +392,80 @@
         <span class="pill">WS: <span>{{ wsUrl }}</span></span>
       </header>
       <div class="grid">
-        <section>
-          <h2>Logs</h2>
-          <div ref="logsEl">
-            <div
-              v-for="line in logs"
-              :key="line.id"
-              class="logline"
-              :class="line.type === 'stderr' ? 'stderr' : 'stdout'"
-            >
-              {{ line.display }}
+        <section class="panel-stack">
+          <div class="panel-section logs">
+            <div class="row">
+              <h2 style="margin: 0">Logs</h2>
+              <span class="pill">{{ logs.length }} lines</span>
+            </div>
+            <div ref="logsEl" class="loglist">
+              <div
+                v-for="line in logs"
+                :key="line.id"
+                class="logline"
+                :class="line.type === 'stderr' ? 'stderr' : 'stdout'"
+              >
+                {{ line.display }}
+              </div>
+            </div>
+          </div>
+          <div class="panel-section profiler">
+            <div class="row">
+              <h2 style="margin: 0">Profiler</h2>
+              <span class="pill">{{ profileStatus }}</span>
+            </div>
+            <div class="profile-summary">
+              <span class="pill">Avg {{ formatMs(profileAvgMs) }}</span>
+              <span class="pill">Max {{ formatMs(profileMaxMs) }}</span>
+              <span class="pill">FPS {{ profileFps }}</span>
+              <span class="pill"
+                >Nodes {{ profileLast?.nodeCount ?? "-" }}</span
+              >
+              <span class="pill"
+                >Bytes {{ profileLast?.outputBytes ?? "-" }}</span
+              >
+            </div>
+            <div class="profile-legend">
+              <span class="legend-item"
+                ><span class="swatch layout"></span>Layout</span
+              >
+              <span class="legend-item"
+                ><span class="swatch render"></span>Render</span
+              >
+              <span class="legend-item"
+                ><span class="swatch diff"></span>Diff</span
+              >
+              <span class="legend-item"
+                ><span class="swatch write"></span>Write</span
+              >
+            </div>
+            <div class="profile-list" ref="profileListEl">
+              <div
+                v-for="frame in profileFrames"
+                :key="frame.id"
+                class="profile-row"
+              >
+                <span class="profile-meta">#{{ frame.id }}</span>
+                <div class="profile-bar" :title="formatFrameTooltip(frame)">
+                  <span
+                    class="profile-seg layout"
+                    :style="{ width: barWidth(frame.layoutMs) }"
+                  ></span>
+                  <span
+                    class="profile-seg render"
+                    :style="{ width: barWidth(frame.renderMs) }"
+                  ></span>
+                  <span
+                    class="profile-seg diff"
+                    :style="{ width: barWidth(frame.diffMs) }"
+                  ></span>
+                  <span
+                    class="profile-seg write"
+                    :style="{ width: barWidth(frame.writeMs) }"
+                  ></span>
+                </div>
+                <span class="profile-ms">{{ formatMs(frame.frameMs) }}</span>
+              </div>
             </div>
           </div>
         </section>
@@ -372,6 +550,8 @@
     <script>
       const baseFontSizePx = 12;
       const baseLineHeight = 1.25;
+      const profilePending = [];
+      let profileFlushTimer = null;
 
       function flattenTree(root) {
         const out = [];
@@ -1050,6 +1230,13 @@
             panModifierActive: false,
             logs: [],
             logSeq: 0,
+            profileFrames: [],
+            profileFlushMs: 250,
+            profileMaxMs: 0,
+            profileAvgMs: 0,
+            profileFps: "-",
+            profileLast: null,
+            profileStatus: "waiting",
             snapshotText: "(none)",
             selectedKey: null,
             selectedType: "(none)",
@@ -1068,9 +1255,15 @@
           this.socket = new WebSocket(this.wsUrl);
           this.socket.addEventListener("open", () => {
             this.status = "connected";
+            if (this.profileFrames.length === 0) {
+              this.profileStatus = "waiting";
+            }
           });
           this.socket.addEventListener("close", () => {
             this.status = "disconnected";
+            if (this.profileFrames.length === 0) {
+              this.profileStatus = "offline";
+            }
           });
           this.socket.addEventListener("error", () => {
             this.status = "error";
@@ -1081,12 +1274,21 @@
           window.addEventListener("keydown", this.onKeyDown);
           window.addEventListener("keyup", this.onKeyUp);
 
+          profileFlushTimer = setInterval(
+            () => this.flushProfileFrames(),
+            this.profileFlushMs,
+          );
+
           this.applyZoom();
           this.updateInspector();
         },
         beforeUnmount() {
           window.removeEventListener("keydown", this.onKeyDown);
           window.removeEventListener("keyup", this.onKeyUp);
+          if (profileFlushTimer) {
+            clearInterval(profileFlushTimer);
+            profileFlushTimer = null;
+          }
         },
         watch: {
           zoom() {
@@ -1113,6 +1315,79 @@
           },
         },
         methods: {
+          formatMs(value) {
+            if (!Number.isFinite(value)) return "-";
+            return value.toFixed(2) + "ms";
+          },
+          barWidth(value) {
+            const max = this.profileMaxMs > 0 ? this.profileMaxMs : 1;
+            const pct = Math.max(0, Math.min(100, (value / max) * 100));
+            return pct.toFixed(1) + "%";
+          },
+          recalcProfileStats() {
+            if (this.profileFrames.length === 0) {
+              this.profileMaxMs = 0;
+              this.profileAvgMs = 0;
+              this.profileFps = "-";
+              this.profileLast = null;
+              this.profileStatus = "waiting";
+              return;
+            }
+            let total = 0;
+            let max = 0;
+            for (const frame of this.profileFrames) {
+              total += frame.frameMs;
+              if (frame.frameMs > max) max = frame.frameMs;
+            }
+            const avg = total / this.profileFrames.length;
+            this.profileMaxMs = max;
+            this.profileAvgMs = avg;
+            this.profileFps = avg > 0 ? Math.round(1000 / avg) : "-";
+            this.profileLast =
+              this.profileFrames[this.profileFrames.length - 1];
+            this.profileStatus = "live";
+          },
+          pushProfileFrame(frame) {
+            const maxFrames = 120;
+            this.profileFrames.push(frame);
+            if (this.profileFrames.length > maxFrames) {
+              this.profileFrames.splice(
+                0,
+                this.profileFrames.length - maxFrames,
+              );
+            }
+            this.recalcProfileStats();
+            this.$nextTick(() => {
+              const el = this.$refs.profileListEl;
+              if (el) el.scrollTop = el.scrollHeight;
+            });
+          },
+          flushProfileFrames() {
+            if (profilePending.length === 0) return;
+            const frames = profilePending.splice(0);
+            const maxFrames = 120;
+            this.profileFrames.push(...frames);
+            if (this.profileFrames.length > maxFrames) {
+              this.profileFrames.splice(
+                0,
+                this.profileFrames.length - maxFrames,
+              );
+            }
+            this.recalcProfileStats();
+            this.$nextTick(() => {
+              const el = this.$refs.profileListEl;
+              if (el) el.scrollTop = el.scrollHeight;
+            });
+          },
+          formatFrameTooltip(frame) {
+            return [
+              `frame ${frame.frameMs.toFixed(2)}ms`,
+              `layout ${frame.layoutMs.toFixed(2)}ms`,
+              `render ${frame.renderMs.toFixed(2)}ms`,
+              `diff ${frame.diffMs.toFixed(2)}ms`,
+              `write ${frame.writeMs.toFixed(2)}ms`,
+            ].join(" | ");
+          },
           setTab(tab) {
             this.tab = tab;
           },
@@ -1207,6 +1482,13 @@
             if (msg.type === "log" && msg.line) this.appendLog(msg.line);
             if (msg.type === "logs" && Array.isArray(msg.lines))
               msg.lines.forEach((line) => this.appendLog(line));
+            if (msg.type === "profile") {
+              if (Array.isArray(msg.frames)) {
+                profilePending.push(...msg.frames);
+              } else if (msg.frame) {
+                profilePending.push(msg.frame);
+              }
+            }
             if (msg.type === "snapshot" && msg.snapshot) {
               this.latestSnapshot = msg.snapshot;
               const indexed = indexTree(this.latestSnapshot.tree);

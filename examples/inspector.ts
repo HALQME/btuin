@@ -69,6 +69,7 @@ function Tag(label: string, bg: number, fg = 16) {
 }
 
 const app = createApp({
+  profile: { enabled: true },
   init({ onKey, onTick, runtime }) {
     const counter = ref(0);
     const selected = ref<"layout" | "style" | "text">("layout");

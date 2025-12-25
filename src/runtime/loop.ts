@@ -20,6 +20,7 @@ type DevtoolsControllerLike = {
     rootElement: ViewElement;
     layoutMap: any;
   }): void;
+  onProfileFrame?(frame: import("./profiler").FrameMetrics): void;
   dispose(): void;
 };
 
@@ -28,6 +29,7 @@ export class LoopManager implements ILoopManager {
   private handleError: ReturnType<typeof createErrorHandler>;
   private cleanupTerminalFn: (() => void) | null = null;
   private cleanupOutputListeners: (() => void)[] = [];
+  private cleanupProfilerListeners: (() => void)[] = [];
   private devtools: DevtoolsControllerLike | null = null;
   private devtoolsInit: Promise<void> | null = null;
   private stopped = false;
@@ -197,6 +199,17 @@ export class LoopManager implements ILoopManager {
     renderer.renderOnce(true);
     updaters.renderEffect(renderer.render());
 
+    if (profiler.isEnabled()) {
+      const cleanup = profiler.subscribeFrames((frame) => {
+        try {
+          this.devtools?.onProfileFrame?.(frame);
+        } catch {
+          // ignore
+        }
+      });
+      this.cleanupProfilerListeners.push(cleanup);
+    }
+
     if (pendingKeyEvents.length && state.mounted) {
       for (const event of pendingKeyEvents.splice(0)) {
         try {
@@ -232,6 +245,15 @@ export class LoopManager implements ILoopManager {
     }
     if (this.cleanupOutputListeners.length > 0) {
       for (const dispose of this.cleanupOutputListeners.splice(0)) {
+        try {
+          dispose();
+        } catch {
+          // ignore
+        }
+      }
+    }
+    if (this.cleanupProfilerListeners.length > 0) {
+      for (const dispose of this.cleanupProfilerListeners.splice(0)) {
         try {
           dispose();
         } catch {

@@ -114,6 +114,7 @@ export class Profiler {
   private frames: FrameMetrics[] = [];
   private frameSeq = 0;
   private lastFrame: FrameMetrics | null = null;
+  private subscribers = new Set<(frame: FrameMetrics) => void>();
 
   constructor(options: ProfileOptions) {
     this.options = {
@@ -135,6 +136,13 @@ export class Profiler {
 
   getLastFrame(): FrameMetrics | null {
     return this.lastFrame;
+  }
+
+  subscribeFrames(handler: (frame: FrameMetrics) => void): () => void {
+    this.subscribers.add(handler);
+    return () => {
+      this.subscribers.delete(handler);
+    };
   }
 
   beginFrame(size: { rows: number; cols: number }, extra?: { nodeCount?: number }) {
@@ -208,6 +216,15 @@ export class Profiler {
     };
     this.frames.push(metrics);
     this.lastFrame = metrics;
+    if (this.subscribers.size > 0) {
+      for (const handler of this.subscribers) {
+        try {
+          handler(metrics);
+        } catch {
+          // ignore subscriber errors
+        }
+      }
+    }
   }
 
   measure<T>(frame: any, key: "layoutMs" | "renderMs" | "diffMs" | "writeMs", fn: () => T): T {
