@@ -1,6 +1,7 @@
 import { AnsiInputParser } from "./parser/ansi";
 import type { InputParser } from "./parser/types";
 import type { KeyHandler } from "./types";
+import { disableBracketedPaste, showCursor } from "./io";
 import { getUiInputStream } from "./tty-streams";
 
 const ESCAPE_KEY_TIMEOUT_MS = 30;
@@ -46,12 +47,70 @@ const terminalState = new TerminalState();
 
 let escapeFlushTimer: ReturnType<typeof setTimeout> | null = null;
 let activeInputStream: ReturnType<typeof getUiInputStream> | null = null;
+let uninstallFatalErrorSafetyNet: (() => void) | null = null;
 
 function clearEscapeFlushTimer() {
   if (escapeFlushTimer) {
     clearTimeout(escapeFlushTimer);
     escapeFlushTimer = null;
   }
+}
+
+function restoreTerminalOnFatalError() {
+  try {
+    showCursor();
+  } catch {
+    // ignore
+  }
+  try {
+    disableBracketedPaste();
+  } catch {
+    // ignore
+  }
+  try {
+    cleanupWithoutClear();
+  } catch {
+    // ignore
+  }
+}
+
+function installFatalErrorSafetyNet() {
+  if (uninstallFatalErrorSafetyNet) return;
+
+  const onUncaughtException = (error: unknown) => {
+    restoreTerminalOnFatalError();
+
+    // If we're the only uncaughtException listener, re-throw asynchronously so the
+    // runtime can preserve its default "print stack + exit" behavior.
+    try {
+      const listeners = process.listeners("uncaughtException");
+      const otherListeners = listeners.filter((l) => l !== onUncaughtException);
+      if (otherListeners.length > 0) return;
+    } catch {
+      // ignore
+    }
+
+    try {
+      process.off("uncaughtException", onUncaughtException);
+    } catch {
+      // ignore
+    }
+
+    queueMicrotask(() => {
+      throw error;
+    });
+  };
+
+  process.on("uncaughtException", onUncaughtException);
+
+  uninstallFatalErrorSafetyNet = () => {
+    try {
+      process.off("uncaughtException", onUncaughtException);
+    } catch {
+      // ignore
+    }
+    uninstallFatalErrorSafetyNet = null;
+  };
 }
 
 /**
@@ -116,6 +175,7 @@ export function setupRawMode() {
 
   if (!input.isTTY || typeof input.setRawMode !== "function") return;
 
+  installFatalErrorSafetyNet();
   input.setRawMode(true);
   input.resume();
   input.setEncoding("utf8");
@@ -149,6 +209,7 @@ export function cleanupWithoutClear() {
     return;
   }
 
+  uninstallFatalErrorSafetyNet?.();
   terminalState.setRawModeActive(false);
 
   const input = activeInputStream ?? getUiInputStream();
@@ -177,6 +238,7 @@ export function cleanup() {
     return;
   }
 
+  uninstallFatalErrorSafetyNet?.();
   terminalState.setRawModeActive(false);
 
   const input = activeInputStream ?? getUiInputStream();

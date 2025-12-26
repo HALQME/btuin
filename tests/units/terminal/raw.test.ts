@@ -6,6 +6,7 @@ mock.module("@/terminal/io", () => ({
   clearScreen: () => {},
   hideCursor: () => {},
   showCursor: () => {},
+  disableBracketedPaste: () => {},
 }));
 
 // Mock process.stdin
@@ -64,6 +65,21 @@ describe("Raw Mode and Key Handling", () => {
     setupRawMode();
     expect(mockStdin._rawMode).toBe(true);
     cleanup();
+    expect(mockStdin._rawMode).toBe(false);
+  });
+
+  it("should force-disable raw mode on uncaughtException", () => {
+    setupRawMode();
+    expect(mockStdin._rawMode).toBe(true);
+
+    const swallow = () => {};
+    process.on("uncaughtException", swallow);
+    try {
+      process.emit("uncaughtException", new Error("boom"));
+    } finally {
+      process.off("uncaughtException", swallow);
+    }
+
     expect(mockStdin._rawMode).toBe(false);
   });
 
