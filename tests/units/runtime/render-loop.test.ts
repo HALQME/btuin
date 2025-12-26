@@ -160,4 +160,49 @@ describe("createRenderer", () => {
     expect(diffCalls).toBe(2);
     renderer.dispose();
   });
+
+  it("requestRender should update reactive dependency tracking (non-reactive invalidation)", async () => {
+    setDirtyVersions({ layout: 0, render: 0 });
+
+    const a = ref(0);
+    const b = ref(0);
+    let mode = 0; // Non-reactive: simulates resize/layout-driven branching.
+    let diffCalls = 0;
+
+    const renderer = createRenderer({
+      getSize: () => ({ rows: 24, cols: 80 }),
+      write: () => {},
+      view: () => {
+        return Block(Text(mode === 0 ? `b=${b.value}` : `a=${a.value}`));
+      },
+      getState: () => ({}),
+      handleError: (e) => console.error(e),
+      deps: {
+        FlatBuffer,
+        getGlobalBufferPool: () => mockPool,
+        renderDiff: () => {
+          diffCalls++;
+          return "x";
+        },
+        layout: () => mockLayoutResult,
+        renderElement: () => {},
+      },
+    });
+
+    renderer.render();
+    expect(diffCalls).toBe(1);
+
+    // Change non-reactive branch selector; must explicitly invalidate to re-track deps.
+    mode = 1;
+    renderer.requestRender();
+    await new Promise<void>((resolve) => queueMicrotask(resolve));
+    expect(diffCalls).toBe(2);
+
+    // After requestRender, `a` should now be tracked and trigger a render.
+    a.value++;
+    await new Promise<void>((resolve) => queueMicrotask(resolve));
+    expect(diffCalls).toBe(3);
+
+    renderer.dispose();
+  });
 });

@@ -117,9 +117,36 @@ export function createRenderer<State>(config: RenderLoopConfig<State>) {
   let renderEffect: ReactiveEffect | null = null;
   let invalidated = false;
   let scheduled = false;
+  let forceNextRender = false;
 
   function invalidate() {
     invalidated = true;
+  }
+
+  function requestRender(options: { forceFullRedraw?: boolean; immediate?: boolean } = {}) {
+    if (options.forceFullRedraw) forceNextRender = true;
+    invalidate();
+
+    // If render() hasn't been called yet, fall back to a direct render.
+    // (This is mostly for mount/bootstrapping paths.)
+    if (!renderEffect) {
+      renderOnce(!!options.forceFullRedraw);
+      return;
+    }
+
+    // Run inside the ReactiveEffect context so dependency tracking stays correct.
+    if (options.immediate) {
+      renderEffect.run();
+      return;
+    }
+
+    if (scheduled) return;
+    scheduled = true;
+    queueMicrotask(() => {
+      scheduled = false;
+      if (!renderEffect?.active) return;
+      renderEffect.run();
+    });
   }
 
   function resolvePadding(padding: unknown): {
@@ -248,8 +275,9 @@ export function createRenderer<State>(config: RenderLoopConfig<State>) {
    */
   function renderOnce(forceFullRedraw = false): void {
     try {
-      const localForceFullRedraw = forceFullRedraw || invalidated;
+      const localForceFullRedraw = forceFullRedraw || invalidated || forceNextRender;
       invalidated = false;
+      forceNextRender = false;
       const newSize = config.getSize();
       const sizeChanged =
         newSize.rows !== state.currentSize.rows || newSize.cols !== state.currentSize.cols;
@@ -564,9 +592,14 @@ export function createRenderer<State>(config: RenderLoopConfig<State>) {
     }
   }
 
-  function render(): ReactiveEffect {
+  function render(options: { forceFullRedraw?: boolean } = {}): ReactiveEffect {
     if (renderEffect) {
       stop(renderEffect);
+    }
+
+    if (options.forceFullRedraw) {
+      forceNextRender = true;
+      invalidated = true;
     }
 
     scheduled = false;
@@ -602,6 +635,7 @@ export function createRenderer<State>(config: RenderLoopConfig<State>) {
     render,
     renderOnce,
     invalidate,
+    requestRender,
     dispose,
     getState,
   };
