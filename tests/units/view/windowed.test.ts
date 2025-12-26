@@ -1,11 +1,28 @@
 import { describe, it, expect } from "bun:test";
-import { Windowed } from "@/view";
+import { Windowed, ViewportSlice } from "@/view";
 import { Text } from "@/view/primitives";
 
 describe("Windowed", () => {
+  it("renders without requiring viewportRows (fallback bound)", () => {
+    const items = Array.from({ length: 3 }, (_, i) => i);
+    const el = Windowed({
+      items,
+      overscan: 0,
+      renderItem: (item) => Text(`item ${item}`),
+    }).build();
+
+    expect(el.type).toBe("block");
+    expect(el.style.flexDirection).toBe("column");
+    expect(el.children).toHaveLength(3);
+    expect((el.children[0] as any).content).toBe("item 0");
+    expect((el.children[2] as any).content).toBe("item 2");
+  });
+});
+
+describe("ViewportSlice", () => {
   it("renders a visible slice from startIndex", () => {
     const items = Array.from({ length: 10 }, (_, i) => i);
-    const el = Windowed({
+    const el = ViewportSlice({
       items,
       startIndex: 3,
       viewportRows: 4,
@@ -16,8 +33,8 @@ describe("Windowed", () => {
 
     expect(el.type).toBe("block");
     expect(el.style.flexDirection).toBe("column");
-    expect(el.style.height).toBe(4);
-    expect(el.style.flexShrink).toBe(0);
+    expect(el.style.layoutBoundary).toBe(true);
+    expect(el.style.scrollRegion).toBe(true);
     expect(el.children).toHaveLength(4);
     expect(el.children[0]!.type).toBe("text");
     expect((el.children[0] as any).content).toBe("item 3");
@@ -26,7 +43,7 @@ describe("Windowed", () => {
 
   it("applies overscan after the viewport", () => {
     const items = Array.from({ length: 10 }, (_, i) => i);
-    const el = Windowed({
+    const el = ViewportSlice({
       items,
       startIndex: 0,
       viewportRows: 3,
@@ -41,7 +58,7 @@ describe("Windowed", () => {
 
   it("uses keyPrefix for stable item keys when missing", () => {
     const items = ["a", "b", "c"];
-    const el = Windowed({
+    const el = ViewportSlice({
       items,
       startIndex: 1,
       viewportRows: 2,

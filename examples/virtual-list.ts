@@ -1,44 +1,51 @@
 import { createApp, ref } from "@/index";
-import { Text, VStack, Windowed } from "@/view";
+import { Text, VStack, Windowed, clampWindowedStartIndex, getWindowedMetrics } from "@/view";
 
 const TOTAL = 50_000;
 const items = Array.from({ length: TOTAL }, (_, i) => `item ${i}`);
 
 const app = createApp({
-  init({ onKey, onResize, runtime }) {
+  init({ onKey, runtime }) {
     const scrollIndex = ref(0);
-    const size = ref(runtime.getSize());
-
-    onResize(() => {
-      size.value = runtime.getSize();
-    });
-
-    const clamp = (value: number) => {
-      const viewportRows = Math.max(0, size.value.rows - 4);
-      const maxScroll = Math.max(0, items.length - viewportRows);
-      return Math.max(0, Math.min(maxScroll, value));
-    };
 
     onKey((k) => {
       if (k.name === "q") runtime.exit(0);
-      if (k.name === "down") scrollIndex.value = clamp(scrollIndex.value + 1);
-      if (k.name === "up") scrollIndex.value = clamp(scrollIndex.value - 1);
-      if (k.name === "pagedown") scrollIndex.value = clamp(scrollIndex.value + 20);
-      if (k.name === "pageup") scrollIndex.value = clamp(scrollIndex.value - 20);
+      if (k.name === "down")
+        scrollIndex.value = clampWindowedStartIndex({
+          itemCount: items.length,
+          startIndex: scrollIndex.value + 1,
+        });
+      if (k.name === "up")
+        scrollIndex.value = clampWindowedStartIndex({
+          itemCount: items.length,
+          startIndex: scrollIndex.value - 1,
+        });
+      if (k.name === "pagedown")
+        scrollIndex.value = clampWindowedStartIndex({
+          itemCount: items.length,
+          startIndex: scrollIndex.value + 20,
+        });
+      if (k.name === "pageup")
+        scrollIndex.value = clampWindowedStartIndex({
+          itemCount: items.length,
+          startIndex: scrollIndex.value - 20,
+        });
     });
 
-    return { scrollIndex, size };
+    return { scrollIndex };
   },
-  render({ scrollIndex, size }) {
+  render({ scrollIndex }) {
     // Reserve 2 rows for header+status and 2 rows for outline padding (1 top + 1 bottom).
-    const viewportRows = Math.max(0, size.value.rows - 4);
     const header = Text(`Windowed: ${items.length} items (q to quit)`).foreground("cyan").shrink(0);
-    const status = Text(`startIndex=${scrollIndex.value}`).foreground("gray").shrink(0);
+    const clamped = getWindowedMetrics({
+      itemCount: items.length,
+      startIndex: scrollIndex.value,
+    }).startIndex;
+    const status = Text(`startIndex=${clamped}`).foreground("gray").shrink(0);
 
     const list = Windowed({
       items,
-      startIndex: scrollIndex.value,
-      viewportRows,
+      startIndex: clamped,
       itemHeight: 1,
       overscan: 2,
       keyPrefix: "windowed",

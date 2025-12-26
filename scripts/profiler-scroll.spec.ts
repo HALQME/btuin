@@ -1,7 +1,7 @@
 import { test, describe, expect } from "bun:test";
 import { existsSync } from "node:fs";
 
-import { createApp, ref, Block, Text, Windowed } from "@/index";
+import { createApp, ref, Block, Text, ViewportSlice } from "@/index";
 import { createNullTerminalAdapter, printSummary, type ProfilerLog } from "./profiler-core";
 
 const N = 50_000;
@@ -39,7 +39,7 @@ const app = createApp({
     const root = Block().direction("column");
     root.add(header);
     root.add(
-      Windowed({
+      ViewportSlice({
         items,
         startIndex,
         viewportRows: 30,

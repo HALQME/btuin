@@ -1,16 +1,15 @@
-import { Block, type BlockElement } from "../primitives/block";
+import type { BlockElement } from "../primitives/block";
 import type { ViewElement } from "../types/elements";
+import { ViewportSlice } from "./viewport-slice";
 
 export interface WindowedOptions<T> {
   items: readonly T[];
   /**
    * Index of the first visible item (0-based).
    *
-   * Clamp this in your state update logic; this function clamps defensively too.
+   * Defaults to 0.
    */
-  startIndex: number;
-  /** Viewport height in terminal rows (cells). */
-  viewportRows: number;
+  startIndex?: number;
   /** Fixed item height in rows (cells). */
   itemHeight?: number;
   /**
@@ -27,6 +26,28 @@ export interface WindowedOptions<T> {
   renderItem: (item: T, index: number) => ViewElement;
 }
 
+export type WindowedMetrics = {
+  viewportRows: number;
+  visibleCount: number;
+  maxStartIndex: number;
+  startIndex: number;
+  endIndex: number;
+};
+
+export type WindowedMetricsInput = {
+  itemCount: number;
+  startIndex?: number;
+  viewportRows?: number;
+  itemHeight?: number;
+  overscan?: number;
+};
+
+function getFallbackViewportRows(): number {
+  // Fallback to terminal height when available; keep a sane default for tests/CI.
+  const rows = (process.stdout as { rows?: number } | undefined)?.rows;
+  return typeof rows === "number" && Number.isFinite(rows) ? Math.max(0, Math.trunc(rows)) : 24;
+}
+
 function clampInt(value: number, min: number, max: number): number {
   if (!Number.isFinite(value)) return min;
   const v = Math.trunc(value);
@@ -35,53 +56,45 @@ function clampInt(value: number, min: number, max: number): number {
   return v;
 }
 
-/**
- * Renders a "window" (visible slice) of a large item collection.
- *
- * This is a view-level helper that returns a `Block` with only the visible
- * children, reducing render traversal costs for very large lists.
- */
-export function Windowed<T>(options: WindowedOptions<T>): BlockElement {
-  const { items, renderItem, viewportRows, itemHeight = 1, overscan = 2, keyPrefix } = options;
+export function getWindowedMetrics(input: WindowedMetricsInput): WindowedMetrics {
+  const safeItemCount = Math.max(0, Math.trunc(input.itemCount));
+  const safeItemHeight = Math.max(1, Math.trunc(input.itemHeight ?? 1));
+  const safeOverscan = Math.max(0, Math.trunc(input.overscan ?? 2));
+  const safeViewportRows = Math.max(0, Math.trunc(input.viewportRows ?? getFallbackViewportRows()));
 
-  const safeItemHeight = Math.max(1, Math.trunc(itemHeight));
-  const safeViewportRows = Math.max(0, Math.trunc(viewportRows));
-  const safeOverscan = Math.max(0, Math.trunc(overscan));
-
-  const firstIndex = clampInt(options.startIndex, 0, Math.max(0, items.length - 1));
   const visibleCount =
     safeViewportRows === 0 ? 0 : Math.ceil(safeViewportRows / safeItemHeight) + safeOverscan;
-  const endIndex = Math.min(items.length, firstIndex + visibleCount);
+  const maxStartIndex = Math.max(0, safeItemCount - Math.max(0, visibleCount));
+  const startIndex = clampInt(input.startIndex ?? 0, 0, safeItemCount === 0 ? 0 : maxStartIndex);
+  const endIndex = Math.min(safeItemCount, startIndex + visibleCount);
 
-  const children: ViewElement[] = [];
-  for (let i = firstIndex; i < endIndex; i++) {
-    const child = renderItem(items[i]!, i);
-    // Windowed rendering relies on overflow+clipping; avoid flexbox shrinking items
-    // when overscan makes total child height exceed the viewport.
-    if (child.style?.flexShrink === undefined) {
-      child.style.flexShrink = 0;
-    }
-    if (safeItemHeight !== 1 && child.style?.height === undefined) {
-      child.style.height = safeItemHeight;
-    }
-    if (keyPrefix && !child.key && !child.identifier) {
-      const k = `${keyPrefix}/${i}`;
-      child.key = k;
-      child.identifier = k;
-    }
-    children.push(child);
-  }
+  return { viewportRows: safeViewportRows, visibleCount, maxStartIndex, startIndex, endIndex };
+}
 
-  const container = Block(...children).direction("column");
-  container.style.scrollRegion = true;
-  // Prevent overscan items from affecting parent flex layout sizing.
-  // With no explicit height, the container's "base size" becomes children sum,
-  // which can exceed the viewport and cause siblings (e.g. headers) to shrink to 0 rows.
-  if (container.style.height === undefined) {
-    container.style.height = safeViewportRows;
-  }
-  if (container.style.flexShrink === undefined) {
-    container.style.flexShrink = 0;
-  }
-  return container;
+export function clampWindowedStartIndex(input: WindowedMetricsInput): number {
+  return getWindowedMetrics(input).startIndex;
+}
+
+/**
+ * User-facing windowed list helper.
+ *
+ * This version does not require `viewportRows`; it uses the current terminal
+ * height as a conservative bound. For more control, use `ViewportSlice`.
+ */
+export function Windowed<T>(options: WindowedOptions<T>): BlockElement {
+  const metrics = getWindowedMetrics({
+    itemCount: options.items.length,
+    startIndex: options.startIndex ?? 0,
+    itemHeight: options.itemHeight,
+    overscan: options.overscan,
+  });
+  return ViewportSlice({
+    items: options.items,
+    startIndex: metrics.startIndex,
+    viewportRows: metrics.viewportRows,
+    itemHeight: options.itemHeight,
+    overscan: options.overscan,
+    keyPrefix: options.keyPrefix,
+    renderItem: options.renderItem,
+  });
 }
