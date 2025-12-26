@@ -19,6 +19,13 @@ export interface RenderDiffOptions {
    * detection overhead for UIs that do not use scroll regions.
    */
   scrollRegion?: { top: number; bottom: number };
+  /**
+   * Explicit DECSTBM scroll operation (0-based inclusive rows, and signed delta).
+   *
+   * When provided, scroll detection is skipped and this operation is used
+   * directly. The caller is responsible for ensuring it is safe/correct.
+   */
+  scrollOp?: { top: number; bottom: number; delta: number };
 }
 
 /**
@@ -65,10 +72,16 @@ export function renderDiff(
 
   const asciiFastPath = prev.isAsciiOnly() && next.isAsciiOnly();
   const hint = options?.scrollRegion;
+  const explicit = options?.scrollOp;
   const allowAuto = process.env.BTUIN_DECSTBM_AUTO === "1";
+
   const scroll =
-    !sizeChanged && process.env.BTUIN_DISABLE_DECSTBM !== "1" && (hint || allowAuto)
-      ? detectVerticalScrollRegion(prev, next, asciiFastPath, hint)
+    !sizeChanged && process.env.BTUIN_DISABLE_DECSTBM !== "1"
+      ? explicit
+        ? normalizeScrollOp(explicit, rows)
+        : hint || allowAuto
+          ? detectVerticalScrollRegion(prev, next, asciiFastPath, hint)
+          : null
       : null;
   const rowMap = scroll ? buildScrollRowMap(rows, scroll) : null;
   const scrollPrefix = scroll ? buildDecstbmScrollPrefix(scroll) : "";
@@ -465,6 +478,21 @@ function renderFullRedrawAscii(
 }
 
 type ScrollRegion = { top: number; bottom: number; delta: number };
+
+function normalizeScrollOp(
+  op: { top: number; bottom: number; delta: number },
+  rows: number,
+): ScrollRegion | null {
+  if (rows <= 0) return null;
+  const top = Math.max(0, Math.trunc(op.top));
+  const bottom = Math.min(rows - 1, Math.trunc(op.bottom));
+  const height = bottom - top + 1;
+  if (height <= 1) return null;
+  const delta = Math.trunc(op.delta);
+  if (delta === 0) return null;
+  if (Math.abs(delta) >= height) return null;
+  return { top, bottom, delta };
+}
 
 function buildDecstbmScrollPrefix(region: ScrollRegion): string {
   const top = region.top + 1;

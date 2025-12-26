@@ -205,4 +205,48 @@ describe("createRenderer", () => {
 
     renderer.dispose();
   });
+
+  it("should use dirty-rect rendering when only render props change", () => {
+    setDirtyVersions({ layout: 0, render: 0 });
+
+    let value = "a";
+    const clips: Array<{ x: number; y: number; width: number; height: number }> = [];
+
+    const renderer = createRenderer({
+      getSize: () => ({ rows: 24, cols: 80 }),
+      write: () => {},
+      view: () => {
+        const child = Text(value).setKey("root/text");
+        return Block(child).setKey("root");
+      },
+      getState: () => ({}),
+      handleError: (e) => console.error(e),
+      deps: {
+        FlatBuffer,
+        getGlobalBufferPool: () => mockPool,
+        renderDiff: () => "x",
+        layout: () => ({
+          root: { x: 0, y: 0, width: 80, height: 24 },
+          "root/text": { x: 0, y: 1, width: 10, height: 1 },
+        }),
+        renderElement: (_el, _buf, _layout, _px, _py, clipRect) => {
+          clips.push(clipRect ?? { x: 0, y: 0, width: 80, height: 24 });
+        },
+      },
+    });
+
+    renderer.renderOnce();
+
+    // 2nd render: collects maps but still does a full render (no previous sigs yet).
+    value = "b";
+    renderer.renderOnce();
+
+    // 3rd render: should use dirty-rect path and pass a clipped rect.
+    value = "c";
+    renderer.renderOnce();
+
+    const last = clips.at(-1);
+    expect(last).toEqual({ x: 0, y: 1, width: 10, height: 1 });
+    renderer.dispose();
+  });
 });

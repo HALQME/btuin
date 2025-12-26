@@ -192,6 +192,7 @@ export function createRenderer<State>(config: RenderLoopConfig<State>) {
     const rects = new Map<string, Rect>();
     const sigs = new Map<string, string>();
     let scrollRegion: { band: { top: number; bottom: number }; fullWidth: boolean } | null = null;
+    let scrollRegionCount = 0;
 
     const signatureOf = (element: ViewElement): string => {
       const bg = element.style?.background;
@@ -240,7 +241,7 @@ export function createRenderer<State>(config: RenderLoopConfig<State>) {
         }
       }
 
-      if (!scrollRegion && element.style?.scrollRegion) {
+      if (element.style?.scrollRegion) {
         const pad = resolvePadding(element.style?.padding);
         const contentRect: Rect = {
           x: rect.x,
@@ -256,10 +257,16 @@ export function createRenderer<State>(config: RenderLoopConfig<State>) {
         };
         const content = intersectRect(contentRect, screen);
         if (content) {
-          scrollRegion = {
-            band: { top: content.y, bottom: content.y + content.height - 1 },
-            fullWidth: content.x === 0 && content.width === screen.width,
-          };
+          scrollRegionCount++;
+          if (scrollRegionCount === 1) {
+            scrollRegion = {
+              band: { top: content.y, bottom: content.y + content.height - 1 },
+              fullWidth: content.x === 0 && content.width === screen.width,
+            };
+          } else {
+            // Multiple scroll regions are ambiguous for DECSTBM; disable optimization.
+            scrollRegion = null;
+          }
         }
       }
     };
@@ -303,6 +310,7 @@ export function createRenderer<State>(config: RenderLoopConfig<State>) {
 
       const rootElement = reconcileTree(prevRootElement, nextRootElement);
       const dirtyVersions = getDirtyVersions();
+      const previousDirtyVersions = prevDirtyVersions;
       const layoutSizeKey = `${state.currentSize.cols}x${state.currentSize.rows}`;
 
       const nodeCount =
@@ -346,7 +354,6 @@ export function createRenderer<State>(config: RenderLoopConfig<State>) {
       prevRootElement = rootElement;
       prevLayoutResult = layoutResult;
       prevLayoutSizeKey = layoutSizeKey;
-      prevDirtyVersions = dirtyVersions;
       prevLayoutAtLayoutVersion = dirtyVersions.layout;
 
       try {
@@ -375,21 +382,29 @@ export function createRenderer<State>(config: RenderLoopConfig<State>) {
       let absRects: Map<string, Rect> | null = null;
       let sigs: Map<string, string> | null = null;
       let scrollRegion: { band: { top: number; bottom: number }; fullWidth: boolean } | null = null;
-      if (!sizeChanged && !localForceFullRedraw && getHasScrollRegion()) {
+      const shouldCollectMaps =
+        !sizeChanged &&
+        !localForceFullRedraw &&
+        (getHasScrollRegion() ||
+          previousRects !== null ||
+          (previousDirtyVersions !== null &&
+            dirtyVersions.layout === previousDirtyVersions.layout &&
+            dirtyVersions.render !== previousDirtyVersions.render));
+
+      if (shouldCollectMaps) {
         const collected = collectAbsRectsAndFindScrollRegion(rootElement, layoutResult);
         absRects = collected.rects;
         sigs = collected.sigs;
         scrollRegion = collected.scrollRegion;
-        prevAbsRects = absRects;
-        prevRenderSigs = sigs;
-      } else {
-        // Avoid carrying stale maps across resizes/full redraws and don't pay the traversal cost
-        // when scroll regions are not used.
+      } else if (sizeChanged || localForceFullRedraw) {
         prevAbsRects = null;
         prevRenderSigs = null;
       }
 
-      const tryScrollFastPath = (): { clips: Rect[] } | null => {
+      const tryScrollFastPath = (): {
+        clips: Rect[];
+        scrollOp: { top: number; bottom: number; delta: number };
+      } | null => {
         if (process.env.BTUIN_DISABLE_SCROLL_FASTPATH === "1") return null;
         if (sizeChanged || localForceFullRedraw) return null;
         if (!previousRects || !absRects || !scrollRegion) return null;
@@ -486,44 +501,73 @@ export function createRenderer<State>(config: RenderLoopConfig<State>) {
 
         if (!previousSigs || !sigs) return null;
 
-        // Bail if something outside the scroll band was removed (hard to "erase" safely).
+        // Bail if something was removed (hard to "erase" safely without a full redraw).
         for (const key of previousSigs.keys()) {
           if (sigs.has(key)) continue;
-          const prevRect = previousRects.get(key);
-          if (!prevRect) continue;
-          const prevIn = prevRect.y >= top && prevRect.y <= bottom;
-          if (!prevIn) return null;
+          return null;
         }
 
         const clips: Rect[] = [];
         clips.push({ x: 0, y: exposedY, width: fullClip.width, height: exposedHeight });
 
-        // Also redraw any elements outside the scroll band whose render-relevant props changed.
+        // Redraw any elements whose render-relevant props changed.
         for (const [key, sig] of sigs) {
           const prevSig = previousSigs.get(key);
           if (prevSig === undefined || prevSig === sig) continue;
           const rect = absRects.get(key);
           if (!rect) continue;
-          const inBand = rect.y >= top && rect.y <= bottom;
-          if (inBand) continue;
-
           const clipped = intersectRect(rect, fullClip);
           if (clipped) clips.push(clipped);
         }
+
+        if (clips.length > 48) return null;
 
         // Build next buffer from prev by scrolling the band, then only render the newly exposed rows.
         buf.copyFrom(state.prevBuffer);
         buf.scrollRowsFrom(state.prevBuffer, scrollTop, scrollBottom, dy);
 
-        return { clips };
+        return { clips, scrollOp: { top: scrollTop, bottom: scrollBottom, delta: dy } };
       };
 
       const scrollFast = tryScrollFastPath();
+
+      const tryDirtyRects = (): Rect[] | null => {
+        if (sizeChanged || localForceFullRedraw) return null;
+        if (!previousRects || !absRects || !previousSigs || !sigs) return null;
+        if (!previousDirtyVersions) return null;
+        if (dirtyVersions.layout !== previousDirtyVersions.layout) return null;
+        if (dirtyVersions.render === previousDirtyVersions.render) return null;
+
+        // If anything was removed, we must full redraw to clear it correctly.
+        for (const key of previousSigs.keys()) {
+          if (!sigs.has(key)) return null;
+        }
+
+        const dirty: Rect[] = [];
+        for (const [key, sig] of sigs) {
+          const prevSig = previousSigs.get(key);
+          if (prevSig !== undefined && prevSig === sig) continue;
+          const rect = absRects.get(key);
+          if (!rect) continue;
+          const clipped = intersectRect(rect, fullClip);
+          if (clipped) dirty.push(clipped);
+        }
+
+        if (dirty.length > 64) return null;
+        return dirty;
+      };
+
+      const dirtyRects = scrollFast ? null : tryDirtyRects();
 
       if (config.profiler && frame) {
         config.profiler.measure(frame, "renderMs", () => {
           if (scrollFast) {
             for (const clip of scrollFast.clips) {
+              deps.renderElement(rootElement, buf, layoutResult, 0, 0, clip);
+            }
+          } else if (dirtyRects !== null) {
+            buf.copyFrom(state.prevBuffer);
+            for (const clip of dirtyRects) {
               deps.renderElement(rootElement, buf, layoutResult, 0, 0, clip);
             }
           } else {
@@ -533,6 +577,11 @@ export function createRenderer<State>(config: RenderLoopConfig<State>) {
       } else {
         if (scrollFast) {
           for (const clip of scrollFast.clips) {
+            deps.renderElement(rootElement, buf, layoutResult, 0, 0, clip);
+          }
+        } else if (dirtyRects !== null) {
+          buf.copyFrom(state.prevBuffer);
+          for (const clip of dirtyRects) {
             deps.renderElement(rootElement, buf, layoutResult, 0, 0, clip);
           }
         } else {
@@ -560,9 +609,9 @@ export function createRenderer<State>(config: RenderLoopConfig<State>) {
         : state.prevBuffer;
 
       const diffOptions =
-        !sizeChanged && !localForceFullRedraw && scrollRegion?.fullWidth
+        scrollFast && process.env.BTUIN_DISABLE_DECSTBM !== "1"
           ? ({
-              scrollRegion: scrollRegion.band,
+              scrollOp: scrollFast.scrollOp,
             } satisfies import("../renderer/diff").RenderDiffOptions)
           : undefined;
 
@@ -585,6 +634,12 @@ export function createRenderer<State>(config: RenderLoopConfig<State>) {
       // Return old prev buffer to the pool and keep the new one
       pool.release(state.prevBuffer);
       state.prevBuffer = buf;
+
+      if (shouldCollectMaps && absRects && sigs) {
+        prevAbsRects = absRects;
+        prevRenderSigs = sigs;
+      }
+      prevDirtyVersions = dirtyVersions;
 
       config.profiler?.endFrame(frame);
     } catch (error) {
