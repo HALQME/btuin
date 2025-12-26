@@ -1,8 +1,9 @@
 import { describe, it, expect } from "bun:test";
 import { createRenderer } from "@/runtime/render-loop";
-import { Block } from "@/view/primitives";
+import { Block, Text } from "@/view/primitives";
 import { FlatBuffer } from "@/renderer";
 import { setDirtyVersions } from "@/view/dirty";
+import { ref } from "@/reactivity";
 import type { Buffer2D } from "@/types";
 
 const mockLayoutResult = { root: { x: 0, y: 0, width: 80, height: 24 } };
@@ -117,6 +118,46 @@ describe("createRenderer", () => {
 
     expect(errorCaught).not.toBeNull();
     expect(errorCaught!).toBe(testError);
+    renderer.dispose();
+  });
+
+  it("should coalesce multiple reactive triggers into one render", async () => {
+    setDirtyVersions({ layout: 0, render: 0 });
+
+    const counter = ref(0);
+    let diffCalls = 0;
+
+    const renderer = createRenderer({
+      getSize: () => ({ rows: 24, cols: 80 }),
+      write: () => {},
+      view: () => {
+        return Block(Text(String(counter.value)));
+      },
+      getState: () => ({}),
+      handleError: (e) => console.error(e),
+      deps: {
+        FlatBuffer,
+        getGlobalBufferPool: () => mockPool,
+        renderDiff: () => {
+          diffCalls++;
+          return "x";
+        },
+        layout: () => mockLayoutResult,
+        renderElement: () => {},
+      },
+    });
+
+    renderer.render();
+    expect(diffCalls).toBe(1);
+
+    counter.value++;
+    counter.value++;
+    counter.value++;
+
+    await new Promise<void>((resolve) => queueMicrotask(resolve));
+
+    // Coalesced: one additional render for the 3 mutations.
+    expect(diffCalls).toBe(2);
     renderer.dispose();
   });
 });

@@ -116,6 +116,7 @@ export function createRenderer<State>(config: RenderLoopConfig<State>) {
   let prevDirtyVersions: { layout: number; render: number } | null = null;
   let renderEffect: ReactiveEffect | null = null;
   let invalidated = false;
+  let scheduled = false;
 
   function invalidate() {
     invalidated = true;
@@ -567,7 +568,20 @@ export function createRenderer<State>(config: RenderLoopConfig<State>) {
     if (renderEffect) {
       stop(renderEffect);
     }
-    renderEffect = effect(() => renderOnce(false));
+
+    scheduled = false;
+    const scheduleRender = (eff: ReactiveEffect) => {
+      if (!eff.active) return;
+      if (scheduled) return;
+      scheduled = true;
+      queueMicrotask(() => {
+        scheduled = false;
+        if (!eff.active) return;
+        eff.run();
+      });
+    };
+
+    renderEffect = effect(() => renderOnce(false), { scheduler: scheduleRender });
     return renderEffect;
   }
 
