@@ -1,5 +1,5 @@
 import { BaseView } from "../base";
-import { markRenderDirty } from "../dirty";
+import { markLayoutDirty, markRenderDirty } from "../dirty";
 import type { TextView } from "../types/elements";
 
 class TextElement extends BaseView implements TextView {
@@ -19,8 +19,19 @@ class TextElement extends BaseView implements TextView {
   set content(value: string) {
     if (this.#content === value) return;
     this.#content = value;
-    // By default, treat content changes as render-only; layout should be driven by explicit
-    // layout styles rather than intrinsic text measurement (keeps TUI updates cheap).
+    // Content changes can affect intrinsic measurement when width/height are auto/unspecified.
+    // In that case we must invalidate layout, otherwise the render loop may reuse a stale
+    // layout map and produce clipping/overlap artifacts.
+    if (
+      this.style.width === undefined ||
+      this.style.width === "auto" ||
+      this.style.height === undefined ||
+      this.style.height === "auto"
+    ) {
+      markLayoutDirty();
+      return;
+    }
+
     markRenderDirty();
   }
 

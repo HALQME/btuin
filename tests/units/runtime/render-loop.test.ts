@@ -216,7 +216,7 @@ describe("createRenderer", () => {
       getSize: () => ({ rows: 24, cols: 80 }),
       write: () => {},
       view: () => {
-        const child = Text(value).setKey("root/text");
+        const child = Text(value).width(10).height(1).setKey("root/text");
         return Block(child).setKey("root");
       },
       getState: () => ({}),
@@ -247,6 +247,45 @@ describe("createRenderer", () => {
 
     const last = clips.at(-1);
     expect(last).toEqual({ x: 0, y: 1, width: 10, height: 1 });
+    renderer.dispose();
+  });
+
+  it("should re-layout when intrinsic text content changes", () => {
+    setDirtyVersions({ layout: 0, render: 0 });
+
+    let value = "a";
+    let layoutCalls = 0;
+
+    const renderer = createRenderer({
+      getSize: () => ({ rows: 24, cols: 80 }),
+      write: () => {},
+      view: () => {
+        const child = Text(value).setKey("root/text");
+        return Block(child).setKey("root");
+      },
+      getState: () => ({}),
+      handleError: (e) => console.error(e),
+      deps: {
+        FlatBuffer,
+        getGlobalBufferPool: () => mockPool,
+        renderDiff: () => "x",
+        layout: () => {
+          layoutCalls++;
+          return {
+            root: { x: 0, y: 0, width: 80, height: 24 },
+            "root/text": { x: 0, y: 1, width: value.length, height: 1 },
+          };
+        },
+        renderElement: () => {},
+      },
+    });
+
+    renderer.renderOnce();
+    expect(layoutCalls).toBe(1);
+
+    value = "aaaaa";
+    renderer.renderOnce();
+    expect(layoutCalls).toBe(2);
     renderer.dispose();
   });
 });
