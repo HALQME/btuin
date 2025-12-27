@@ -1,4 +1,4 @@
-import { BaseView } from "../base";
+import { BaseView, type ViewProps } from "../base";
 import { markLayoutDirty, markRenderDirty } from "../dirty";
 import type { TextView } from "../types/elements";
 
@@ -7,9 +7,9 @@ class TextElement extends BaseView implements TextView {
 
   #content: string;
 
-  constructor(content: string) {
-    super();
-    this.#content = content;
+  constructor(props: { content: string } & ViewProps) {
+    super(props);
+    this.#content = props.content;
   }
 
   get content(): string {
@@ -41,8 +41,13 @@ class TextElement extends BaseView implements TextView {
 }
 
 export function Text(content: string): TextElement;
-export function Text(props: { value: string }): TextElement;
-export function Text(contentOrProps: string | { value: string }): TextElement {
-  const content = typeof contentOrProps === "string" ? contentOrProps : contentOrProps.value;
-  return new TextElement(content);
+export function Text(props: { value: string } & ViewProps): TextElement;
+export function Text(
+  contentOrProps: string | ({ value: string } & ViewProps)
+): TextElement {
+  if (typeof contentOrProps === "string") {
+    return new TextElement({ content: contentOrProps });
+  }
+  const { value, ...props } = contentOrProps;
+  return new TextElement({ content: value, ...props });
 }

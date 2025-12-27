@@ -1,4 +1,4 @@
-import { BaseView } from "../base";
+import { BaseView, type ViewProps } from "../base";
 import { markLayoutDirty } from "../dirty";
 import type { BlockView, ViewElement } from "../types/elements";
 
@@ -6,8 +6,8 @@ export class BlockElement extends BaseView implements BlockView {
   type = "block" as const;
   children: ViewElement[];
 
-  constructor() {
-    super();
+  constructor(props: ViewProps = {}) {
+    super(props);
     // デフォルトは Flexbox の標準挙動
     this.style.display = "flex";
     this.children = new Proxy<ViewElement[]>([], {
@@ -58,6 +58,20 @@ export class BlockElement extends BaseView implements BlockView {
 }
 
 // ファクトリ関数
-export function Block(...children: ViewElement[]): BlockElement {
+export function Block(props: ViewProps, ...children: ViewElement[]): BlockElement;
+export function Block(...children: ViewElement[]): BlockElement;
+export function Block(...args: any[]): BlockElement {
+  const firstArg = args[0];
+  if (
+    args.length > 0 &&
+    typeof firstArg === "object" &&
+    firstArg !== null &&
+    !Array.isArray(firstArg) &&
+    !("type" in firstArg)
+  ) {
+    const [props, ...children] = args;
+    return new BlockElement(props).add(...children);
+  }
+  const children = args;
   return new BlockElement().add(...children);
 }

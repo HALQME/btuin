@@ -2,6 +2,7 @@ import type { KeyEventHook } from "../components/lifecycle";
 import type { Dimension, LayoutStyle } from "../layout-engine/types";
 import type { OutlineOptions } from "../renderer/types";
 import type { KeyEvent } from "../terminal/types/key-event";
+import type { Semantics } from "./types/elements";
 import { markHasScrollRegion, markLayoutDirty, markRenderDirty } from "./dirty";
 
 const layoutStyleKeys = new Set<string>([
@@ -88,6 +89,7 @@ export interface ViewProps {
   identifier?: string;
   focusKey?: string;
   onFocus?: (e: KeyEvent) => void;
+  semantics?: Semantics;
   // Taffy用のスタイル定義を含める
   style?: Partial<LayoutStyle> & {
     // Taffyにない独自の見た目プロパティもここに入れると管理しやすい
@@ -107,6 +109,7 @@ export abstract class BaseView implements ViewProps {
   public key?: string;
   public identifier?: string;
   public focusKey?: string;
+  public semantics?: Semantics;
   public keyHooks: KeyEventHook[] = [];
 
   constructor(props: ViewProps = {}) {
@@ -117,6 +120,7 @@ export abstract class BaseView implements ViewProps {
       this.identifier = key;
     }
     if (props.focusKey) this.focusKey = props.focusKey;
+    if (props.semantics) this.semantics = props.semantics;
   }
 
   // --- レイアウト (Taffy直結) ---
