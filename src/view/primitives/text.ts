@@ -42,9 +42,7 @@ class TextElement extends BaseView implements TextView {
 
 export function Text(content: string): TextElement;
 export function Text(props: { value: string } & ViewProps): TextElement;
-export function Text(
-  contentOrProps: string | ({ value: string } & ViewProps)
-): TextElement {
+export function Text(contentOrProps: string | ({ value: string } & ViewProps)): TextElement {
   if (typeof contentOrProps === "string") {
     return new TextElement({ content: contentOrProps });
   }

@@ -1,5 +1,5 @@
 import { isBlock, type ViewElement } from "./types/elements";
-import { type Semantics } from "./types/semantics"
+import { type Semantics } from "./types/semantics";
 
 function identityKey(element: ViewElement): string | undefined {
   return element.key ?? element.identifier;

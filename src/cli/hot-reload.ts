@@ -434,27 +434,17 @@ export function runHotReloadProcess(options: RunHotReloadProcessOptions): HotRel
 }
 
 function openUrlInBrowser(url: string) {
-
   const platform = process.platform;
 
   const cmd =
-
     platform === "darwin"
-
       ? ["open", url]
-
       : platform === "win32"
-
         ? ["cmd", "/c", "start", "", url]
-
         : ["xdg-open", url];
 
-
-
   try {
-
     Bun.spawn({
-
       cmd,
 
       stdin: "ignore",
@@ -462,15 +452,8 @@ function openUrlInBrowser(url: string) {
       stdout: "ignore",
 
       stderr: "ignore",
-
     }).unref();
-
   } catch {
-
     // ignore
-
   }
-
 }
-
-

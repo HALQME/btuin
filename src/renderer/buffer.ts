@@ -18,6 +18,7 @@ export class FlatBuffer {
   readonly codes: Uint32Array;
   readonly extras: Map<number, string>;
   readonly widths: Uint8Array;
+  readonly attrs: Uint8Array;
   readonly fg: (string | undefined)[];
   readonly bg: (string | undefined)[];
   private asciiOnly = true;
@@ -29,6 +30,7 @@ export class FlatBuffer {
     this.codes = new Uint32Array(size);
     this.extras = new Map();
     this.widths = new Uint8Array(size);
+    this.attrs = new Uint8Array(size);
     this.fg = Array.from({ length: size });
     this.bg = Array.from({ length: size });
     this.clear();
@@ -41,6 +43,7 @@ export class FlatBuffer {
     this.codes.fill(32); // space
     this.extras.clear();
     this.widths.fill(1);
+    this.attrs.fill(0);
     this.fg.fill(undefined);
     this.bg.fill(undefined);
     this.asciiOnly = true;
@@ -57,14 +60,17 @@ export class FlatBuffer {
    * Get a cell's character and styling at the given position.
    * Out-of-bounds reads return a space with no style.
    */
-  get(row: number, col: number): { char: string; style: { fg?: string; bg?: string } } {
+  get(
+    row: number,
+    col: number,
+  ): { char: string; style: { fg?: string; bg?: string; attrs?: number } } {
     if (row < 0 || row >= this.rows) return { char: " ", style: {} };
     if (col < 0 || col >= this.cols) return { char: " ", style: {} };
     const idx = this.index(row, col);
     const width = this.widths[idx] ?? 1;
     return {
       char: width === 0 ? "" : this.glyphStringAtIndex(idx),
-      style: { fg: this.fg[idx], bg: this.bg[idx] },
+      style: { fg: this.fg[idx], bg: this.bg[idx], attrs: this.attrs[idx] },
     };
   }
 
