@@ -10,6 +10,17 @@ describe("Block Primitive", () => {
     expect(element.style?.display).toBe("flex");
   });
 
+  it("should create a BlockElement with semantics", () => {
+    const block = Block({
+      semantics: { role: "list" },
+    });
+    const element = block.build();
+
+    expect(element.semantics).toEqual({
+      role: "list",
+    });
+  });
+
   it("should add children", () => {
     const text = Text({ value: "hello" });
     const block = Block(text);
