@@ -66,9 +66,8 @@ describe("renderDiff", () => {
     const occurrences = (output.match(/b/g) || []).length;
     expect(occurrences).toBe(8);
 
-    // Check if it moves to each cell
-    expect(output).toContain("\x1b[1;1H");
-    expect(output).toContain("\x1b[3;2H");
+    // Starts from home for a fast full redraw
+    expect(output.startsWith("\x1b[0m\x1b[H")).toBe(true);
   });
 
   it("should batch color changes", () => {
@@ -84,9 +83,8 @@ describe("renderDiff", () => {
     const output = renderDiff(prev, next);
 
     // Expected:
-    // Move -> Set Green -> 'a' -> Move -> 'b' -> Move -> Set Blue -> 'c' -> Move -> 'd' -> Reset
-    const expected =
-      "\x1b[1;1H\x1b[32ma" + "\x1b[1;2Hb" + "\x1b[1;3H\x1b[34mc" + "\x1b[1;4Hd" + "\x1b[0m";
+    // Move -> Set Green -> 'ab' -> Set Blue -> 'cd' -> Reset
+    const expected = "\x1b[1;1H\x1b[32mab\x1b[34mcd\x1b[0m";
     expect(output).toBe(expected);
   });
 
@@ -102,7 +100,7 @@ describe("renderDiff", () => {
 
     const expected =
       "\x1b[1;1H\x1b[31ma" +
-      "\x1b[1;2H\x1b[39mb" + // After red 'a', resets to default fg for 'b'
+      "\x1b[39mb" + // After red 'a', resets to default fg for 'b'
       "\x1b[0m";
 
     expect(output).toBe(expected);
@@ -134,8 +132,88 @@ describe("renderDiff", () => {
 
     expect(output.length).toBeGreaterThan(0);
     expect(stats.changedCells).toBe(3);
-    expect(stats.cursorMoves).toBe(3);
+    // Two runs: row 1 col 1..2, then row 2 col 1.
+    expect(stats.cursorMoves).toBe(2);
     expect(stats.fgChanges).toBe(2);
     expect(stats.ops).toBe(stats.cursorMoves + stats.fgChanges + stats.bgChanges + stats.resets);
+  });
+
+  it("should use DECSTBM scroll region when content shifts vertically", () => {
+    const rows = 10;
+    const cols = 5;
+    const prev = createMockBuffer(rows, cols, " ");
+    const next = createMockBuffer(rows, cols, " ");
+
+    // Header + footer stay fixed, middle region scrolls up by 1.
+    for (let c = 0; c < cols; c++) {
+      prev.set(0, c, "H");
+      next.set(0, c, "H");
+      prev.set(rows - 1, c, "F");
+      next.set(rows - 1, c, "F");
+    }
+
+    // Fill prev region rows 1..8 with per-row letters.
+    for (let r = 1; r <= 8; r++) {
+      const ch = String.fromCharCode("A".charCodeAt(0) + r);
+      for (let c = 0; c < cols; c++) {
+        prev.set(r, c, ch);
+      }
+    }
+
+    // Next region rows 1..7 are shifted from prev 2..8.
+    for (let r = 1; r <= 7; r++) {
+      const ch = String.fromCharCode("A".charCodeAt(0) + (r + 1));
+      for (let c = 0; c < cols; c++) {
+        next.set(r, c, ch);
+      }
+    }
+    // Newly exposed line at the bottom of the region (row 8).
+    next.set(8, 0, "Z");
+
+    const output = renderDiff(prev, next, undefined, { scrollRegion: { top: 1, bottom: 8 } });
+
+    // region is rows 2..9 (1-based) and scrolls up by 1.
+    const expectedPrefix = "\x1b[0m\x1b[2;9r\x1b[2;1H\x1b[1S\x1b[r";
+    expect(output.startsWith(expectedPrefix)).toBe(true);
+
+    // Only the new cell should be drawn after the scroll.
+    expect(output).toContain("\x1b[9;1HZ");
+  });
+
+  it("should use explicit DECSTBM scroll op when provided", () => {
+    const rows = 10;
+    const cols = 5;
+    const prev = createMockBuffer(rows, cols, " ");
+    const next = createMockBuffer(rows, cols, " ");
+
+    // Header + footer stay fixed, middle region scrolls up by 1.
+    for (let c = 0; c < cols; c++) {
+      prev.set(0, c, "H");
+      next.set(0, c, "H");
+      prev.set(rows - 1, c, "F");
+      next.set(rows - 1, c, "F");
+    }
+
+    for (let r = 1; r <= 8; r++) {
+      const ch = String.fromCharCode("A".charCodeAt(0) + r);
+      for (let c = 0; c < cols; c++) {
+        prev.set(r, c, ch);
+      }
+    }
+    for (let r = 1; r <= 7; r++) {
+      const ch = String.fromCharCode("A".charCodeAt(0) + (r + 1));
+      for (let c = 0; c < cols; c++) {
+        next.set(r, c, ch);
+      }
+    }
+    next.set(8, 0, "Z");
+
+    const output = renderDiff(prev, next, undefined, {
+      scrollOp: { top: 1, bottom: 8, delta: 1 },
+    });
+
+    const expectedPrefix = "\x1b[0m\x1b[2;9r\x1b[2;1H\x1b[1S\x1b[r";
+    expect(output.startsWith(expectedPrefix)).toBe(true);
+    expect(output).toContain("\x1b[9;1HZ");
   });
 });

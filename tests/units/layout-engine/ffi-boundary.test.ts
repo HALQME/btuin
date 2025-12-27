@@ -38,7 +38,7 @@ describe("Layout Engine FFI boundary", () => {
       layout_engine_style_prop_children_offset: { args: [], returns: FFIType.u32 },
     });
 
-    const expectedAbiVersion = 1;
+    const expectedAbiVersion = 2;
 
     const expectedStylePropIndex = {
       FlexDirection: 2,

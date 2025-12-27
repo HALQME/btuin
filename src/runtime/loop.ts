@@ -161,7 +161,7 @@ export class LoopManager implements ILoopManager {
           if (!state.isMounted || state.isUnmounting) return;
           if (state.renderMode !== "inline") return;
           uiSuspended = false;
-          renderer.renderOnce(false);
+          renderer.requestRender({ immediate: true });
         });
       };
 
@@ -170,6 +170,7 @@ export class LoopManager implements ILoopManager {
         uiSuspended = true;
         const seq = inline.cleanup();
         if (seq) terminal.write(seq);
+        renderer.invalidate();
       };
 
       if (terminal.onStdout && terminal.writeStdout) {
@@ -196,8 +197,7 @@ export class LoopManager implements ILoopManager {
       }
     }
 
-    renderer.renderOnce(true);
-    updaters.renderEffect(renderer.render());
+    updaters.renderEffect(renderer.render({ forceFullRedraw: true }));
     if (state.renderEffect && state.mounted) {
       state.renderEffect.meta = {
         type: "render",
@@ -234,7 +234,7 @@ export class LoopManager implements ILoopManager {
             if (state.renderMode !== "inline") {
               terminal.clearScreen();
             }
-            renderer.renderOnce(true);
+            renderer.requestRender({ forceFullRedraw: true });
           } catch (error) {
             this.handleError(createErrorContext("resize", error));
           }

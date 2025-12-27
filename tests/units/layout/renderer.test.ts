@@ -108,4 +108,20 @@ describe("renderElement", () => {
     // absY = 1 + 1 = 2
     expect(buffer.get(2, 3).char).toBe("O");
   });
+
+  test("should clip children outside parent bounds", () => {
+    const child = Text({ value: "A" }).setKey("child").build();
+    const parent = Block(child).setKey("parent").build();
+
+    const layoutMap = {
+      parent: { x: 0, y: 0, width: 10, height: 2 },
+      // This child starts below the parent's bottom edge.
+      child: { x: 0, y: 2, width: 1, height: 1 },
+    };
+    const buffer = createBuffer(4, 10);
+
+    renderElement(parent, buffer, layoutMap);
+
+    expect(buffer.get(2, 0).char).toBe(" ");
+  });
 });

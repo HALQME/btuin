@@ -4,9 +4,13 @@ import { layout, renderElement } from "../layout";
 import type { DiffStats } from "../renderer/diff";
 import type { Buffer2D } from "../renderer/types";
 import { isBlock, type ViewElement } from "../view/types/elements";
+import { getDirtyVersions, getHasScrollRegion, setDirtyVersions } from "../view/dirty";
+import { reconcileTree } from "../view/reconcile";
 import { createErrorContext } from "./error-boundary";
 import type { Profiler } from "./profiler";
 import type { ComputedLayout } from "../layout-engine/types";
+
+type Rect = { x: number; y: number; width: number; height: number };
 
 export interface BufferPoolLike {
   acquire(): Buffer2D;
@@ -16,7 +20,12 @@ export interface BufferPoolLike {
 export interface RenderLoopDeps {
   FlatBuffer: typeof FlatBuffer;
   getGlobalBufferPool: (rows: number, cols: number) => BufferPoolLike;
-  renderDiff: (prev: Buffer2D, next: Buffer2D, stats?: DiffStats) => string;
+  renderDiff: (
+    prev: Buffer2D,
+    next: Buffer2D,
+    stats?: DiffStats,
+    options?: import("../renderer/diff").RenderDiffOptions,
+  ) => string;
   layout: (root: ViewElement, containerSize?: { width: number; height: number }) => ComputedLayout;
   renderElement: (
     element: ViewElement,
@@ -24,6 +33,7 @@ export interface RenderLoopDeps {
     layoutMap: ComputedLayout,
     parentX?: number,
     parentY?: number,
+    clipRect?: { x: number; y: number; width: number; height: number },
   ) => void;
 }
 
@@ -100,7 +110,170 @@ export function createRenderer<State>(config: RenderLoopConfig<State>) {
   let prevRootElement: ViewElement | null = null;
   let prevLayoutResult: ComputedLayout | null = null;
   let prevLayoutSizeKey: string | null = null;
+  let prevLayoutAtLayoutVersion: number | null = null;
+  let prevAbsRects: Map<string, Rect> | null = null;
+  let prevRenderSigs: Map<string, string> | null = null;
+  let prevDirtyVersions: { layout: number; render: number } | null = null;
   let renderEffect: ReactiveEffect | null = null;
+  let invalidated = false;
+  let scheduled = false;
+  let forceNextRender = false;
+
+  function invalidate() {
+    invalidated = true;
+  }
+
+  function requestRender(options: { forceFullRedraw?: boolean; immediate?: boolean } = {}) {
+    if (options.forceFullRedraw) forceNextRender = true;
+    invalidate();
+
+    // If render() hasn't been called yet, fall back to a direct render.
+    // (This is mostly for mount/bootstrapping paths.)
+    if (!renderEffect) {
+      renderOnce(!!options.forceFullRedraw);
+      return;
+    }
+
+    // Run inside the ReactiveEffect context so dependency tracking stays correct.
+    if (options.immediate) {
+      renderEffect.run();
+      return;
+    }
+
+    if (scheduled) return;
+    scheduled = true;
+    queueMicrotask(() => {
+      scheduled = false;
+      if (!renderEffect?.active) return;
+      renderEffect.run();
+    });
+  }
+
+  function resolvePadding(padding: unknown): {
+    top: number;
+    right: number;
+    bottom: number;
+    left: number;
+  } {
+    if (typeof padding === "number") {
+      return { top: padding, right: padding, bottom: padding, left: padding };
+    }
+    if (Array.isArray(padding) && padding.length === 4) {
+      const [top, right, bottom, left] = padding as number[];
+      return {
+        top: typeof top === "number" ? top : 0,
+        right: typeof right === "number" ? right : 0,
+        bottom: typeof bottom === "number" ? bottom : 0,
+        left: typeof left === "number" ? left : 0,
+      };
+    }
+    return { top: 0, right: 0, bottom: 0, left: 0 };
+  }
+
+  function intersectRect(a: Rect, b: Rect): Rect | null {
+    const x1 = Math.max(a.x, b.x);
+    const y1 = Math.max(a.y, b.y);
+    const x2 = Math.min(a.x + a.width, b.x + b.width);
+    const y2 = Math.min(a.y + a.height, b.y + b.height);
+    const width = x2 - x1;
+    const height = y2 - y1;
+    if (width <= 0 || height <= 0) return null;
+    return { x: x1, y: y1, width, height };
+  }
+
+  function collectAbsRectsAndFindScrollRegion(
+    root: ViewElement,
+    layoutMap: ComputedLayout,
+  ): {
+    rects: Map<string, Rect>;
+    sigs: Map<string, string>;
+    scrollRegion: { band: { top: number; bottom: number }; fullWidth: boolean } | null;
+  } {
+    const rects = new Map<string, Rect>();
+    const sigs = new Map<string, string>();
+    let scrollRegion: { band: { top: number; bottom: number }; fullWidth: boolean } | null = null;
+    let scrollRegionCount = 0;
+
+    const signatureOf = (element: ViewElement): string => {
+      const bg = element.style?.background;
+      const fg = element.style?.foreground;
+      const outline = element.style?.outline;
+      const padding = element.style?.padding;
+
+      if (element.type === "text") {
+        return `t|${element.content}|fg:${fg ?? ""}|bg:${bg ?? ""}`;
+      }
+      if (element.type === "input") {
+        return `i|${element.value}|fg:${fg ?? ""}|bg:${bg ?? ""}`;
+      }
+      // block
+      const outlineKey =
+        outline === undefined ? "" : `o:${outline.style ?? "single"}:${outline.color ?? ""}`;
+      const paddingKey =
+        padding === undefined
+          ? ""
+          : typeof padding === "number"
+            ? `p:${padding}`
+            : `p:${padding.join(",")}`;
+      return `b|bg:${bg ?? ""}|${outlineKey}|${paddingKey}`;
+    };
+
+    const walk = (element: ViewElement, parentX: number, parentY: number) => {
+      const key = element.identifier;
+      if (!key) return;
+      const layout = layoutMap[key];
+      if (!layout) return;
+
+      const absX = layout.x + parentX;
+      const absY = layout.y + parentY;
+      const rect: Rect = {
+        x: Math.floor(absX),
+        y: Math.floor(absY),
+        width: Math.floor(layout.width),
+        height: Math.floor(layout.height),
+      };
+      rects.set(key, rect);
+      sigs.set(key, signatureOf(element));
+
+      if (isBlock(element)) {
+        for (const child of element.children) {
+          walk(child, absX, absY);
+        }
+      }
+
+      if (element.style?.scrollRegion) {
+        const pad = resolvePadding(element.style?.padding);
+        const contentRect: Rect = {
+          x: rect.x,
+          y: rect.y + Math.floor(pad.top),
+          width: rect.width,
+          height: Math.max(0, rect.height - Math.floor(pad.top) - Math.floor(pad.bottom)),
+        };
+        const screen = {
+          x: 0,
+          y: 0,
+          width: state.currentSize.cols,
+          height: state.currentSize.rows,
+        };
+        const content = intersectRect(contentRect, screen);
+        if (content) {
+          scrollRegionCount++;
+          if (scrollRegionCount === 1) {
+            scrollRegion = {
+              band: { top: content.y, bottom: content.y + content.height - 1 },
+              fullWidth: content.x === 0 && content.width === screen.width,
+            };
+          } else {
+            // Multiple scroll regions are ambiguous for DECSTBM; disable optimization.
+            scrollRegion = null;
+          }
+        }
+      }
+    };
+
+    walk(root, 0, 0);
+    return { rects, sigs, scrollRegion };
+  }
 
   /**
    * Performs a render cycle
@@ -109,11 +282,14 @@ export function createRenderer<State>(config: RenderLoopConfig<State>) {
    */
   function renderOnce(forceFullRedraw = false): void {
     try {
+      const localForceFullRedraw = forceFullRedraw || invalidated || forceNextRender;
+      invalidated = false;
+      forceNextRender = false;
       const newSize = config.getSize();
       const sizeChanged =
         newSize.rows !== state.currentSize.rows || newSize.cols !== state.currentSize.cols;
 
-      if (sizeChanged || forceFullRedraw) {
+      if (sizeChanged || localForceFullRedraw) {
         // When size changes, re-create a pool bound to the new dimensions
         state.currentSize = newSize;
         pool = deps.getGlobalBufferPool(state.currentSize.rows, state.currentSize.cols);
@@ -123,7 +299,18 @@ export function createRenderer<State>(config: RenderLoopConfig<State>) {
         state.prevBuffer = pool.acquire();
       }
 
-      const rootElement = config.view(config.getState());
+      const dirtyBeforeView = getDirtyVersions();
+      const nextRootElement = config.view(config.getState());
+      if (nextRootElement !== prevRootElement) {
+        // Immediate-mode render functions build new ViewElement instances every frame, and those
+        // constructors/method chains can trip dirty tracking. Roll back those "construction"
+        // marks and let reconciliation dirties reflect actual changes on the retained tree.
+        setDirtyVersions(dirtyBeforeView);
+      }
+
+      const rootElement = reconcileTree(prevRootElement, nextRootElement);
+      const dirtyVersions = getDirtyVersions();
+      const previousDirtyVersions = prevDirtyVersions;
       const layoutSizeKey = `${state.currentSize.cols}x${state.currentSize.rows}`;
 
       const nodeCount =
@@ -132,11 +319,26 @@ export function createRenderer<State>(config: RenderLoopConfig<State>) {
           : undefined;
       const frame = config.profiler?.beginFrame(state.currentSize, { nodeCount }) ?? null;
 
+      if (
+        !sizeChanged &&
+        !localForceFullRedraw &&
+        prevRootElement &&
+        rootElement === prevRootElement &&
+        prevDirtyVersions &&
+        prevLayoutSizeKey === layoutSizeKey &&
+        dirtyVersions.layout === prevDirtyVersions.layout &&
+        dirtyVersions.render === prevDirtyVersions.render
+      ) {
+        config.profiler?.endFrame(frame);
+        return;
+      }
+
       const layoutResult =
         rootElement === prevRootElement &&
         prevLayoutResult &&
         prevLayoutSizeKey === layoutSizeKey &&
-        !sizeChanged
+        !sizeChanged &&
+        prevLayoutAtLayoutVersion === dirtyVersions.layout
           ? prevLayoutResult
           : (config.profiler?.measure(frame, "layoutMs", () =>
               deps.layout(rootElement, {
@@ -152,6 +354,7 @@ export function createRenderer<State>(config: RenderLoopConfig<State>) {
       prevRootElement = rootElement;
       prevLayoutResult = layoutResult;
       prevLayoutSizeKey = layoutSizeKey;
+      prevLayoutAtLayoutVersion = dirtyVersions.layout;
 
       try {
         config.onLayout?.({ size: state.currentSize, rootElement, layoutMap: layoutResult });
@@ -167,12 +370,223 @@ export function createRenderer<State>(config: RenderLoopConfig<State>) {
           buf = new deps.FlatBuffer(state.currentSize.rows, state.currentSize.cols);
         }
       }
+      const fullClip: Rect = {
+        x: 0,
+        y: 0,
+        width: state.currentSize.cols,
+        height: state.currentSize.rows,
+      };
+
+      const previousRects = prevAbsRects;
+      const previousSigs = prevRenderSigs;
+      let absRects: Map<string, Rect> | null = null;
+      let sigs: Map<string, string> | null = null;
+      let scrollRegion: { band: { top: number; bottom: number }; fullWidth: boolean } | null = null;
+      const shouldCollectMaps =
+        !sizeChanged &&
+        !localForceFullRedraw &&
+        (getHasScrollRegion() ||
+          previousRects !== null ||
+          (previousDirtyVersions !== null &&
+            dirtyVersions.layout === previousDirtyVersions.layout &&
+            dirtyVersions.render !== previousDirtyVersions.render));
+
+      if (shouldCollectMaps) {
+        const collected = collectAbsRectsAndFindScrollRegion(rootElement, layoutResult);
+        absRects = collected.rects;
+        sigs = collected.sigs;
+        scrollRegion = collected.scrollRegion;
+      } else if (sizeChanged || localForceFullRedraw) {
+        prevAbsRects = null;
+        prevRenderSigs = null;
+      }
+
+      const tryScrollFastPath = (): {
+        clips: Rect[];
+        scrollOp: { top: number; bottom: number; delta: number };
+      } | null => {
+        if (process.env.BTUIN_DISABLE_SCROLL_FASTPATH === "1") return null;
+        if (sizeChanged || localForceFullRedraw) return null;
+        if (!previousRects || !absRects || !scrollRegion) return null;
+        if (!scrollRegion.fullWidth) return null;
+
+        const { top, bottom } = scrollRegion.band;
+        const bandHeight = bottom - top + 1;
+        if (bandHeight <= 1) return null;
+
+        // Terminal scroll regions are full-width; skip when the band isn't.
+        if (fullClip.width <= 0) return null;
+
+        const maxShift = Math.min(40, bandHeight - 1);
+        const counts = new Map<number, number>();
+        let compared = 0;
+
+        for (const [key, prevRect] of previousRects) {
+          const nextRect = absRects.get(key);
+          if (!nextRect) continue;
+
+          const prevIn = prevRect.y >= top && prevRect.y <= bottom;
+          const nextIn = nextRect.y >= top && nextRect.y <= bottom;
+          if (!prevIn || !nextIn) continue;
+
+          if (
+            prevRect.x !== nextRect.x ||
+            prevRect.width !== nextRect.width ||
+            prevRect.height !== nextRect.height
+          ) {
+            continue;
+          }
+
+          const dy = nextRect.y - prevRect.y;
+          if (dy === 0) continue;
+          if (Math.abs(dy) > maxShift) continue;
+
+          counts.set(dy, (counts.get(dy) ?? 0) + 1);
+          compared++;
+        }
+
+        if (compared < 3) return null;
+
+        let bestDy = 0;
+        let bestCount = 0;
+        for (const [dy, count] of counts) {
+          if (count > bestCount) {
+            bestCount = count;
+            bestDy = dy;
+          }
+        }
+        if (bestDy === 0) return null;
+        if (bestCount / compared < 0.6) return null;
+
+        // Verify that things outside the band don't move, and inside the band only translate.
+        for (const [key, prevRect] of previousRects) {
+          const nextRect = absRects.get(key);
+          if (!nextRect) continue;
+
+          const prevIn = prevRect.y >= top && prevRect.y <= bottom;
+          const nextIn = nextRect.y >= top && nextRect.y <= bottom;
+
+          if (!prevIn && !nextIn) {
+            if (
+              prevRect.x !== nextRect.x ||
+              prevRect.y !== nextRect.y ||
+              prevRect.width !== nextRect.width ||
+              prevRect.height !== nextRect.height
+            ) {
+              return null;
+            }
+            continue;
+          }
+
+          if (prevIn && nextIn) {
+            if (
+              prevRect.x !== nextRect.x ||
+              prevRect.width !== nextRect.width ||
+              prevRect.height !== nextRect.height ||
+              nextRect.y !== prevRect.y + bestDy
+            ) {
+              return null;
+            }
+          }
+        }
+
+        const scrollTop = top;
+        const scrollBottom = bottom;
+        const dy = bestDy;
+
+        const exposedHeight = Math.abs(dy);
+        if (exposedHeight <= 0) return null;
+
+        const exposedY = dy < 0 ? scrollBottom - exposedHeight + 1 : scrollTop;
+
+        if (!previousSigs || !sigs) return null;
+
+        // Bail if something was removed (hard to "erase" safely without a full redraw).
+        for (const key of previousSigs.keys()) {
+          if (sigs.has(key)) continue;
+          return null;
+        }
+
+        const clips: Rect[] = [];
+        clips.push({ x: 0, y: exposedY, width: fullClip.width, height: exposedHeight });
+
+        // Redraw any elements whose render-relevant props changed.
+        for (const [key, sig] of sigs) {
+          const prevSig = previousSigs.get(key);
+          if (prevSig === undefined || prevSig === sig) continue;
+          const rect = absRects.get(key);
+          if (!rect) continue;
+          const clipped = intersectRect(rect, fullClip);
+          if (clipped) clips.push(clipped);
+        }
+
+        if (clips.length > 48) return null;
+
+        // Build next buffer from prev by scrolling the band, then only render the newly exposed rows.
+        buf.copyFrom(state.prevBuffer);
+        buf.scrollRowsFrom(state.prevBuffer, scrollTop, scrollBottom, dy);
+
+        return { clips, scrollOp: { top: scrollTop, bottom: scrollBottom, delta: dy } };
+      };
+
+      const scrollFast = tryScrollFastPath();
+
+      const tryDirtyRects = (): Rect[] | null => {
+        if (sizeChanged || localForceFullRedraw) return null;
+        if (!previousRects || !absRects || !previousSigs || !sigs) return null;
+        if (!previousDirtyVersions) return null;
+        if (dirtyVersions.layout !== previousDirtyVersions.layout) return null;
+        if (dirtyVersions.render === previousDirtyVersions.render) return null;
+
+        // If anything was removed, we must full redraw to clear it correctly.
+        for (const key of previousSigs.keys()) {
+          if (!sigs.has(key)) return null;
+        }
+
+        const dirty: Rect[] = [];
+        for (const [key, sig] of sigs) {
+          const prevSig = previousSigs.get(key);
+          if (prevSig !== undefined && prevSig === sig) continue;
+          const rect = absRects.get(key);
+          if (!rect) continue;
+          const clipped = intersectRect(rect, fullClip);
+          if (clipped) dirty.push(clipped);
+        }
+
+        if (dirty.length > 64) return null;
+        return dirty;
+      };
+
+      const dirtyRects = scrollFast ? null : tryDirtyRects();
+
       if (config.profiler && frame) {
         config.profiler.measure(frame, "renderMs", () => {
-          deps.renderElement(rootElement, buf, layoutResult, 0, 0);
+          if (scrollFast) {
+            for (const clip of scrollFast.clips) {
+              deps.renderElement(rootElement, buf, layoutResult, 0, 0, clip);
+            }
+          } else if (dirtyRects !== null) {
+            buf.copyFrom(state.prevBuffer);
+            for (const clip of dirtyRects) {
+              deps.renderElement(rootElement, buf, layoutResult, 0, 0, clip);
+            }
+          } else {
+            deps.renderElement(rootElement, buf, layoutResult, 0, 0, fullClip);
+          }
         });
       } else {
-        deps.renderElement(rootElement, buf, layoutResult, 0, 0);
+        if (scrollFast) {
+          for (const clip of scrollFast.clips) {
+            deps.renderElement(rootElement, buf, layoutResult, 0, 0, clip);
+          }
+        } else if (dirtyRects !== null) {
+          buf.copyFrom(state.prevBuffer);
+          for (const clip of dirtyRects) {
+            deps.renderElement(rootElement, buf, layoutResult, 0, 0, clip);
+          }
+        } else {
+          deps.renderElement(rootElement, buf, layoutResult, 0, 0, fullClip);
+        }
       }
 
       config.profiler?.drawHud(buf);
@@ -190,30 +604,30 @@ export function createRenderer<State>(config: RenderLoopConfig<State>) {
           }
         : undefined;
 
-      const prevForDiff = forceFullRedraw
+      const prevForDiff = localForceFullRedraw
         ? new deps.FlatBuffer(state.currentSize.rows, state.currentSize.cols)
         : state.prevBuffer;
 
+      const diffOptions =
+        scrollFast && process.env.BTUIN_DISABLE_DECSTBM !== "1"
+          ? ({
+              scrollOp: scrollFast.scrollOp,
+            } satisfies import("../renderer/diff").RenderDiffOptions)
+          : undefined;
+
       const output =
         config.profiler?.measure(frame, "diffMs", () =>
-          deps.renderDiff(prevForDiff, buf, diffStats),
-        ) ?? deps.renderDiff(prevForDiff, buf);
-      const safeOutput =
-        output === ""
-          ? deps.renderDiff(
-              new deps.FlatBuffer(state.currentSize.rows, state.currentSize.cols),
-              buf,
-            )
-          : output;
+          deps.renderDiff(prevForDiff, buf, diffStats, diffOptions),
+        ) ?? deps.renderDiff(prevForDiff, buf, undefined, diffOptions);
       if (frame && diffStats) {
         config.profiler?.recordDiffStats(frame, diffStats);
       }
-      if (safeOutput) {
-        config.profiler?.recordOutput(frame, safeOutput);
+      if (output) {
+        config.profiler?.recordOutput(frame, output);
         if (config.profiler && frame) {
-          config.profiler.measure(frame, "writeMs", () => config.write(safeOutput));
+          config.profiler.measure(frame, "writeMs", () => config.write(output));
         } else {
-          config.write(safeOutput);
+          config.write(output);
         }
       }
 
@@ -221,17 +635,41 @@ export function createRenderer<State>(config: RenderLoopConfig<State>) {
       pool.release(state.prevBuffer);
       state.prevBuffer = buf;
 
+      if (shouldCollectMaps && absRects && sigs) {
+        prevAbsRects = absRects;
+        prevRenderSigs = sigs;
+      }
+      prevDirtyVersions = dirtyVersions;
+
       config.profiler?.endFrame(frame);
     } catch (error) {
       config.handleError(createErrorContext("render", error));
     }
   }
 
-  function render(): ReactiveEffect {
+  function render(options: { forceFullRedraw?: boolean } = {}): ReactiveEffect {
     if (renderEffect) {
       stop(renderEffect);
     }
-    renderEffect = effect(() => renderOnce(false));
+
+    if (options.forceFullRedraw) {
+      forceNextRender = true;
+      invalidated = true;
+    }
+
+    scheduled = false;
+    const scheduleRender = (eff: ReactiveEffect) => {
+      if (!eff.active) return;
+      if (scheduled) return;
+      scheduled = true;
+      queueMicrotask(() => {
+        scheduled = false;
+        if (!eff.active) return;
+        eff.run();
+      });
+    };
+
+    renderEffect = effect(() => renderOnce(false), { scheduler: scheduleRender });
     return renderEffect;
   }
 
@@ -251,6 +689,8 @@ export function createRenderer<State>(config: RenderLoopConfig<State>) {
   return {
     render,
     renderOnce,
+    invalidate,
+    requestRender,
     dispose,
     getState,
   };

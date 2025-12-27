@@ -1,7 +1,7 @@
 import { describe, it, expect } from "bun:test";
 import { createLayout } from "@/layout";
 import { Block, Text } from "@/view/primitives";
-import { LayoutBoundary } from "@/view/layout";
+import { LayoutBoundary } from "@/view/collections";
 import type { ComputedLayout, LayoutInputNode } from "@/types";
 
 // Mock the layout engine

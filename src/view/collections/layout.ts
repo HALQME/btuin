@@ -1,5 +1,5 @@
-import { Block, type BlockElement } from "./primitives";
-import type { ViewElement } from "./types/elements";
+import { Block, type BlockElement } from "../primitives";
+import type { ViewElement } from "../types/elements";
 
 // VStack は単に flex-direction: column な Block を作るだけ
 export function VStack(children: ViewElement[] = []): BlockElement {

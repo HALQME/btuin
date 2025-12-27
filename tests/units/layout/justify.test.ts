@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { HStack, VStack } from "@/view/layout";
+import { HStack, VStack } from "@/view/collections";
 import { Text } from "@/view/primitives";
 import { layout } from "@/layout/index";
 

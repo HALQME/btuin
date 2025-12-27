@@ -208,4 +208,102 @@ export class FlatBuffer {
       nextCol++;
     }
   }
+
+  copyFrom(other: FlatBuffer): void {
+    if (this.rows !== other.rows || this.cols !== other.cols) {
+      throw new Error("[btuin] FlatBuffer.copyFrom: size mismatch");
+    }
+    this.codes.set(other.codes);
+    this.widths.set(other.widths);
+    this.extras.clear();
+    for (const [idx, value] of other.extras) {
+      this.extras.set(idx, value);
+    }
+    for (let i = 0; i < this.fg.length; i++) {
+      this.fg[i] = other.fg[i];
+      this.bg[i] = other.bg[i];
+    }
+    this.asciiOnly = other.asciiOnly;
+  }
+
+  clearRow(row: number): void {
+    if (row < 0 || row >= this.rows) return;
+    const start = row * this.cols;
+    const end = start + this.cols;
+    this.codes.fill(32, start, end);
+    this.widths.fill(1, start, end);
+    for (let i = start; i < end; i++) {
+      this.extras.delete(i);
+      this.fg[i] = undefined;
+      this.bg[i] = undefined;
+    }
+  }
+
+  /**
+   * Scroll a full-width band of rows from `source` into this buffer.
+   *
+   * This matches terminal scroll region constraints (DECSTBM): row-only bands,
+   * no column sub-rectangles.
+   */
+  scrollRowsFrom(source: FlatBuffer, top: number, bottom: number, dy: number): void {
+    if (this.rows !== source.rows || this.cols !== source.cols) {
+      throw new Error("[btuin] FlatBuffer.scrollRowsFrom: size mismatch");
+    }
+    if (!Number.isFinite(dy)) return;
+    dy = Math.trunc(dy);
+    if (dy === 0) return;
+
+    top = Math.max(0, Math.trunc(top));
+    bottom = Math.min(this.rows - 1, Math.trunc(bottom));
+    if (bottom < top) return;
+
+    const height = bottom - top + 1;
+    const shift = Math.abs(dy);
+    if (shift >= height) {
+      for (let r = top; r <= bottom; r++) this.clearRow(r);
+      return;
+    }
+
+    if (dy < 0) {
+      // Content moves up: dest top..bottom-shift gets source top+shift..bottom
+      for (let r = top; r <= bottom - shift; r++) {
+        this.copyRowFrom(source, r - dy, r);
+      }
+      for (let r = bottom - shift + 1; r <= bottom; r++) {
+        this.clearRow(r);
+      }
+    } else {
+      // Content moves down: dest top+shift..bottom gets source top..bottom-shift
+      for (let r = bottom; r >= top + shift; r--) {
+        this.copyRowFrom(source, r - dy, r);
+      }
+      for (let r = top; r < top + shift; r++) {
+        this.clearRow(r);
+      }
+    }
+  }
+
+  private copyRowFrom(source: FlatBuffer, sourceRow: number, destRow: number) {
+    if (sourceRow < 0 || sourceRow >= source.rows) {
+      this.clearRow(destRow);
+      return;
+    }
+
+    const srcStart = sourceRow * source.cols;
+    const dstStart = destRow * this.cols;
+    const len = this.cols;
+
+    this.codes.set(source.codes.subarray(srcStart, srcStart + len), dstStart);
+    this.widths.set(source.widths.subarray(srcStart, srcStart + len), dstStart);
+    for (let i = 0; i < len; i++) {
+      const srcIdx = srcStart + i;
+      const dstIdx = dstStart + i;
+      this.fg[dstIdx] = source.fg[srcIdx];
+      this.bg[dstIdx] = source.bg[srcIdx];
+      this.extras.delete(dstIdx);
+      const extra = source.extras.get(srcIdx);
+      if (extra !== undefined) this.extras.set(dstIdx, extra);
+    }
+    this.asciiOnly = this.asciiOnly && source.asciiOnly;
+  }
 }

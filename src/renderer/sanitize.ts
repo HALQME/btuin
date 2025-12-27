@@ -4,15 +4,24 @@
  */
 
 /**
- * Regular expression to match ANSI escape sequences
- * Matches sequences like: \x1b[...m, \u001b[...H, etc.
+ * Regular expression to match ANSI escape sequences.
+ *
+ * We intentionally avoid overly-greedy patterns that can span across multiple
+ * CSI sequences and accidentally delete normal text when output contains
+ * interleaved cursor moves + SGR resets (common in render loops).
  */
-const ESC = String.fromCharCode(0x1b);
-const CSI = `${ESC}\\[`;
 const ANSI_ESCAPE_REGEX = new RegExp(
-  `${CSI}[0-9;]*m|${CSI}[^m]*m|${CSI}[0-9;]*[A-Za-z]|${CSI}[^A-Za-z]*[A-Za-z]`,
+  [
+    // CSI (Control Sequence Introducer): ESC [ ... final-byte
+    "\\u001b\\[[0-?]*[ -/]*[@-~]",
+    // OSC (Operating System Command): ESC ] ... BEL or ST
+    "\\u001b\\][^\\u0007\\u001b]*(?:\\u0007|\\u001b\\\\)",
+    // 2-byte ESC sequences
+    "\\u001b[@-Z\\\\-_]",
+  ].join("|"),
   "g",
 );
+const ESC = "\u001b";
 
 /**
  * Regular expression to match other control characters (except common whitespace)
