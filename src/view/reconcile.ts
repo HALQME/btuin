@@ -1,7 +1,26 @@
 import { isBlock, type ViewElement } from "./types/elements";
+import { type Semantics } from "./types/semantics"
 
 function identityKey(element: ViewElement): string | undefined {
   return element.key ?? element.identifier;
+}
+
+function semanticsAreEqual(a?: Semantics, b?: Semantics): boolean {
+  if (a === b) return true;
+  if (!a || !b) return a === b;
+
+  const aKeys = Object.keys(a);
+  const bKeys = Object.keys(b);
+
+  if (aKeys.length !== bKeys.length) return false;
+
+  for (const key of aKeys) {
+    if (!Object.prototype.hasOwnProperty.call(b, key) || (a as any)[key] !== (b as any)[key]) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 function styleValueEquals(key: string, a: unknown, b: unknown): boolean {
@@ -115,6 +134,10 @@ function syncCommonProps(prev: ViewElement, next: ViewElement): void {
 
   if (next.focusKey !== undefined && prev.focusKey !== next.focusKey) {
     prev.focus(next.focusKey);
+  }
+
+  if (!semanticsAreEqual(prev.semantics, next.semantics)) {
+    prev.semantics = next.semantics;
   }
 
   syncStyle(prev.style, next.style);

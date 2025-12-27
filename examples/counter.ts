@@ -2,6 +2,7 @@ import { createApp, ref } from "@/index";
 import { Text, VStack } from "@/view";
 
 const app = createApp({
+  profile: { enabled: true },
   init({ onKey, setExitOutput, runtime }) {
     const count = ref(0);
     onKey((k) => {
@@ -16,7 +17,14 @@ const app = createApp({
   render({ count }) {
     return VStack([
       Text("Counter"), //
-      Text(String(count.value)),
+      Text({
+        value: String(count.value),
+        semantics: {
+          role: "status",
+          valueNow: count.value,
+          valueText: `The current count is ${count.value}`,
+        },
+      }),
     ])
       .width("100%")
       .height("100%")

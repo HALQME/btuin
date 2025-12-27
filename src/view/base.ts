@@ -2,7 +2,7 @@ import type { KeyEventHook } from "../components/lifecycle";
 import type { Dimension, LayoutStyle } from "../layout-engine/types";
 import type { OutlineOptions } from "../renderer/types";
 import type { KeyEvent } from "../terminal/types/key-event";
-import type { Semantics } from "./types/elements";
+import type { Semantics } from "./types/semantics";
 import { markHasScrollRegion, markLayoutDirty, markRenderDirty } from "./dirty";
 
 const layoutStyleKeys = new Set<string>([

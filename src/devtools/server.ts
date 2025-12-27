@@ -4,7 +4,14 @@ import type { OutlineOptions } from "../renderer/types";
 import type { ConsoleCaptureHandle, ConsoleLine } from "../terminal/capture";
 import type { FrameMetrics } from "../runtime/profiler";
 import type { ReactivityEvent } from "../reactivity/devtools";
-import { isBlock, isText, type ViewElement } from "../view/types/elements";
+import {
+  isBlock,
+  isText,
+  type ViewElement,
+} from "../view/types/elements";
+import {
+  type Semantics
+} from "../view/types/semantics"
 import type { DevtoolsOptions } from "./types";
 import htmlDocument from "./inspector.html" with { type: "text" };
 
@@ -76,6 +83,7 @@ type ViewNode = {
   children?: ViewNode[];
   layoutStyle?: LayoutStyleInfo;
   viewStyle?: ViewStyleInfo;
+  semantics?: Semantics;
 };
 
 type BrowserSnapshot = {
@@ -140,9 +148,10 @@ function buildBrowserSnapshot(snapshot: DevtoolsSnapshot): BrowserSnapshot {
 
     const layoutStyle = pickLayoutStyle(el.style);
     const viewStyle = pickViewStyle(el.style);
+    const semantics = el.semantics;
 
     if (isText(el)) {
-      return { key, type: el.type, text: el.content, layoutStyle, viewStyle };
+      return { key, type: el.type, text: el.content, layoutStyle, viewStyle, semantics };
     }
 
     if (isBlock(el)) {
@@ -151,11 +160,12 @@ function buildBrowserSnapshot(snapshot: DevtoolsSnapshot): BrowserSnapshot {
         type: el.type,
         layoutStyle,
         viewStyle,
+        semantics,
         children: el.children.map((child) => walk(child, absX, absY)),
       };
     }
 
-    return { key, type: el.type, layoutStyle, viewStyle };
+    return { key, type: el.type, layoutStyle, viewStyle, semantics };
   };
 
   const tree = walk(snapshot.rootElement, 0, 0);

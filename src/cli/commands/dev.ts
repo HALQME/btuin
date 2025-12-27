@@ -74,7 +74,7 @@ export function runDev(options: DevCommandOptions) {
 
     try {
       env.BTUIN_DEVTOOLS_CONTROLLER = fileURLToPath(
-        new URL("../devtools/controller.ts", import.meta.url),
+        new URL("../../devtools/controller.ts", import.meta.url),
       );
     } catch {
       // ignore
