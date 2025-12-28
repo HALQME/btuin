@@ -47,7 +47,7 @@ export async function runBuild(options: BuildOptions) {
 
   if (!result.success) {
     for (const log of result.logs) {
-      process.stderr.write(`${log}\n`);
+      Bun.stderr.write(`${log}\n`);
     }
     process.exitCode = 1;
     return;
@@ -63,8 +63,8 @@ export async function runBuild(options: BuildOptions) {
   const dest = join(nativeDir, binName);
   await copyFile(source, dest);
 
-  process.stderr.write(`[btuin] build output: ${outputDir}\n`);
-  process.stderr.write(`[btuin] layout engine: ${dest}\n`);
+  Bun.stderr.write(`[btuin] build output: ${outputDir}\n`);
+  Bun.stderr.write(`[btuin] layout engine: ${dest}\n`);
 }
 
 interface BuildParsed {

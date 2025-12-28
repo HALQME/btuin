@@ -31,7 +31,7 @@ const commands: CommandDefinition[] = [toCommand(devCommand), toCommand(buildCom
 
 function printHelp() {
   const list = formatCommandList(commands);
-  process.stderr.write(
+  Bun.stderr.write(
     [
       "btuin",
       "",
@@ -49,16 +49,16 @@ function printHelp() {
 
 function printCommandHelp(commandName: string, help: HelpInfo) {
   const lines = formatCommandHelp(commandName, help);
-  process.stderr.write([`btuin ${commandName}`, "", ...lines, ""].join("\n"));
+  Bun.stderr.write([`btuin ${commandName}`, "", ...lines, ""].join("\n"));
 }
 
 function printVersion() {
   try {
     const pkgPath = fileURLToPath(new URL("../../package.json", import.meta.url));
     const pkg = JSON.parse(readFileSync(pkgPath, "utf8")) as { name?: string; version?: string };
-    process.stdout.write(`${pkg.name ?? "btuin"} ${pkg.version ?? ""}`.trimEnd() + "\n");
+    Bun.stdout.write(`${pkg.name ?? "btuin"} ${pkg.version ?? ""}`.trimEnd() + "\n");
   } catch {
-    process.stdout.write("btuin\n");
+    Bun.stdout.write("btuin\n");
   }
 }
 
@@ -87,7 +87,7 @@ export async function btuinCli(argv: string[]) {
   const [commandName, ...rest] = argv;
   const command = commands.find((cmd) => cmd.name === commandName);
   if (!command) {
-    process.stderr.write(`[btuin] unknown command: ${commandName}\n`);
+    Bun.stderr.write(`[btuin] unknown command: ${commandName}\n`);
     printHelp();
     process.exitCode = 1;
     return;
@@ -97,7 +97,7 @@ export async function btuinCli(argv: string[]) {
     await command.run(command.parse(rest));
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    process.stderr.write(`${message}\n`);
+    Bun.stderr.write(`${message}\n`);
     printCommandHelp(command.name, command.help);
     process.exitCode = 1;
   }

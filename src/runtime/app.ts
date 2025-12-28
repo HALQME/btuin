@@ -87,7 +87,7 @@ export function App<State>(root: Component<State>, options: CreateAppOptions = {
 
     let handleError: ReturnType<typeof createErrorHandler> = (context) => {
       const message = context.error.stack ?? context.error.message;
-      process.stderr.write(`[btuin] error(${context.phase}): ${message}\n`);
+      Bun.stderr.write(`[btuin] error(${context.phase}): ${message}\n`);
     };
 
     try {
@@ -248,7 +248,7 @@ function resolveDevtoolsOptions(
       port: Number.isInteger(port) && (port as number) >= 0 ? (port as number) : undefined,
       onListen: (info: { host: string; port: number; url: string }) => {
         try {
-          process.stderr.write(`[btuin] devtools: ${info.url}\n`);
+          Bun.stderr.write(`[btuin] devtools: ${info.url}\n`);
         } catch {
           // ignore
         }

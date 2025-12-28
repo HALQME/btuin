@@ -15,9 +15,9 @@ export interface DevCommandOptions {
   childArgs: string[];
 }
 
-export function runDev(options: DevCommandOptions) {
+export async function runDev(options: DevCommandOptions) {
   const entryAbs = options.entry;
-  const watchPaths = (() => {
+  const watchPaths = await (async () => {
     const out: string[] = [];
     const add = (p: string) => {
       const abs = resolve(options.cwd, p);
@@ -30,10 +30,10 @@ export function runDev(options: DevCommandOptions) {
     }
 
     const srcDir = join(options.cwd, "src");
-    if (existsSync(srcDir)) add(srcDir);
+    if (await Bun.file(srcDir).exists()) add(srcDir);
 
     const entryDir = dirname(entryAbs);
-    if (existsSync(entryDir)) out.push(entryDir);
+    if (await Bun.file(entryDir).exists()) out.push(entryDir);
 
     if (out.length === 0) out.push(options.cwd);
     return out;
@@ -52,8 +52,8 @@ export function runDev(options: DevCommandOptions) {
       host: options.tcp.host ?? "127.0.0.1",
       port: options.tcp.port ?? 0,
       onListen: ({ host, port }) => {
-        process.stderr.write(`[btuin] hot-reload tcp: ${host}:${port}\n`);
-        process.stderr.write(`[btuin] trigger: printf 'reload\\n' | nc ${host} ${port}\n`);
+        Bun.stderr.write(`[btuin] hot-reload tcp: ${host}:${port}\n`);
+        Bun.stderr.write(`[btuin] trigger: printf 'reload\\n' | nc ${host} ${port}\n`);
       },
     };
   }

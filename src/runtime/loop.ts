@@ -66,7 +66,7 @@ export class LoopManager implements ILoopManager {
         this.cleanupOutputListeners.push(() => controller.dispose());
       } catch (error) {
         const message = error instanceof Error ? (error.stack ?? error.message) : String(error);
-        process.stderr.write(`[btuin] failed to init devtools: ${message}\n`);
+        Bun.stderr.write(`[btuin] failed to init devtools: ${message}\n`);
       }
     })();
   }
