@@ -17,7 +17,7 @@ export interface BuildOptions {
 
 function resolveLayoutEngineBinary(): { source: string; binName: string } {
   const cliDir = dirname(fileURLToPath(import.meta.url));
-  const layoutEngineDir = resolve(cliDir, "..", "layout-engine");
+  const layoutEngineDir = resolve(cliDir, "../..", "layout-engine");
   const platform = process.platform;
   const arch = process.arch;
   const binName = `liblayout_engine-${platform}-${arch}.${suffix}`;
