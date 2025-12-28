@@ -1,8 +1,9 @@
 import type { KeyEvent } from "../terminal/types/key-event";
 import { stop } from "../reactivity";
 import { handleComponentKey, renderComponent } from "../components";
+import { invokeKeyHooks } from "../components/lifecycle";
 import { createInlineDiffRenderer } from "../renderer";
-import { layout } from "../layout";
+import { collectFocusTargets, focusManager, layout } from "../layout";
 import { Block } from "../view/primitives";
 import type { ViewElement } from "../view/types/elements";
 import { createRenderer } from "./render-loop";
@@ -99,6 +100,24 @@ export class LoopManager implements ILoopManager {
       try {
         if (this.devtools?.handleKey(event)) return;
 
+        if (focusManager.enabled.value) {
+          if (event.name === "tab") {
+            if (event.shift) {
+              focusManager.previous();
+            } else {
+              focusManager.next();
+            }
+            return;
+          }
+        }
+
+        const activeTarget = focusManager.getActiveTarget();
+        if (activeTarget?.element.keyHooks.length) {
+          if (invokeKeyHooks(activeTarget.element.keyHooks, event)) {
+            return;
+          }
+        }
+
         const handled = handleComponentKey(state.mounted, event);
         if (!handled && (event.sequence === "\x03" || (event.ctrl && event.name === "c"))) {
           app.exit(0, "sigint");
@@ -131,6 +150,7 @@ export class LoopManager implements ILoopManager {
       getState: () => ({}),
       onLayout: ({ size, rootElement, layoutMap }) => {
         try {
+          focusManager.setTargets(collectFocusTargets(rootElement, layoutMap));
           this.devtools?.onLayout?.({
             size,
             rootElement,
@@ -149,6 +169,8 @@ export class LoopManager implements ILoopManager {
           }
         : undefined,
     });
+
+    focusManager.enabled.value = true;
 
     if (inline) {
       let uiSuspended = false;
@@ -245,6 +267,7 @@ export class LoopManager implements ILoopManager {
   }
 
   stop() {
+    focusManager.enabled.value = false;
     const { state, updaters } = this.ctx;
     this.stopped = true;
     if (state.renderEffect) {

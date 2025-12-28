@@ -1,6 +1,60 @@
+import { ref } from "../reactivity";
+import type { Ref } from "../reactivity/ref";
 import type { ComputedLayout } from "../layout-engine/types";
 import { isBlock, type ViewElement } from "../view/types/elements";
 import type { FocusTarget } from "../view/types/focus";
+
+class FocusManager {
+  targets: FocusTarget[] = [];
+  activeTarget: Ref<string | null> = ref(null);
+  enabled = ref(false);
+
+  setTargets(targets: FocusTarget[]) {
+    this.targets = targets.sort((a, b) => {
+      if (a.rect.y === b.rect.y) {
+        return a.rect.x - b.rect.x;
+      }
+      return a.rect.y - b.rect.y;
+    });
+
+    if (this.targets.length > 0 && this.activeTarget.value === null) {
+      this.activeTarget.value = this.targets[0]?.focusKey ?? null;
+    }
+
+    if (
+      this.activeTarget.value &&
+      !this.targets.some((t) => t.focusKey === this.activeTarget.value)
+    ) {
+      this.activeTarget.value = this.targets[0]?.focusKey ?? null;
+    }
+  }
+
+  activate(key: string) {
+    if (this.targets.some((t) => t.focusKey === key)) {
+      this.activeTarget.value = key;
+    }
+  }
+
+  next() {
+    if (!this.enabled.value || this.targets.length === 0) return;
+    const currentIndex = this.targets.findIndex((t) => t.focusKey === this.activeTarget.value);
+    const nextIndex = (currentIndex + 1) % this.targets.length;
+    this.activeTarget.value = this.targets[nextIndex]?.focusKey ?? null;
+  }
+
+  previous() {
+    if (!this.enabled.value || this.targets.length === 0) return;
+    const currentIndex = this.targets.findIndex((t) => t.focusKey === this.activeTarget.value);
+    const nextIndex = (currentIndex - 1 + this.targets.length) % this.targets.length;
+    this.activeTarget.value = this.targets[nextIndex]?.focusKey ?? null;
+  }
+
+  getActiveTarget(): FocusTarget | undefined {
+    return this.targets.find((t) => t.focusKey === this.activeTarget.value);
+  }
+}
+
+export const focusManager = new FocusManager();
 
 function visitFocusTargets(
   element: ViewElement,

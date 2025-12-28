@@ -5,6 +5,7 @@ import { isBlock, isText, type BlockView, type ViewElement } from "../view/types
 import type { LayoutContainerSize, LayoutEngine, LayoutOptions } from "./types";
 
 export { renderElement } from "./renderer";
+export * from "./focus";
 
 function ensureKeys(element: ViewElement, prefix: string) {
   if (!element.identifier && !element.key) {
