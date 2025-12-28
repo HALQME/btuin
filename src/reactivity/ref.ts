@@ -7,7 +7,7 @@
 
 import { reactive, isReactive, toRaw } from "./reactive";
 import { track, trigger } from "./effect";
-import { setRefLabel, trackRef, triggerRef } from "./devtools";
+import { setRefLabel, trackRef, triggerRef } from "./tracker";
 
 const IS_REF_KEY = Symbol("__v_isRef");
 

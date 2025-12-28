@@ -1,6 +1,6 @@
 import { mkdirSync, appendFileSync } from "node:fs";
 import path from "node:path";
-import type { ConsoleLine } from "../terminal/capture";
+import type { ConsoleLine } from "../../terminal/capture";
 
 export interface LogStreamer {
   writeLine(line: ConsoleLine): void;

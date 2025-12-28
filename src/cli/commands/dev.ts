@@ -1,6 +1,4 @@
 import { isAbsolute, resolve, dirname, join } from "node:path";
-import { existsSync } from "node:fs";
-import { fileURLToPath } from "node:url";
 import { runHotReloadProcess } from "../hot-reload";
 import type { Command } from "./command";
 
@@ -73,11 +71,11 @@ export function runDev(options: DevCommandOptions) {
     const env: DevtoolsEnv = { BTUIN_DEVTOOLS: "1" };
 
     try {
-      env.BTUIN_DEVTOOLS_CONTROLLER = fileURLToPath(
-        new URL("../../devtools/controller.ts", import.meta.url),
+      env.BTUIN_DEVTOOLS_CONTROLLER = Bun.fileURLToPath(
+        new URL("../devtools/controller.ts", import.meta.dirname),
       );
-    } catch {
-      // ignore
+    } catch (e) {
+      console.error("[btuin] Failed to resolve devtools controller path:", e);
     }
 
     const host = process.env.BTUIN_DEVTOOLS_HOST ?? "127.0.0.1";
@@ -93,19 +91,25 @@ export function runDev(options: DevCommandOptions) {
             open() {},
             data() {},
             close() {},
-            error() {},
+            error(socket, error) {
+              console.error(
+                "[btuin] devtools listener error:",
+                `socket: ${socket.localAddress}:${socket.localPort}`,
+                error,
+              );
+            },
           },
         });
         const port = listener.port;
         try {
           listener.stop(true);
-        } catch {
-          // ignore
+        } catch (e) {
+          console.error("[btuin] Failed to stop temporary listener:", e);
         }
         env.BTUIN_DEVTOOLS_PORT = String(port);
         env.BTUIN_DEVTOOLS_HOST = host;
-      } catch {
-        // ignore
+      } catch (e) {
+        console.error("[btuin] Failed to find a free port for devtools:", e);
       }
     }
 
@@ -302,11 +306,11 @@ export const devCommand: Command<DevParsed> = {
     ],
   },
   parse: parseDevArgs,
-  run: (parsed: DevParsed) => {
+  run: async (parsed: DevParsed) => {
     const cwd = parsed.cwd ? resolve(process.cwd(), parsed.cwd) : process.cwd();
     const entryAbs = toAbsolutePath(cwd, parsed.entry);
 
-    runDev({
+    await runDev({
       entry: entryAbs,
       cwd,
       watch: parsed.watch,

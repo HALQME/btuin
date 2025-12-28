@@ -1,11 +1,11 @@
 import type { ServerWebSocket } from "bun";
-import type { ComputedLayout, LayoutStyle } from "../layout-engine/types";
-import type { OutlineOptions } from "../renderer/types";
-import type { ConsoleCaptureHandle, ConsoleLine } from "../terminal/capture";
-import type { FrameMetrics } from "../runtime/profiler";
-import type { ReactivityEvent } from "../reactivity/devtools";
-import { isBlock, isText, type ViewElement } from "../view/types/elements";
-import { type Semantics } from "../view/types/semantics";
+import type { ComputedLayout, LayoutStyle } from "../../layout-engine/types";
+import type { OutlineOptions } from "../../renderer/types";
+import type { ConsoleCaptureHandle, ConsoleLine } from "../../terminal/capture";
+import type { FrameMetrics } from "../../runtime/profiler";
+import type { ReactivityEvent } from "../../reactivity/tracker";
+import { isBlock, isText, type ViewElement } from "../../view/types/elements";
+import { type Semantics } from "../../view/types/semantics";
 import type { DevtoolsOptions } from "./types";
 import htmlDocument from "./inspector.html" with { type: "text" };
 

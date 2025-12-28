@@ -44,7 +44,7 @@ export type WindowedMetricsInput = {
 
 function getFallbackViewportRows(): number {
   // Fallback to terminal height when available; keep a sane default for tests/CI.
-  const rows = (process.stdout as { rows?: number } | undefined)?.rows;
+  const rows = (Bun.stdout as { rows?: number } | undefined)?.rows;
   return typeof rows === "number" && Number.isFinite(rows) ? Math.max(0, Math.trunc(rows)) : 24;
 }
 

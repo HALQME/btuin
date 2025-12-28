@@ -67,13 +67,13 @@ export function useLog(options: UseLogOptions = {}): UseLogResult {
   const dispose = () => {
     try {
       unsubscribe();
-    } catch {
-      // ignore
+    } catch (e) {
+      console.error(e);
     }
     try {
       capture.dispose();
-    } catch {
-      // ignore
+    } catch (e) {
+      console.error(e);
     }
   };
 

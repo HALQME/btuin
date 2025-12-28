@@ -69,10 +69,6 @@ export function setRefLabel(target: object, label: string) {
   refLabels.set(target, label);
 }
 
-export function getRefLabel(target: object): string | undefined {
-  return refLabels.get(target);
-}
-
 export function trackRef(target: object, key = "value") {
   emit("track", target, String(key));
 }

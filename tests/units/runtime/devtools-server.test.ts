@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { createConsoleCapture } from "@/terminal/capture";
-import { setupDevtoolsServer } from "@/devtools/server";
+import { setupDevtoolsServer } from "@/cli/devtools/server";
 import { Block, Text } from "@/view/primitives";
 import type { ComputedLayout } from "@/layout-engine/types";
 

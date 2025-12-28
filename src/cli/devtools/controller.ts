@@ -1,16 +1,16 @@
-import type { KeyEvent } from "../terminal/types/key-event";
-import type { ConsoleCaptureHandle } from "../terminal/capture";
+import type { KeyEvent } from "../../terminal/types/key-event";
+import type { ConsoleCaptureHandle } from "../../terminal/capture";
 import { setupDevtoolsLogStreaming } from "./log-stream";
 import type { DevtoolsOptions } from "./types";
 import { setupDevtoolsServer, type DevtoolsSnapshot } from "./server";
-import type { FrameMetrics } from "../runtime/profiler";
-import { subscribeReactivity } from "../reactivity/devtools";
+import type { FrameMetrics } from "../../runtime/profiler";
+import { subscribeReactivity } from "../../reactivity/tracker";
 
 export interface DevtoolsController {
   handleKey(event: KeyEvent): boolean;
   wrapView(
-    root: import("../view/types/elements").ViewElement,
-  ): import("../view/types/elements").ViewElement;
+    root: import("../../view/types/elements").ViewElement,
+  ): import("../../view/types/elements").ViewElement;
   onLayout?(snapshot: DevtoolsSnapshot): void;
   onProfileFrame?(frame: FrameMetrics): void;
   dispose(): void;
@@ -47,13 +47,13 @@ export function createDevtoolsController(options: DevtoolsOptions | undefined): 
     dispose: () => {
       try {
         cleanupReactivity?.();
-      } catch {
-        // ignore
+      } catch (e) {
+        console.error(e);
       }
       try {
         server?.dispose();
-      } catch {
-        // ignore
+      } catch (e) {
+        console.error(e);
       }
       streaming.dispose();
     },

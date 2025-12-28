@@ -1,4 +1,4 @@
-import { createConsoleCapture, type ConsoleCaptureHandle } from "../terminal/capture";
+import { createConsoleCapture, type ConsoleCaptureHandle } from "../../terminal/capture";
 import { createJsonlFileLogStreamer, createJsonlTcpLogStreamer, type LogStreamer } from "./stream";
 import type { DevtoolsOptions } from "./types";
 

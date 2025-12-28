@@ -212,8 +212,12 @@ export function createTcpReloadServer(
             if (msg) onReload();
           }
         },
-        error() {
-          // ignore
+        error(socket, error) {
+          console.error(
+            "[btuin] hot-reload tcp server error:",
+            `socket: ${socket.localAddress}:${socket.localPort}`,
+            error,
+          );
         },
         close() {
           // ignore
