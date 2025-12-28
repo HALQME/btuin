@@ -1,23 +1,18 @@
 import { createApp, ref } from "@/index";
 import { Text, VStack } from "@/view";
-
+import { type KeyEvent } from "@/types";
 const app = createApp({
-  init({ onKey, onTick, runtime, setExitOutput }) {
+  init: ({ onKey, runtime }) => {
     const progress = ref(0);
-
-    onKey((k) => {
-      if (k.name === "q") runtime.exit(0);
-    });
-
-    onTick(() => {
-      progress.value = Math.min(100, progress.value + 1);
-      setExitOutput(`canceled (${progress.value}%)`);
-      if (progress.value >= 100) {
-        setExitOutput("done.");
-        runtime.exit(0);
+    const timer = setInterval(() => {
+      progress.value += 1;
+    }, 100);
+    onKey((k: KeyEvent) => {
+      if (k.ctrl && k.name === "c") {
+        clearInterval(timer);
+        runtime.exit();
       }
-    }, 25);
-
+    });
     return { progress };
   },
   render({ progress }) {

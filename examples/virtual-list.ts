@@ -1,4 +1,5 @@
 import { createApp, ref } from "@/index";
+import type { KeyEvent } from "@/types";
 import { Text, VStack, Windowed, clampWindowedStartIndex, getWindowedMetrics } from "@/view";
 
 const TOTAL = 50_000;
@@ -8,7 +9,7 @@ const app = createApp({
   init({ onKey, runtime }) {
     const scrollIndex = ref(0);
 
-    onKey((k) => {
+    onKey((k: KeyEvent) => {
       if (k.name === "q") runtime.exit(0);
       if (k.name === "down")
         scrollIndex.value = clampWindowedStartIndex({

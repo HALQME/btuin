@@ -1,11 +1,12 @@
 import { createApp, ref } from "@/index";
+import { type KeyEvent } from "@/types";
 import { Text, VStack } from "@/view";
 
 const app = createApp({
   profile: { enabled: true },
   init({ onKey, setExitOutput, runtime }) {
     const count = ref(0);
-    onKey((k) => {
+    onKey((k: KeyEvent) => {
       setExitOutput(count.value.toString());
       if (k.name === "up") count.value++;
       if (k.name === "down") count.value--;

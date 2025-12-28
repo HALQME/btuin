@@ -1,4 +1,5 @@
 import { createApp, ref } from "@/index";
+import { type KeyEvent } from "@/types";
 import { truncateTextWidth, wrapTextWidth } from "@/renderer";
 import { HStack, Text, VStack, ZStack } from "@/view";
 import { Block } from "@/view/primitives";
@@ -82,7 +83,7 @@ const app = createApp({
       logs.value = next;
     };
 
-    onKey((k) => {
+    onKey((k: KeyEvent) => {
       if (k.name === "up") counter.value++;
       if (k.name === "down") counter.value--;
       if (k.name === "1") selected.value = "layout";
