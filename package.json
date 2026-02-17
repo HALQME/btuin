@@ -1,38 +1,22 @@
 {
-  "name": "btuin",
+  "name": "@btuin/root",
   "version": "0.1.0-4",
-  "private": false,
+  "private": true,
   "repository": {
     "type": "git",
     "url": "git+https://github.com/HALQME/btuin.git"
   },
-  "bin": {
-    "btuin": "bin/btuin"
-  },
-  "files": [
-    "bin",
-    "README.md",
-    "src",
-    "tsconfig.json"
-  ],
   "type": "module",
-  "exports": {
-    ".": "./src/index.ts",
-    "./components": "./src/components/index.ts",
-    "./dev": "./src/dev/index.ts",
-    "./hooks": "./src/hooks/index.ts",
-    "./layout": "./src/layout/index.ts",
-    "./layout-engine": "./src/layout-engine/index.ts",
-    "./reactivity": "./src/reactivity/index.ts",
-    "./renderer": "./src/renderer/index.ts",
-    "./runtime": "./src/runtime/index.ts",
-    "./terminal": "./src/terminal/index.ts",
-    "./types": "./src/types/index.ts",
-    "./view": "./src/view/index.ts"
-  },
-  "publishConfig": {
-    "access": "public",
-    "registry": "https://registry.npmjs.org/"
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "build": "mise run build",
+    "test": "mise run test",
+    "lint": "mise run lint",
+    "format": "mise run format",
+    "check": "mise run check"
   },
   "devDependencies": {
     "@types/bun": "^1.3.5"

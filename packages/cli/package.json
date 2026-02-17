@@ -1,0 +1,40 @@
+{
+  "name": "@btuin/cli",
+  "version": "0.1.0-4",
+  "description": "CLI tooling for btuin",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/HALQME/btuin.git",
+    "directory": "packages/cli"
+  },
+  "bin": {
+    "btuin": "./bin/btuin"
+  },
+  "type": "module",
+  "exports": {
+    ".": "./src/main.ts",
+    "./commands": "./src/commands/index.ts",
+    "./devtools": "./src/devtools/index.ts"
+  },
+  "files": [
+    "bin",
+    "src",
+    "README.md"
+  ],
+  "dependencies": {
+    "btuin": "workspace:*"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.5"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "engines": {
+    "bun": "^1.3.5"
+  }
+}

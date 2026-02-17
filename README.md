@@ -2,6 +2,28 @@
 
 Declarative TUI framework for the Bun runtime.
 
+## Monorepo Structure
+
+This repository is organized as a monorepo with the following packages:
+
+```
+btuin/
+├── packages/
+│   ├── core/          # btuin - Core TUI framework
+│   ├── cli/           # @btuin/cli - CLI tooling
+│   └── devtools/      # @btuin/devtools - Development tools
+├── apps/
+│   └── docs/          # Documentation
+├── tests/             # Test suite
+└── examples/          # Usage examples
+```
+
+### Packages
+
+- **`btuin`** (packages/core): Core TUI framework. This is the only package needed for production.
+- **`@btuin/cli`** (packages/cli): CLI tooling including hot reload (`btuin dev`) and build commands.
+- **`@btuin/devtools`** (packages/devtools): Development tools including performance profilers.
+
 ## Features
 
 - **Declarative UI**: Describe your interface with a tree of components.
@@ -19,11 +41,23 @@ Declarative TUI framework for the Bun runtime.
 
 ## Installation
 
+### Core Package (Required)
+
 ```bash
 bun add btuin
 ```
 
-Publishing/install details: `docs/github-packages.md`
+### CLI Tools (Development)
+
+```bash
+bun add -d @btuin/cli
+```
+
+### DevTools (Development)
+
+```bash
+bun add -d @btuin/devtools
+```
 
 ## Usage
 
@@ -166,17 +200,62 @@ await app.mount();
 
 Contributions are welcome.
 
-> This repository uses `mise` for tool management (`mise install`).
+> This repository uses **Nix Flakes** for reproducible development environment.
+
+### Prerequisites
+
+- [Nix](https://nixos.org/download.html) with flakes enabled
+- [direnv](https://direnv.net/) (optional, for automatic environment activation)
 
 ### Development Setup
 
+Using `direnv` (automatic):
 ```bash
+# Clone the repository
+git clone https://github.com/HALQME/btuin.git
+cd btuin
+
+# Allow direnv to load the environment
+direnv allow
+
 # Install dependencies
-mise exec -- bun install --frozen-lockfile
+bun install
 
 # Build the native layout-engine
-mise run build:ffi
+build-ffi
 
 # Run tests
-mise run test
+test-btuin
 ```
+
+Using `nix develop` (manual):
+```bash
+# Enter the development shell
+nix develop
+
+# Install dependencies
+bun install
+
+# Build the native layout-engine
+build-ffi
+
+# Run tests
+test-btuin
+```
+
+### Available Commands
+
+Once in the development environment, the following commands are available:
+
+| Command | Description |
+|---------|-------------|
+| `build-ffi` | Build the Rust FFI binary |
+| `check` | Run TypeScript type check |
+| `format` | Run oxfmt on packages and tests |
+| `lint` | Run oxlint on packages and tests |
+| `lint-fix` | Run oxlint with auto-fix |
+| `precommit` | Run format + lint-fix + check |
+| `test-btuin` | Run test suite |
+| `test-watch` | Run tests in watch mode |
+| `profiler` | Run profiler tests |
+| `clean` | Remove all node_modules |

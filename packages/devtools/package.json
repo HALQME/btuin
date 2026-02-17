@@ -1,0 +1,34 @@
+{
+  "name": "@btuin/devtools",
+  "version": "0.1.0-4",
+  "description": "Development tools for btuin",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/HALQME/btuin.git",
+    "directory": "packages/devtools"
+  },
+  "type": "module",
+  "exports": {
+    "./profiler": "./src/profiler-core.ts"
+  },
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "dependencies": {
+    "btuin": "workspace:*"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.5"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "engines": {
+    "bun": "^1.3.5"
+  }
+}

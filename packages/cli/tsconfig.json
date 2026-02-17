@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "btuin": ["../core/src"],
+      "btuin/*": ["../core/src/*"],
+      "@btuin/cli": ["./src"],
+      "@btuin/cli/*": ["./src/*"]
+    }
+  },
+  "include": ["src/**/*", "bin/**/*"],
+  "exclude": ["node_modules"]
+}

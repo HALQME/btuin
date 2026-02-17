@@ -85,7 +85,7 @@ export async function runDev(options: DevCommandOptions) {
 
     const pluginConfig = [
       {
-        module: "src/cli/devtools/controller.ts",
+        module: "@btuin/cli/devtools/controller",
         options: devtoolsOptions,
       },
     ];

@@ -1,6 +1,6 @@
 import { vi } from "bun:test";
-import type { AppPlugin, AppPluginFactory } from "../../src/runtime/plugin";
-import type { ViewElement } from "../../src/view/types/elements";
+import type { AppPlugin, AppPluginFactory } from "@/runtime/plugin";
+import type { ViewElement } from "@/view/types/elements";
 
 export const mockPluginHooks = {
   handleKey: vi.fn(),

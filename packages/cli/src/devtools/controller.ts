@@ -1,10 +1,10 @@
-import type { AppPlugin, AppPluginFactory } from "../../runtime/plugin";
-import type { ConsoleCaptureHandle } from "../../terminal/capture";
+import type { AppPlugin, AppPluginFactory } from "btuin/runtime/plugin";
+import type { ConsoleCaptureHandle } from "btuin/terminal/capture";
 import { setupDevtoolsLogStreaming } from "./log-stream";
 import type { DevtoolsOptions } from "./types";
 import { setupDevtoolsServer, type DevtoolsSnapshot } from "./server";
-import type { FrameMetrics } from "../../runtime/profiler";
-import { subscribeReactivity } from "../../reactivity/tracker";
+import type { FrameMetrics } from "btuin/runtime/profiler";
+import { subscribeReactivity } from "btuin/reactivity/tracker";
 
 const devtoolsPluginFactory: AppPluginFactory = (
   options: DevtoolsOptions | undefined,

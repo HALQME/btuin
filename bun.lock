@@ -11,11 +11,65 @@
         "typescript": "^5",
       },
     },
+    "apps/docs": {
+      "name": "@btuin/docs",
+      "version": "0.1.0-4",
+      "devDependencies": {
+        "@types/bun": "^1.3.5",
+      },
+    },
+    "packages/cli": {
+      "name": "@btuin/cli",
+      "version": "0.1.0-4",
+      "bin": {
+        "btuin": "./bin/btuin",
+      },
+      "dependencies": {
+        "btuin": "workspace:*",
+      },
+      "devDependencies": {
+        "@types/bun": "^1.3.5",
+      },
+      "peerDependencies": {
+        "typescript": "^5",
+      },
+    },
+    "packages/core": {
+      "name": "btuin",
+      "version": "0.1.0-4",
+      "devDependencies": {
+        "@types/bun": "^1.3.5",
+      },
+      "peerDependencies": {
+        "typescript": "^5",
+      },
+    },
+    "packages/devtools": {
+      "name": "@btuin/devtools",
+      "version": "0.1.0-4",
+      "dependencies": {
+        "btuin": "workspace:*",
+      },
+      "devDependencies": {
+        "@types/bun": "^1.3.5",
+      },
+      "peerDependencies": {
+        "typescript": "^5",
+      },
+    },
   },
   "packages": {
+    "@btuin/cli": ["@btuin/cli@workspace:packages/cli"],
+
+    "@btuin/devtools": ["@btuin/devtools@workspace:packages/devtools"],
+
+    "@btuin/docs": ["@btuin/docs@workspace:apps/docs"],
+
     "@types/bun": ["@types/bun@1.3.5", "", { "dependencies": { "bun-types": "1.3.5" } }, "sha512-RnygCqNrd3srIPEWBd5LFeUYG7plCoH2Yw9WaZGyNmdTEei+gWaHqydbaIRkIkcbXwhBT94q78QljxN0Sk838w=="],
 
     "@types/node": ["@types/node@25.0.3", "", { "dependencies": { "undici-types": "~7.16.0" } }, "sha512-W609buLVRVmeW693xKfzHeIV6nJGGz98uCPfeXI1ELMLXVeKYZ9m15fAMSaUPBHYLGFsVRcMmSCksQOrZV9BYA=="],
+
+    "btuin": ["btuin@workspace:packages/core"],
 
     "bun-types": ["bun-types@1.3.5", "", { "dependencies": { "@types/node": "*" } }, "sha512-inmAYe2PFLs0SUbFOWSVD24sg1jFlMPxOjOSSCYqUgn4Hsc3rDc7dFvfVYjFPNHtov6kgUeulV4SxbuIV/stPw=="],
 

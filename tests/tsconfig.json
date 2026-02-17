@@ -1,0 +1,17 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "btuin": ["../packages/core/src"],
+      "btuin/*": ["../packages/core/src/*"],
+      "@btuin/cli": ["../packages/cli/src"],
+      "@btuin/cli/*": ["../packages/cli/src/*"],
+      "@btuin/devtools": ["../packages/devtools/src"],
+      "@btuin/devtools/*": ["../packages/devtools/src/*"],
+      "@/*": ["../packages/core/src/*"]
+    }
+  },
+  "include": ["**/*"],
+  "exclude": ["node_modules"]
+}

@@ -1,0 +1,41 @@
+{
+  "name": "btuin",
+  "version": "0.1.0-4",
+  "description": "TUI framework for Bun",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/HALQME/btuin.git",
+    "directory": "packages/core"
+  },
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./components": "./src/components/index.ts",
+    "./hooks": "./src/hooks/index.ts",
+    "./layout": "./src/layout/index.ts",
+    "./layout-engine": "./src/layout-engine/index.ts",
+    "./reactivity": "./src/reactivity/index.ts",
+    "./renderer": "./src/renderer/index.ts",
+    "./runtime": "./src/runtime/index.ts",
+    "./terminal": "./src/terminal/index.ts",
+    "./types": "./src/types/index.ts",
+    "./view": "./src/view/index.ts"
+  },
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.5"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "engines": {
+    "bun": "^1.3.5"
+  }
+}
