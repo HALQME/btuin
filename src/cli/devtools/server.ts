@@ -284,8 +284,18 @@ export function setupDevtoolsServer(
     const resolvedPort = server.port ?? port;
     const url = `http://${resolvedHost}:${resolvedPort}`;
     info = { host: resolvedHost, port: resolvedPort, url };
+
+    // Always write to stderr and try to send IPC message to the parent (hot-reload process)
     try {
-      cfg.onListen?.(info);
+      Bun.stderr.write(`[btuin] devtools: ${info.url}\n`);
+    } catch {
+      // ignore
+    }
+    try {
+      const send = (process as any).send as undefined | ((message: unknown) => void);
+      if (typeof send === "function") {
+        send({ type: "btuin:devtools:listen", info });
+      }
     } catch {
       // ignore
     }

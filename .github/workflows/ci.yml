@@ -19,11 +19,6 @@ jobs:
         with:
           cache: true
 
-      - name: Setup mise
-        uses: jdx/mise-action@v2
-        with:
-          cache: true
-
       - name: Install toolchains
         run: mise install
 

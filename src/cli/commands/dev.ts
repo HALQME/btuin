@@ -2,8 +2,6 @@ import { isAbsolute, resolve, dirname, join } from "node:path";
 import { runHotReloadProcess } from "../hot-reload";
 import type { Command } from "./command";
 
-type DevtoolsEnv = Record<string, string | undefined>;
-
 export interface DevCommandOptions {
   entry: string;
   cwd: string;
@@ -58,70 +56,48 @@ export async function runDev(options: DevCommandOptions) {
     };
   }
 
-  const devtoolsEnv: DevtoolsEnv = (() => {
-    if (!options.devtools.enabled) {
-      return {
-        BTUIN_DEVTOOLS: undefined,
-        BTUIN_DEVTOOLS_HOST: undefined,
-        BTUIN_DEVTOOLS_PORT: undefined,
-        BTUIN_DEVTOOLS_CONTROLLER: undefined,
-      };
-    }
-
-    const env: DevtoolsEnv = { BTUIN_DEVTOOLS: "1" };
+  const env: Record<string, string | undefined> = {};
+  if (options.devtools.enabled) {
+    const devtoolsOptions: import("../devtools/types").DevtoolsOptions = {
+      enabled: true,
+      server: {
+        host: options.tcp.enabled ? options.tcp.host : "127.0.0.1",
+        port: 0, // find ephemeral port
+      },
+    };
 
     try {
-      env.BTUIN_DEVTOOLS_CONTROLLER = Bun.fileURLToPath(
-        new URL("../devtools/controller.ts", import.meta.dirname),
-      );
+      const listener = Bun.listen({
+        hostname: devtoolsOptions.server!.host ?? "127.0.0.1",
+        port: 0,
+        socket: {
+          open() {},
+          data() {},
+          close() {},
+          error() {},
+        },
+      });
+      devtoolsOptions.server!.port = listener.port;
+      listener.stop(true);
     } catch (e) {
-      console.error("[btuin] Failed to resolve devtools controller path:", e);
+      console.error("[btuin] Failed to find a free port for devtools:", e);
     }
 
-    const host = process.env.BTUIN_DEVTOOLS_HOST ?? "127.0.0.1";
-    const portFromEnv = process.env.BTUIN_DEVTOOLS_PORT;
-    if (!process.env.BTUIN_DEVTOOLS_HOST) env.BTUIN_DEVTOOLS_HOST = host;
-
-    if (!portFromEnv) {
-      try {
-        const listener = Bun.listen({
-          hostname: host,
-          port: 0,
-          socket: {
-            open() {},
-            data() {},
-            close() {},
-            error(socket, error) {
-              console.error(
-                "[btuin] devtools listener error:",
-                `socket: ${socket.localAddress}:${socket.localPort}`,
-                error,
-              );
-            },
-          },
-        });
-        const port = listener.port;
-        try {
-          listener.stop(true);
-        } catch (e) {
-          console.error("[btuin] Failed to stop temporary listener:", e);
-        }
-        env.BTUIN_DEVTOOLS_PORT = String(port);
-        env.BTUIN_DEVTOOLS_HOST = host;
-      } catch (e) {
-        console.error("[btuin] Failed to find a free port for devtools:", e);
-      }
-    }
-
-    return env;
-  })();
+    const pluginConfig = [
+      {
+        module: "src/cli/devtools/controller.ts",
+        options: devtoolsOptions,
+      },
+    ];
+    env.BTUIN_PLUGINS = JSON.stringify(pluginConfig);
+  }
 
   runHotReloadProcess({
     command: "bun",
     args: [entryAbs, ...options.childArgs],
     cwd: options.cwd,
     watch: { paths: watchPaths, debounceMs: options.debounceMs },
-    env: devtoolsEnv,
+    env,
     openDevtoolsBrowser: options.openBrowser && options.devtools.enabled,
     tcp: options.tcp.enabled
       ? {

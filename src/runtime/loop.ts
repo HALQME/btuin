@@ -10,70 +10,24 @@ import { createRenderer } from "./render-loop";
 import { createErrorContext, createErrorHandler } from "./error-boundary";
 import type { AppContext } from "./context";
 import type { ILoopManager } from "./types";
-import { pathToFileURL } from "node:url";
-import { resolve } from "node:path";
-
-type DevtoolsControllerLike = {
-  handleKey(event: KeyEvent): boolean;
-  wrapView(root: ViewElement): ViewElement;
-  onLayout?(snapshot: {
-    size: { rows: number; cols: number };
-    rootElement: ViewElement;
-    layoutMap: any;
-  }): void;
-  onProfileFrame?(frame: import("./profiler").FrameMetrics): void;
-  dispose(): void;
-};
+import type { AppPlugin } from "./plugin";
 
 export class LoopManager implements ILoopManager {
   private ctx: AppContext;
   private handleError: ReturnType<typeof createErrorHandler>;
+  private plugins: AppPlugin[];
   private cleanupTerminalFn: (() => void) | null = null;
   private cleanupOutputListeners: (() => void)[] = [];
   private cleanupProfilerListeners: (() => void)[] = [];
-  private devtools: DevtoolsControllerLike | null = null;
-  private devtoolsInit: Promise<void> | null = null;
-  private stopped = false;
 
-  constructor(context: AppContext, handleError: ReturnType<typeof createErrorHandler>) {
+  constructor(
+    context: AppContext,
+    handleError: ReturnType<typeof createErrorHandler>,
+    plugins: AppPlugin[],
+  ) {
     this.ctx = context;
     this.handleError = handleError;
-  }
-
-  private initDevtools() {
-    if (this.devtoolsInit) return;
-
-    const options = this.ctx.options.devtools;
-    if (!options) return;
-
-    this.devtoolsInit = (async () => {
-      try {
-        const mod: any = await import(resolveDevtoolsControllerModule());
-        const factory: undefined | ((opts: unknown) => DevtoolsControllerLike) =
-          mod?.createDevtoolsController;
-        if (!factory) return;
-        const controller = factory(options);
-        if (this.stopped) {
-          try {
-            controller.dispose();
-          } catch {
-            // ignore
-          }
-          return;
-        }
-
-        this.devtools = controller;
-        this.cleanupOutputListeners.push(() => controller.dispose());
-      } catch (error) {
-        const message = error instanceof Error ? (error.stack ?? error.message) : String(error);
-        Bun.stderr.write(`[btuin] failed to init devtools: ${message}\n`);
-      }
-    })();
-  }
-
-  prepare(): Promise<void> {
-    this.initDevtools();
-    return this.devtoolsInit ?? Promise.resolve();
+    this.plugins = plugins;
   }
 
   start(rows: number, cols: number) {
@@ -89,8 +43,6 @@ export class LoopManager implements ILoopManager {
 
     const pendingKeyEvents: KeyEvent[] = [];
 
-    this.initDevtools();
-
     terminal.onKey((event: KeyEvent) => {
       if (!state.mounted) {
         pendingKeyEvents.push(event);
@@ -98,7 +50,9 @@ export class LoopManager implements ILoopManager {
       }
 
       try {
-        if (this.devtools?.handleKey(event)) return;
+        for (const plugin of this.plugins) {
+          if (plugin.handleKey?.(event)) return;
+        }
 
         if (focusManager.enabled.value) {
           if (event.name === "tab") {
@@ -144,20 +98,25 @@ export class LoopManager implements ILoopManager {
       write: terminal.write,
       view: (): ViewElement => {
         if (!state.mounted) return Block();
-        const root = renderComponent(state.mounted);
-        return this.devtools?.wrapView(root) ?? root;
+        let root = renderComponent(state.mounted);
+        for (const plugin of this.plugins) {
+          root = plugin.wrapView?.(root) ?? root;
+        }
+        return root;
       },
       getState: () => ({}),
       onLayout: ({ size, rootElement, layoutMap }) => {
-        try {
-          focusManager.setTargets(collectFocusTargets(rootElement, layoutMap));
-          this.devtools?.onLayout?.({
-            size,
-            rootElement,
-            layoutMap,
-          });
-        } catch {
-          // ignore
+        focusManager.setTargets(collectFocusTargets(rootElement, layoutMap));
+        for (const plugin of this.plugins) {
+          try {
+            plugin.onLayout?.({
+              size,
+              rootElement,
+              layoutMap,
+            });
+          } catch (e) {
+            console.error(`[btuin] error in plugin '${plugin.name}' onLayout hook:`, e);
+          }
         }
       },
       handleError: this.handleError,
@@ -231,10 +190,12 @@ export class LoopManager implements ILoopManager {
 
     if (profiler.isEnabled()) {
       const cleanup = profiler.subscribeFrames((frame) => {
-        try {
-          this.devtools?.onProfileFrame?.(frame);
-        } catch {
-          // ignore
+        for (const plugin of this.plugins) {
+          try {
+            plugin.onProfileFrame?.(frame);
+          } catch (e) {
+            console.error(`[btuin] error in plugin '${plugin.name}' onProfileFrame hook:`, e);
+          }
         }
       });
       this.cleanupProfilerListeners.push(cleanup);
@@ -269,48 +230,43 @@ export class LoopManager implements ILoopManager {
   stop() {
     focusManager.enabled.value = false;
     const { state, updaters } = this.ctx;
-    this.stopped = true;
     if (state.renderEffect) {
       stop(state.renderEffect);
       updaters.renderEffect(null);
     }
-    if (this.cleanupOutputListeners.length > 0) {
-      for (const dispose of this.cleanupOutputListeners.splice(0)) {
-        try {
-          dispose();
-        } catch {
-          // ignore
-        }
+
+    for (const dispose of this.cleanupOutputListeners.splice(0)) {
+      try {
+        dispose();
+      } catch (e) {
+        console.error("[btuin] error during output listener cleanup:", e);
       }
     }
-    if (this.cleanupProfilerListeners.length > 0) {
-      for (const dispose of this.cleanupProfilerListeners.splice(0)) {
-        try {
-          dispose();
-        } catch {
-          // ignore
-        }
+    for (const dispose of this.cleanupProfilerListeners.splice(0)) {
+      try {
+        dispose();
+      } catch (e) {
+        console.error("[btuin] error during profiler listener cleanup:", e);
       }
     }
+
+    for (const plugin of this.plugins) {
+      try {
+        plugin.dispose?.();
+      } catch (e) {
+        console.error(`[btuin] error disposing plugin '${plugin.name}':`, e);
+      }
+    }
+    this.plugins = [];
+
     if (state.disposeResize) {
       state.disposeResize();
       updaters.disposeResize(null);
     }
-
-    this.devtools = null;
   }
 
   cleanupTerminal() {
     this.cleanupTerminalFn?.();
     this.cleanupTerminalFn = null;
   }
-}
-
-function resolveDevtoolsControllerModule(): string {
-  const spec = process.env.BTUIN_DEVTOOLS_CONTROLLER;
-  if (!spec) return "../" + "devtools/controller";
-  if (spec.startsWith("file:")) return spec;
-  if (spec.startsWith("/")) return pathToFileURL(spec).href;
-  if (spec.startsWith(".")) return pathToFileURL(resolve(process.cwd(), spec)).href;
-  return spec;
 }
