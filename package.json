@@ -12,16 +12,26 @@
     "apps/*"
   ],
   "scripts": {
-    "build": "mise run build",
-    "test": "mise run test",
-    "lint": "mise run lint",
-    "format": "mise run format",
-    "check": "mise run check"
+    "build": "bun run build:ffi",
+    "build:ffi": "cd packages/core/src/layout-engine && zig build -Doptimize=ReleaseFast",
+    "build:ffi:debug": "cd packages/core/src/layout-engine && zig build",
+    "build:ffi:all": "cd packages/core/src/layout-engine && zig build release",
+    "test": "bun test",
+    "test:zig": "cd packages/core/src/layout-engine && zig build test",
+    "test:watch": "bun test --watch",
+    "lint": "oxlint packages/*/src tests",
+    "lint:fix": "oxlint packages/*/src tests --fix",
+    "format": "oxfmt packages/*/src tests",
+    "check": "tsc --noEmit",
+    "precommit": "bun run format && bun run lint:fix && bun run check",
+    "bench": "cd packages/core/src/layout-engine && zig build bench",
+    "clean": "rm -rf node_modules packages/*/node_modules packages/core/src/layout-engine/zig-out packages/core/src/layout-engine/.zig-cache",
+    "profiler": "bun test ./packages/devtools/src/profiler*.spec.ts"
   },
   "devDependencies": {
-    "@types/bun": "^1.3.5"
-  },
-  "peerDependencies": {
+    "@types/bun": "^1.3.5",
+    "oxc": "latest",
+    "oxlint": "latest",
     "typescript": "^5"
   },
   "engines": {

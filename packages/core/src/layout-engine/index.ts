@@ -3,33 +3,48 @@ import path from "node:path";
 import type { LayoutInputNode, ComputedLayout, Dimension, LayoutStyle } from "./types";
 import { existsSync } from "node:fs";
 
-// --- Data Layout Constants (must match Rust) ---
-// prettier-ignore
-enum StyleProp {
-  Display, PositionType, FlexDirection, FlexWrap,
-  JustifyContent, AlignItems, AlignSelf,
-  FlexGrow, FlexShrink, FlexBasis,
-  Width, Height, MinWidth, MinHeight, MaxWidth, MaxHeight,
-  MarginLeft, MarginRight, MarginTop, MarginBottom,
-  PaddingLeft, PaddingRight, PaddingTop, PaddingBottom,
-  GapRow, GapColumn,
-  ChildrenCount, ChildrenOffset,
-  TotalProps,
-}
-const STYLE_STRIDE = StyleProp.TotalProps;
+// --- Constants (must match Zig layout-engine) ---
+const STYLE_STRIDE = 32;
+const RESULT_STRIDE = 5;
 
-// --- Incremental FFI ops (must match Rust) ---
-enum LayoutOp {
-  CreateLeaf = 1,
-  UpdateStyle = 2,
-  SetChildren = 3,
-  RemoveNode = 4,
-}
+// StyleProp indices (must match StyleProp enum in Zig)
+const StyleProp = {
+  Display: 0,
+  PositionType: 1,
+  FlexDirection: 2,
+  JustifyContent: 3,
+  AlignItems: 4,
+  AlignSelf: 5,
+  FlexGrow: 6,
+  FlexShrink: 7,
+  Width: 8,
+  Height: 9,
+  MinWidth: 10,
+  MinHeight: 11,
+  MaxWidth: 12,
+  MaxHeight: 13,
+  GapRow: 14,
+  GapColumn: 15,
+  PaddingTop: 16,
+  PaddingRight: 17,
+  PaddingBottom: 18,
+  PaddingLeft: 19,
+  MarginTop: 20,
+  MarginRight: 21,
+  MarginBottom: 22,
+  MarginLeft: 23,
+  ChildrenCount: 24,
+  ChildrenOffset: 25,
+} as const;
 
-// --- Helper Functions for Serialization ---
+// --- Helper Functions ---
 
 function dimToFloat(dim: Dimension | undefined): number {
-  if (typeof dim === "number") return dim;
+  if (typeof dim === "number") {
+    // Negative values represent percentages in the new API
+    // e.g., -0.5 means 50%
+    return dim;
+  }
   return NaN; // Represents 'auto'
 }
 
@@ -47,75 +62,12 @@ function boxToQuad(
   return [0, 0, 0, 0];
 }
 
-function writeStyle(out: Float32Array, node: LayoutInputNode) {
-  out.fill(0);
-  const style: LayoutStyle = node;
-
-  out[StyleProp.FlexGrow] = style.flexGrow ?? 0;
-  out[StyleProp.FlexShrink] = style.flexShrink ?? 1;
-
-  const flexDirectionMap: Record<string, number> = {
-    row: 0,
-    column: 1,
-    "row-reverse": 2,
-    "column-reverse": 3,
-  };
-  out[StyleProp.FlexDirection] = flexDirectionMap[style.flexDirection ?? "row"] ?? 0;
-
-  const [gapRow, gapColumn] = gapToPair(style.gap);
-  out[StyleProp.GapRow] = gapRow;
-  out[StyleProp.GapColumn] = gapColumn;
-
-  const justifyContentMap: Record<string, number> = {
-    "flex-start": 0,
-    "flex-end": 1,
-    center: 2,
-    "space-between": 3,
-    "space-around": 4,
-    "space-evenly": 5,
-  };
-  out[StyleProp.JustifyContent] = justifyContentMap[style.justifyContent ?? "flex-start"] ?? 0;
-
-  const alignItemsMap: Record<string, number> = {
-    "flex-start": 0,
-    "flex-end": 1,
-    center: 2,
-    baseline: 3,
-    stretch: 4,
-  };
-  out[StyleProp.AlignItems] = alignItemsMap[style.alignItems ?? "stretch"] ?? 4;
-
-  const positionTypeMap: Record<string, number> = {
-    relative: 0,
-    absolute: 1,
-  };
-  out[StyleProp.PositionType] = positionTypeMap[style.position ?? "relative"] ?? 0;
-
-  out[StyleProp.Width] = dimToFloat(style.width);
-  out[StyleProp.Height] = dimToFloat(style.height);
-
-  const marginArr = boxToQuad(style.margin);
-  out.set(marginArr, StyleProp.MarginLeft);
-
-  const paddingArr = boxToQuad(style.padding);
-  out.set(paddingArr, StyleProp.PaddingLeft);
-}
-
-function sameFloat(a: number, b: number): boolean {
-  return a === b || (Number.isNaN(a) && Number.isNaN(b));
-}
-
-function sameStyle(a: Float32Array, b: Float32Array): boolean {
-  for (let i = 0; i < STYLE_STRIDE; i++) {
-    if (!sameFloat(a[i]!, b[i]!)) return false;
-  }
-  return true;
-}
+// --- Serialization ---
 
 function serializeTree(root: LayoutInputNode): {
-  flatNodes: LayoutInputNode[];
   nodesBuffer: Float32Array;
   childrenBuffer: Uint32Array;
+  nodeCount: number;
 } {
   const flatNodes: LayoutInputNode[] = [];
   const nodeMap = new Map<LayoutInputNode, number>();
@@ -124,7 +76,7 @@ function serializeTree(root: LayoutInputNode): {
     if (nodeMap.has(node)) return;
     const id = idCounter.count++;
     nodeMap.set(node, id);
-    flatNodes[id] = node; // Ensure order by ID
+    flatNodes[id] = node;
     if (node.children) {
       for (const child of node.children) {
         traverse(child, idCounter);
@@ -143,9 +95,11 @@ function serializeTree(root: LayoutInputNode): {
     const style: LayoutStyle = node;
     const offset = i * STYLE_STRIDE;
 
-    nodesBuffer[offset + StyleProp.FlexGrow] = style.flexGrow ?? 0;
-    nodesBuffer[offset + StyleProp.FlexShrink] = style.flexShrink ?? 1;
+    // Basic display properties
+    nodesBuffer[offset + StyleProp.Display] = 0; // Flex
+    nodesBuffer[offset + StyleProp.PositionType] = style.position === "absolute" ? 1 : 0;
 
+    // Flex direction
     const flexDirectionMap: Record<string, number> = {
       row: 0,
       column: 1,
@@ -155,10 +109,7 @@ function serializeTree(root: LayoutInputNode): {
     nodesBuffer[offset + StyleProp.FlexDirection] =
       flexDirectionMap[style.flexDirection ?? "row"] ?? 0;
 
-    const [gapRow, gapColumn] = gapToPair(style.gap);
-    nodesBuffer[offset + StyleProp.GapRow] = gapRow;
-    nodesBuffer[offset + StyleProp.GapColumn] = gapColumn;
-
+    // Justify content
     const justifyContentMap: Record<string, number> = {
       "flex-start": 0,
       "flex-end": 1,
@@ -170,31 +121,57 @@ function serializeTree(root: LayoutInputNode): {
     nodesBuffer[offset + StyleProp.JustifyContent] =
       justifyContentMap[style.justifyContent ?? "flex-start"] ?? 0;
 
+    // Align items
     const alignItemsMap: Record<string, number> = {
-      "flex-start": 0,
-      "flex-end": 1,
-      center: 2,
-      baseline: 3,
+      stretch: 0,
+      "flex-start": 1,
+      "flex-end": 2,
+      center: 3,
+    };
+    nodesBuffer[offset + StyleProp.AlignItems] = alignItemsMap[style.alignItems ?? "stretch"] ?? 0;
+
+    // Align self
+    const alignSelfMap: Record<string, number> = {
+      auto: 0,
+      "flex-start": 1,
+      "flex-end": 2,
+      center: 3,
       stretch: 4,
     };
-    nodesBuffer[offset + StyleProp.AlignItems] = alignItemsMap[style.alignItems ?? "stretch"] ?? 4;
+    nodesBuffer[offset + StyleProp.AlignSelf] = alignSelfMap[style.alignSelf ?? "auto"] ?? 0;
 
-    const positionTypeMap: Record<string, number> = {
-      relative: 0,
-      absolute: 1,
-    };
-    nodesBuffer[offset + StyleProp.PositionType] =
-      positionTypeMap[style.position ?? "relative"] ?? 0;
+    // Flex properties
+    nodesBuffer[offset + StyleProp.FlexGrow] = style.flexGrow ?? 0;
+    nodesBuffer[offset + StyleProp.FlexShrink] = style.flexShrink ?? 1;
 
+    // Dimensions (width, height)
     nodesBuffer[offset + StyleProp.Width] = dimToFloat(style.width);
     nodesBuffer[offset + StyleProp.Height] = dimToFloat(style.height);
+    nodesBuffer[offset + StyleProp.MinWidth] = dimToFloat(style.minWidth);
+    nodesBuffer[offset + StyleProp.MinHeight] = dimToFloat(style.minHeight);
+    nodesBuffer[offset + StyleProp.MaxWidth] = dimToFloat(style.maxWidth);
+    nodesBuffer[offset + StyleProp.MaxHeight] = dimToFloat(style.maxHeight);
 
-    const marginArr = boxToQuad(style.margin);
-    nodesBuffer.set(marginArr, offset + StyleProp.MarginLeft);
+    // Gap
+    const [gapRow, gapColumn] = gapToPair(style.gap);
+    nodesBuffer[offset + StyleProp.GapRow] = gapRow;
+    nodesBuffer[offset + StyleProp.GapColumn] = gapColumn;
 
+    // Padding (top, right, bottom, left)
     const paddingArr = boxToQuad(style.padding);
-    nodesBuffer.set(paddingArr, offset + StyleProp.PaddingLeft);
+    nodesBuffer[offset + StyleProp.PaddingTop] = paddingArr[0];
+    nodesBuffer[offset + StyleProp.PaddingRight] = paddingArr[1];
+    nodesBuffer[offset + StyleProp.PaddingBottom] = paddingArr[2];
+    nodesBuffer[offset + StyleProp.PaddingLeft] = paddingArr[3];
 
+    // Margin (top, right, bottom, left)
+    const marginArr = boxToQuad(style.margin);
+    nodesBuffer[offset + StyleProp.MarginTop] = marginArr[0];
+    nodesBuffer[offset + StyleProp.MarginRight] = marginArr[1];
+    nodesBuffer[offset + StyleProp.MarginBottom] = marginArr[2];
+    nodesBuffer[offset + StyleProp.MarginLeft] = marginArr[3];
+
+    // Children
     const children = node.children ?? [];
     nodesBuffer[offset + StyleProp.ChildrenOffset] = childrenBufferData.length;
     nodesBuffer[offset + StyleProp.ChildrenCount] = children.length;
@@ -206,307 +183,149 @@ function serializeTree(root: LayoutInputNode): {
   }
 
   const childrenBuffer = new Uint32Array(childrenBufferData);
-  return { flatNodes, nodesBuffer, childrenBuffer };
+  return { nodesBuffer, childrenBuffer, nodeCount };
 }
 
-// --- FFI setup ---
+// --- FFI Setup ---
 
-const libName = "liblayout_engine";
+const libName = "liblayout-engine";
 const libPath = () => {
+  // Try development path first
   let devpath = path.join(import.meta.dir, "target", "release", `${libName}.${suffix}`);
   if (existsSync(devpath)) {
     return devpath;
   }
+  
+  // Try root level (for built packages)
+  let rootPath = path.join(import.meta.dir, "..", "..", "..", `${libName}.${suffix}`);
+  if (existsSync(rootPath)) {
+    return rootPath;
+  }
+
+  // Try platform-specific binary
   const platform = process.platform;
   const arch = process.arch;
-  const binName = `liblayout_engine-${platform}-${arch}.${suffix}`;
-  const libPath = path.join(import.meta.dir, "native", binName);
+  const binName = `${libName}-${platform}-${arch}.${suffix}`;
+  const nativePath = path.join(import.meta.dir, "native", binName);
 
-  if (!existsSync(libPath))
-    throw new Error(`
-        [btuin] Native binary not found at: ${libPath}
-        Platform: ${platform}, Arch: ${arch}
-        Please ensure the package is installed correctly.
-      `);
+  if (!existsSync(nativePath))
+    throw new Error(
+      `[btuin] Native binary not found. ` +
+      `Tried: ${devpath}, ${rootPath}, ${nativePath}\n` +
+      `Please run: build-ffi`
+    );
 
-  return libPath;
+  return nativePath;
 };
 
 const { symbols } = dlopen(libPath(), {
-  create_engine: { args: [], returns: FFIType.ptr },
-  destroy_engine: { args: [FFIType.ptr], returns: FFIType.void },
-  compute_layout_from_buffers: {
-    args: [FFIType.ptr, FFIType.ptr, FFIType.u64, FFIType.ptr, FFIType.u64],
-    returns: FFIType.i32,
-  },
-  apply_ops_and_compute: {
+  // Engine lifecycle
+  le_create: { args: [], returns: FFIType.ptr },
+  le_destroy: { args: [FFIType.ptr], returns: FFIType.void },
+  le_version: { args: [], returns: FFIType.u32 },
+  
+  // Layout computation
+  le_compute: {
     args: [
-      FFIType.ptr,
-      FFIType.ptr,
-      FFIType.u64,
-      FFIType.ptr,
-      FFIType.u64,
-      FFIType.ptr,
-      FFIType.u64,
+      FFIType.ptr,      // engine
+      FFIType.ptr,      // style_buffer
+      FFIType.u64,      // style_buffer_len
+      FFIType.ptr,      // children_buffer
+      FFIType.u64,      // children_buffer_len
+      FFIType.u32,      // node_count
+      FFIType.f32,      // available_width
+      FFIType.f32,      // available_height
     ],
     returns: FFIType.i32,
   },
-  get_results_ptr: { args: [FFIType.ptr], returns: FFIType.ptr },
-  get_results_len: { args: [FFIType.ptr], returns: FFIType.u64 },
+  
+  // Results access
+  le_get_results_ptr: { args: [FFIType.ptr], returns: FFIType.ptr },
+  le_get_results_len: { args: [FFIType.ptr], returns: FFIType.u64 },
+  
+  // Introspection
+  le_abi_version: { args: [], returns: FFIType.u32 },
+  le_style_stride: { args: [], returns: FFIType.u32 },
+  le_result_stride: { args: [], returns: FFIType.u32 },
 });
 
-// --- Memory Management ---
+// Verify ABI version
+const abiVersion = symbols.le_abi_version();
+if (abiVersion !== 3) {
+  console.warn(
+    `[btuin] Layout engine ABI version mismatch. ` +
+    `Expected: 3, Got: ${abiVersion}`
+  );
+}
 
-const registry = new FinalizationRegistry((enginePtr: import("bun:ffi").Pointer) => {
-  console.log(`[FFI] Finalizing engine at ${enginePtr}`);
-  symbols.destroy_engine(enginePtr);
-});
-
-// --- FFI Wrapper Class ---
+// --- Layout Engine Class ---
 
 class LayoutEngineJS {
   private enginePtr: import("bun:ffi").Pointer | null;
-  private keyToId = new Map<string, number>();
-  private idToKey = new Map<number, string>();
-  private prevStyle = new Map<number, Float32Array>();
-  private prevChildren = new Map<number, number[]>();
-  private freeIds: number[] = [];
-  private nextId = 1;
 
   constructor() {
-    this.enginePtr = symbols.create_engine();
+    this.enginePtr = symbols.le_create();
     if (!this.enginePtr) throw new Error("Failed to create layout engine.");
-    registry.register(this, this.enginePtr, this);
   }
 
-  compute(root: LayoutInputNode): ComputedLayout {
+  compute(root: LayoutInputNode, availableWidth = Infinity, availableHeight = Infinity): ComputedLayout {
     if (!this.enginePtr) throw new Error("Layout engine has been destroyed.");
-    if (process.env.BTUIN_DISABLE_FFI_DIRTY_CHECKING === "1") {
-      return this.computeFull(root);
-    }
-    try {
-      return this.computeDirty(root);
-    } catch {
-      this.resetDirtyCache();
-      return this.computeFull(root);
-    }
-  }
+    
+    const { nodesBuffer, childrenBuffer, nodeCount } = serializeTree(root);
 
-  private resetDirtyCache() {
-    this.keyToId.clear();
-    this.idToKey.clear();
-    this.prevStyle.clear();
-    this.prevChildren.clear();
-    this.freeIds.length = 0;
-    this.nextId = 1;
-  }
-
-  private computeFull(root: LayoutInputNode): ComputedLayout {
-    if (!this.enginePtr) throw new Error("Layout engine has been destroyed.");
-    const { flatNodes, nodesBuffer, childrenBuffer } = serializeTree(root);
-
-    const status = symbols.compute_layout_from_buffers(
+    const status = symbols.le_compute(
       this.enginePtr,
       nodesBuffer.length > 0 ? ptr(nodesBuffer) : null,
       nodesBuffer.length,
       childrenBuffer.length > 0 ? ptr(childrenBuffer) : null,
       childrenBuffer.length,
+      nodeCount,
+      Number.isFinite(availableWidth) ? availableWidth : 1e38,
+      Number.isFinite(availableHeight) ? availableHeight : 1e38,
     );
 
     if (status !== 0) {
       throw new Error(`Layout computation failed with status: ${status}`);
     }
 
-    const computedLayout: ComputedLayout = {};
-    this.readResultsToLayout(computedLayout, (id) => {
-      const node = flatNodes[id];
-      return node?.key ?? node?.identifier;
-    });
-    return computedLayout;
+    return this.readResults();
   }
 
-  private computeDirty(root: LayoutInputNode): ComputedLayout {
-    if (!this.enginePtr) throw new Error("Layout engine has been destroyed.");
+  private readResults(): ComputedLayout {
+    const resultsPtr = symbols.le_get_results_ptr(this.enginePtr);
+    const resultsLen = Number(symbols.le_get_results_len(this.enginePtr));
 
-    const rootKey = root.key ?? root.identifier;
-    if (!rootKey) return this.computeFull(root);
+    if (!resultsPtr || resultsLen === 0) return {};
 
-    const prevRootKey = this.idToKey.get(0);
-    if (prevRootKey && prevRootKey !== rootKey) {
-      this.keyToId.delete(prevRootKey);
-    }
-    this.keyToId.set(rootKey, 0);
-    this.idToKey.set(0, rootKey);
-
-    const seen = new Set<number>();
-
-    const ensureId = (key: string): number => {
-      const existing = this.keyToId.get(key);
-      if (existing !== undefined) return existing;
-      const id = this.freeIds.pop() ?? this.nextId++;
-      this.keyToId.set(key, id);
-      this.idToKey.set(id, key);
-      return id;
-    };
-
-    const styleScratch = new Float32Array(STYLE_STRIDE);
-    const stylePayloads: Float32Array[] = [];
-    const childrenPayloads: number[][] = [];
-    const ops: number[] = [];
-    let childrenCursor = 0;
-
-    const pushStyle = (style: Float32Array): number => {
-      const offset = stylePayloads.length * STYLE_STRIDE;
-      stylePayloads.push(style);
-      return offset;
-    };
-    const pushChildren = (children: number[]): { offset: number; count: number } => {
-      const offset = childrenCursor;
-      childrenPayloads.push(children);
-      childrenCursor += children.length;
-      return { offset, count: children.length };
-    };
-
-    const visit = (node: LayoutInputNode): number => {
-      const key = node.key ?? node.identifier;
-      if (!key) throw new Error("[btuin] LayoutInputNode must have key or identifier.");
-      const id = ensureId(key);
-      seen.add(id);
-
-      writeStyle(styleScratch, node);
-      const prev = this.prevStyle.get(id);
-      if (!prev) {
-        const stored = new Float32Array(STYLE_STRIDE);
-        stored.set(styleScratch);
-        this.prevStyle.set(id, stored);
-        const styleOffset = pushStyle(stored);
-        ops.push(LayoutOp.CreateLeaf, id, styleOffset);
-      } else if (!sameStyle(prev, styleScratch)) {
-        prev.set(styleScratch);
-        const styleOffset = pushStyle(prev);
-        ops.push(LayoutOp.UpdateStyle, id, styleOffset);
-      }
-
-      const childrenIds = (node.children ?? []).map(visit);
-      const prevKids = this.prevChildren.get(id) ?? [];
-      let sameKids = prevKids.length === childrenIds.length;
-      if (sameKids) {
-        for (let i = 0; i < childrenIds.length; i++) {
-          if (prevKids[i] !== childrenIds[i]) {
-            sameKids = false;
-            break;
-          }
-        }
-      }
-      if (!sameKids) {
-        const { offset, count } = pushChildren(childrenIds);
-        ops.push(LayoutOp.SetChildren, id, offset, count);
-        this.prevChildren.set(id, childrenIds);
-      }
-      return id;
-    };
-
-    visit(root);
-
-    // removals (after parents are updated)
-    for (const id of this.prevStyle.keys()) {
-      if (id === 0) continue;
-      if (seen.has(id)) continue;
-      ops.push(LayoutOp.RemoveNode, id);
-      this.prevStyle.delete(id);
-      this.prevChildren.delete(id);
-      const key = this.idToKey.get(id);
-      if (key) this.keyToId.delete(key);
-      this.idToKey.delete(id);
-      this.freeIds.push(id);
-    }
-
-    if (ops.length === 0) {
-      const computedLayout: ComputedLayout = {};
-      this.readResultsToLayout(computedLayout, (id) => this.idToKey.get(id));
-      return computedLayout;
-    }
-
-    const opsBuf = new Uint32Array(ops);
-    const styles = new Float32Array(stylePayloads.length * STYLE_STRIDE);
-    for (let i = 0; i < stylePayloads.length; i++) {
-      styles.set(stylePayloads[i]!, i * STYLE_STRIDE);
-    }
-
-    const children = new Uint32Array(childrenCursor);
-    {
-      let offset = 0;
-      for (const arr of childrenPayloads) {
-        children.set(arr, offset);
-        offset += arr.length;
-      }
-    }
-
-    const status = symbols.apply_ops_and_compute(
-      this.enginePtr,
-      opsBuf.length > 0 ? ptr(opsBuf) : null,
-      opsBuf.length,
-      styles.length > 0 ? ptr(styles) : null,
-      styles.length,
-      children.length > 0 ? ptr(children) : null,
-      children.length,
+    const resultsBuffer = new Float32Array(
+      toArrayBuffer(resultsPtr, 0, resultsLen * Float32Array.BYTES_PER_ELEMENT)
     );
-
-    if (status !== 0) {
-      this.resetDirtyCache();
-      return this.computeFull(root);
-    }
 
     const computedLayout: ComputedLayout = {};
-    this.readResultsToLayout(computedLayout, (id) => this.idToKey.get(id));
-    return computedLayout;
-  }
-
-  private readResultsToLayout(
-    target: ComputedLayout,
-    resolveKey: (id: number) => string | undefined,
-  ) {
-    const resultsPtr = symbols.get_results_ptr(this.enginePtr);
-    const resultsLenU64 = symbols.get_results_len(this.enginePtr);
-    const resultsLen = Number(resultsLenU64);
-    if (!Number.isSafeInteger(resultsLen)) {
-      throw new Error(`Unexpected results length (u64): ${resultsLenU64.toString()}`);
-    }
-
-    if (!resultsPtr || resultsLen === 0) return;
-
-    const resultsArrayBuffer = toArrayBuffer(
-      resultsPtr,
-      0,
-      resultsLen * Float32Array.BYTES_PER_ELEMENT,
-    );
-    const resultsBuffer = new Float32Array(resultsArrayBuffer);
-
-    const resultStride = 5; // js_id, x, y, width, height
-
     const snap = (value: number): number => {
       if (!Number.isFinite(value)) return value;
       const rounded = Math.round(value);
       return Math.abs(value - rounded) < 1e-4 ? rounded : value;
     };
 
-    for (let i = 0; i < resultsLen; i += resultStride) {
-      const jsId = resultsBuffer[i]!;
-      const key = resolveKey(jsId);
-      if (!key) continue;
-      target[key] = {
+    for (let i = 0; i < resultsLen; i += RESULT_STRIDE) {
+      const nodeId = resultsBuffer[i]!;
+      // Node ID corresponds to traversal order, we need to map it back
+      // For now, use the node ID as the key directly
+      computedLayout[nodeId] = {
         x: snap(resultsBuffer[i + 1]!),
         y: snap(resultsBuffer[i + 2]!),
         width: snap(resultsBuffer[i + 3]!),
         height: snap(resultsBuffer[i + 4]!),
       };
     }
+
+    return computedLayout;
   }
 
   destroy() {
     if (this.enginePtr) {
-      symbols.destroy_engine(this.enginePtr);
-      registry.unregister(this);
+      symbols.le_destroy(this.enginePtr);
       this.enginePtr = null;
     }
   }
@@ -523,8 +342,12 @@ function getEngine(): LayoutEngineJS {
   return engineInstance;
 }
 
-export function computeLayout(root: LayoutInputNode): ComputedLayout {
-  return getEngine().compute(root);
+export function computeLayout(
+  root: LayoutInputNode,
+  availableWidth?: number,
+  availableHeight?: number
+): ComputedLayout {
+  return getEngine().compute(root, availableWidth, availableHeight);
 }
 
 export function cleanupLayoutEngine() {
@@ -533,3 +356,6 @@ export function cleanupLayoutEngine() {
     engineInstance = null;
   }
 }
+
+// Export constants for introspection
+export { STYLE_STRIDE, RESULT_STRIDE };
