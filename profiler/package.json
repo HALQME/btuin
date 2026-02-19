@@ -15,9 +15,6 @@
     "src",
     "README.md"
   ],
-  "dependencies": {
-    "btuin": "workspace:*"
-  },
   "publishConfig": {
     "access": "public",
     "registry": "https://registry.npmjs.org/"

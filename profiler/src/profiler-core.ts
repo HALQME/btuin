@@ -1,4 +1,30 @@
-import type { TerminalAdapter } from "@/runtime/terminal-adapter";
+type KeyEvent = {
+  sequence: string;
+  name: string;
+  ctrl: boolean;
+  meta: boolean;
+  shift: boolean;
+  data?: string;
+};
+
+type TerminalAdapter = {
+  setupRawMode(): void;
+  clearScreen(): void;
+  moveCursor(row: number, col: number): void;
+  cleanupWithoutClear(): void;
+  setBracketedPaste?(enabled: boolean): void;
+  patchConsole(): () => void;
+  startCapture(): void;
+  stopCapture(): void;
+  onStdout?(handler: (text: string) => void): () => void;
+  onStderr?(handler: (text: string) => void): () => void;
+  writeStdout?(text: string): void;
+  writeStderr?(text: string): void;
+  onKey(handler: (event: KeyEvent) => void): void;
+  getTerminalSize(): { rows: number; cols: number };
+  disposeSingletonCapture(): void;
+  write(output: string): void;
+};
 
 type FrameMetrics = {
   id: number;
