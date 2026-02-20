@@ -12,6 +12,10 @@ const app = createApp({
         clearInterval(timer);
         runtime.exit();
       }
+      if (k.name === "q") {
+        clearInterval(timer);
+        runtime.exit();
+      }
     });
     return { progress };
   },
@@ -23,4 +27,4 @@ const app = createApp({
   },
 });
 
-await app.mount({ inline: true, inlineCleanupOnExit: true });
+app.mount({ inline: true, inlineCleanupOnExit: true });

@@ -33,28 +33,28 @@ bun add btuin
 import { createApp, ref, ui } from "btuin";
 
 const app = createApp({
-  // `init`は状態とイベントリスナーをセットアップするために一度だけ呼び出されます。
-  init({ onKey, runtime }) {
-    const count = ref(0);
+	// `init`は状態とイベントリスナーをセットアップするために一度だけ呼び出されます。
+	init({ onKey, runtime }) {
+		const count = ref(0);
 
-    onKey((keyEvent) => {
-      if (keyEvent.name === "up") count.value++;
-      if (keyEvent.name === "down") count.value--;
-      if (keyEvent.name === "q") runtime.exit(0);
-    });
+		onKey((keyEvent) => {
+			if (keyEvent.name === "up") count.value++;
+			if (keyEvent.name === "down") count.value--;
+			if (keyEvent.name === "q") runtime.exit(0);
+		});
 
-    return { count };
-  },
+		return { count };
+	},
 
-  // `render`はUIツリーを返します。状態が変化するたびに再実行されます。
-  render({ count }) {
-    return ui
-      .VStack([ui.Text("Counter"), ui.Text(String(count.value))])
-      .width("100%")
-      .height("100%")
-      .justify("center") // 子要素を垂直方向に中央揃え
-      .align("center"); // 子要素を水平方向に中央揃え
-  },
+	// `render`はUIツリーを返します。状態が変化するたびに再実行されます。
+	render({ count }) {
+		return ui
+			.VStack([ui.Text("Counter"), ui.Text(String(count.value))])
+			.width("100%")
+			.height("100%")
+			.justify("center") // 子要素を垂直方向に中央揃え
+			.align("center"); // 子要素を水平方向に中央揃え
+	},
 });
 
 await app.mount();
@@ -72,30 +72,30 @@ await app.mount();
 import { createApp, ref, ui } from "btuin";
 
 const app = createApp({
-  init({ onKey, onTick, runtime, setExitOutput }) {
-    const progress = ref(0);
+	init({ onKey, onTick, runtime, setExitOutput }) {
+		const progress = ref(0);
 
-    onKey((k) => k.name === "q" && runtime.exit(0));
+		onKey((k) => k.name === "q" && runtime.exit(0));
 
-    onTick(() => {
-      progress.value++;
-      if (progress.value >= 100) {
-        setExitOutput("完了！");
-        runtime.exit(0);
-      }
-    }, 25);
+		onTick(() => {
+			progress.value++;
+			if (progress.value >= 100) {
+				setExitOutput("完了！");
+				runtime.exit(0);
+			}
+		}, 25);
 
-    return { progress };
-  },
-  render({ progress }) {
-    return ui.Text(`進捗: ${progress.value}%`);
-  },
+		return { progress };
+	},
+	render({ progress }) {
+		return ui.Text(`進捗: ${progress.value}%`);
+	},
 });
 
 await app.mount({
-  inline: true,
-  // 終了時に画面からUIをクリアする
-  inlineCleanupOnExit: true,
+	inline: true,
+	// 終了時に画面からUIをクリアする
+	inlineCleanupOnExit: true,
 });
 ```
 
@@ -110,33 +110,33 @@ const TOTAL = 50_000;
 const items = Array.from({ length: TOTAL }, (_, i) => `アイテム ${i}`);
 
 const app = createApp({
-  init({ onKey, runtime }) {
-    const scrollIndex = ref(0);
+	init({ onKey, runtime }) {
+		const scrollIndex = ref(0);
 
-    onKey((k) => {
-      if (k.name === "q") runtime.exit(0);
-      // 注: `clampWindowedStartIndex`は、スクロールインデックスが
-      // 有効な範囲内に収まるようにするためのヘルパーです。
-      if (k.name === "down") scrollIndex.value++;
-      if (k.name === "up") scrollIndex.value--;
-      if (k.name === "pagedown") scrollIndex.value += 20;
-      if (k.name === "pageup") scrollIndex.value -= 20;
-    });
+		onKey((k) => {
+			if (k.name === "q") runtime.exit(0);
+			// 注: `clampWindowedStartIndex`は、スクロールインデックスが
+			// 有効な範囲内に収まるようにするためのヘルパーです。
+			if (k.name === "down") scrollIndex.value++;
+			if (k.name === "up") scrollIndex.value--;
+			if (k.name === "pagedown") scrollIndex.value += 20;
+			if (k.name === "pageup") scrollIndex.value -= 20;
+		});
 
-    return { scrollIndex };
-  },
-  render({ scrollIndex }) {
-    const list = ui.Windowed({
-      items,
-      startIndex: scrollIndex.value,
-      renderItem: (item) => ui.Text(item),
-    });
+		return { scrollIndex };
+	},
+	render({ scrollIndex }) {
+		const list = ui.Windowed({
+			items,
+			startIndex: scrollIndex.value,
+			renderItem: (item) => ui.Text(item),
+		});
 
-    return ui.VStack([
-      ui.Text(`${items.length}個のアイテムを表示中（qで終了）`),
-      list,
-    ]);
-  },
+		return ui.VStack([
+			ui.Text(`${items.length}個のアイテムを表示中（qで終了）`),
+			list,
+		]);
+	},
 });
 
 await app.mount();

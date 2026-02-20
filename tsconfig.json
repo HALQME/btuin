@@ -3,7 +3,7 @@
     // Environment setup & latest features
     "lib": ["ESNext"],
     "target": "ESNext",
-    "module": "Preserve",
+    "module": "esnext",
     "moduleDetection": "force",
     "allowJs": false,
     // Bundler mode
@@ -28,8 +28,8 @@
       "btuin/*": ["./packages/core/src/*"],
       "@btuin/cli": ["./packages/cli/src"],
       "@btuin/cli/*": ["./packages/cli/src/*"],
-      "@btuin/devtools": ["./packages/devtools/src"],
-      "@btuin/devtools/*": ["./packages/devtools/src/*"],
+      "@btuin/devtools": ["packages/profiler/src"],
+      "@btuin/devtools/*": ["packages/profiler/src/*"],
       "@/*": ["./packages/core/src/*"]
     }
   },
@@ -38,7 +38,7 @@
     "apps/*/src/**/*",
     "tests/**/*",
     "examples/**/*"
-  ],
+, "profiler"  ],
   "exclude": [
     "node_modules",
     "**/node_modules"

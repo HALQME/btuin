@@ -1,10 +1,10 @@
 {
-  "extends": "../../tsconfig.json",
+  "extends": "../tsconfig.json",
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
-      "@/*": ["../../packages/core/src/*"],
-      "btuin/*": ["../../packages/core/src/*"],
+      "@/*": ["../packages/core/src/*"],
+      "btuin/*": ["../packages/core/src/*"],
       "@btuin/devtools": ["./src"],
       "@btuin/devtools/*": ["./src/*"]
     }

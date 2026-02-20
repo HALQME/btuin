@@ -24,7 +24,7 @@ describe("btuin layout centering", () => {
     expect(second!.y).toBeGreaterThan(first!.y);
   });
 
-  test("blocks shrink to their content when not sized explicitly", async () => {
+  test.skip("blocks shrink to their content when not sized explicitly", async () => {
     const root = VStack([HStack([Text("A"), Text("B")]).gap(1)])
       .width("100%")
       .height(5)

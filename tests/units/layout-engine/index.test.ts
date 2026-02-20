@@ -144,4 +144,80 @@ describe("Layout Engine", () => {
     expect(layout2.a?.height).toBe(2);
     expect(layout2.b).toBeUndefined();
   });
+
+  it("should maintain positions of non-leaf nodes (nested containers)", () => {
+    const root: LayoutInputNode = {
+      identifier: "root",
+      type: "block",
+      width: 100,
+      height: 100,
+      flexDirection: "column",
+      children: [
+        {
+          identifier: "container",
+          type: "block",
+          width: 100,
+          height: 50,
+          padding: 10,
+          children: [
+            {
+              identifier: "item",
+              type: "block",
+              width: 10,
+              height: 10,
+            },
+          ],
+        },
+      ],
+    };
+
+    const layout = computeLayout(root);
+
+    expect(layout.root?.x).toBe(0);
+    expect(layout.root?.y).toBe(0);
+
+    // This was failing before the fix (it was being reset to x:0, y:0)
+    expect(layout.container).toBeDefined();
+    expect(layout.container?.x).toBe(0);
+    expect(layout.container?.y).toBe(0);
+
+    expect(layout.item).toBeDefined();
+    expect(layout.item?.x).toBe(10); // container.padding-left
+    expect(layout.item?.y).toBe(10); // container.padding-top
+
+    // Test with a container that has an offset
+    const root2: LayoutInputNode = {
+      identifier: "root",
+      type: "block",
+      width: 100,
+      height: 100,
+      flexDirection: "column",
+      children: [
+        {
+          identifier: "spacer",
+          type: "block",
+          width: 100,
+          height: 10,
+        },
+        {
+          identifier: "nested",
+          type: "block",
+          width: 100,
+          height: 20,
+          children: [
+            {
+              identifier: "leaf",
+              type: "block",
+              width: 5,
+              height: 5,
+            },
+          ],
+        },
+      ],
+    };
+
+    const layout2 = computeLayout(root2);
+    expect(layout2.nested?.y).toBe(10); // After spacer
+    expect(layout2.leaf?.y).toBe(0);    // relative to parent nested (0,0)
+  });
 });

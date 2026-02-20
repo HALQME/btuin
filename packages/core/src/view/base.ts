@@ -112,6 +112,16 @@ export abstract class BaseView implements ViewProps {
   public semantics?: Semantics;
   public keyHooks: KeyEventHook[] = [];
 
+  // Backwards-compat: some plugins/tests expect a `.props` bag with a `value` field
+  // (historical API). Provide a lightweight getter that maps common properties.
+  get props(): Record<string, any> {
+    // If element has a `content` property (Text), expose it as `value`.
+    const anyThis = this as any;
+    const out: Record<string, any> = {};
+    if (typeof anyThis.content === "string") out.value = anyThis.content;
+    return out;
+  }
+
   constructor(props: ViewProps = {}) {
     this.style = createDirtyStyleProxy({ ...props.style });
     const key = props.key ?? props.identifier;

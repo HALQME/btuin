@@ -351,24 +351,15 @@
       #previewStage {
         position: relative;
         font-family:
-          ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
-          "Noto Sans Mono CJK JP", "Noto Sans Mono", "M PLUS 1 Code",
-          "BIZ UDGothic", "MS Gothic", "Osaka-Mono", Osaka, "Liberation Mono",
-          "Courier New", monospace;
+          ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Noto Sans Mono CJK JP",
+          "Noto Sans Mono", "M PLUS 1 Code", "BIZ UDGothic", "MS Gothic", "Osaka-Mono", Osaka,
+          "Liberation Mono", "Courier New", monospace;
         font-size: 12px;
         line-height: 1.25;
         background-color: var(--cell-bg);
         background-image:
-          linear-gradient(
-            to right,
-            rgba(148, 163, 184, 0.08) 1px,
-            transparent 1px
-          ),
-          linear-gradient(
-            to bottom,
-            rgba(148, 163, 184, 0.08) 1px,
-            transparent 1px
-          );
+          linear-gradient(to right, rgba(148, 163, 184, 0.08) 1px, transparent 1px),
+          linear-gradient(to bottom, rgba(148, 163, 184, 0.08) 1px, transparent 1px);
         background-size: var(--cellw, 9px) var(--cellh, 18px);
       }
       #previewStage.is-3d {
@@ -777,14 +768,7 @@
         }
       }
 
-      function appendOutlineText(
-        pushLayer,
-        box,
-        outlineStyle,
-        color,
-        cellW,
-        cellH,
-      ) {
+      function appendOutlineText(pushLayer, box, outlineStyle, color, cellW, cellH) {
         if (!box || box.width <= 0 || box.height <= 0) return;
         const chars =
           outlineStyle === "double"
@@ -796,8 +780,7 @@
 
         const mkLine = (text, x, y, w, h) => {
           const el = document.createElement("div");
-          el.className =
-            "node outline-text" + (outlineStyle === "double" ? " double" : "");
+          el.className = "node outline-text" + (outlineStyle === "double" ? " double" : "");
           el.style.left = x * cellW + "px";
           el.style.top = y * cellH + "px";
           el.style.width = w * cellW + "px";
@@ -810,36 +793,23 @@
         };
 
         if (height === 1) {
-          const line =
-            width === 1
-              ? chars.v
-              : chars.tl + chars.h.repeat(width - 2) + chars.tr;
+          const line = width === 1 ? chars.v : chars.tl + chars.h.repeat(width - 2) + chars.tr;
           pushLayer(mkLine(line, box.x, box.y, width, 1));
           return;
         }
 
-        const topLine =
-          width === 1
-            ? chars.v
-            : chars.tl + chars.h.repeat(width - 2) + chars.tr;
-        const bottomLine =
-          width === 1
-            ? chars.v
-            : chars.bl + chars.h.repeat(width - 2) + chars.br;
+        const topLine = width === 1 ? chars.v : chars.tl + chars.h.repeat(width - 2) + chars.tr;
+        const bottomLine = width === 1 ? chars.v : chars.bl + chars.h.repeat(width - 2) + chars.br;
         pushLayer(mkLine(topLine, box.x, box.y, width, 1));
         pushLayer(mkLine(bottomLine, box.x, box.y + height - 1, width, 1));
 
         if (height > 2) {
           const midCount = height - 2;
-          const leftCol = Array.from({ length: midCount }, () => chars.v).join(
-            "\n",
-          );
+          const leftCol = Array.from({ length: midCount }, () => chars.v).join("\n");
           const rightCol = leftCol;
           pushLayer(mkLine(leftCol, box.x, box.y + 1, 1, midCount));
           if (width > 1) {
-            pushLayer(
-              mkLine(rightCol, box.x + width - 1, box.y + 1, 1, midCount),
-            );
+            pushLayer(mkLine(rightCol, box.x + width - 1, box.y + 1, 1, midCount));
           }
         }
       }
@@ -1023,8 +993,7 @@
 
         const frag = document.createDocumentFragment();
         let paintIndex = 0;
-        const defaultBg =
-          getComputedStyle(previewStage).backgroundColor || "transparent";
+        const defaultBg = getComputedStyle(previewStage).backgroundColor || "transparent";
         const bgCache = new Map();
         const resolveBgForKey = (key) => {
           if (bgCache.has(key)) return bgCache.get(key);
@@ -1054,13 +1023,7 @@
           const z = depth * state.depthStep;
           const shift = Math.round(depth * state.depthStep * 0.18);
           el.style.transform =
-            "translateZ(" +
-            z +
-            "px) translateX(" +
-            shift +
-            "px) translateY(" +
-            shift +
-            "px)";
+            "translateZ(" + z + "px) translateX(" + shift + "px) translateY(" + shift + "px)";
           el.style.transformStyle = "preserve-3d";
           const depthClamped = Math.min(10, depth);
           if (!el.classList.contains("selection")) {
@@ -1073,11 +1036,7 @@
             !el.classList.contains("text")
           ) {
             el.style.boxShadow =
-              "0 " +
-              depthClamped +
-              "px " +
-              depthClamped * 2 +
-              "px rgba(0, 0, 0, 0.35)";
+              "0 " + depthClamped + "px " + depthClamped * 2 + "px rgba(0, 0, 0, 0.35)";
           }
           if (el.classList.contains("text")) {
             el.style.textShadow =
@@ -1098,10 +1057,7 @@
         const pushLayerForKey = (key) => (el) => pushLayer(el, key);
         for (const item of items) {
           const node = item.node;
-          const box =
-            snapshot.layout && node && node.key
-              ? snapshot.layout[node.key]
-              : null;
+          const box = snapshot.layout && node && node.key ? snapshot.layout[node.key] : null;
           if (!box) continue;
           const rbox = {
             x: Math.floor(box.x),
@@ -1145,8 +1101,7 @@
             );
           }
           if (viewStyle && viewStyle.outline) {
-            const outlineColor =
-              colorToCss(viewStyle.outline.color) || "rgba(148, 163, 184, 0.8)";
+            const outlineColor = colorToCss(viewStyle.outline.color) || "rgba(148, 163, 184, 0.8)";
             appendOutlineText(
               pushLayerForKey(node.key),
               rbox,
@@ -1157,8 +1112,7 @@
             );
           }
 
-          const shouldBox =
-            state.showBoxes && !viewStyle?.outline && item.depth > 0;
+          const shouldBox = state.showBoxes && !viewStyle?.outline && item.depth > 0;
           const fg = colorToCss(viewStyle?.foreground);
           const outline = viewStyle?.outline || null;
           const title =
@@ -1265,8 +1219,7 @@
 
         const w = rect.width / 10;
         const h = rect.height;
-        if (!Number.isFinite(w) || !Number.isFinite(h) || w <= 0 || h <= 0)
-          return null;
+        if (!Number.isFinite(w) || !Number.isFinite(h) || w <= 0 || h <= 0) return null;
         return { w, h };
       }
 
@@ -1275,10 +1228,7 @@
       createApp({
         data() {
           return {
-            wsUrl:
-              (location.protocol === "https:" ? "wss://" : "ws://") +
-              location.host +
-              "/ws",
+            wsUrl: (location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws",
             status: "connecting…",
             tab: "preview",
             zoom: 100,
@@ -1353,10 +1303,7 @@
           window.addEventListener("keydown", this.onKeyDown);
           window.addEventListener("keyup", this.onKeyUp);
 
-          profileFlushTimer = setInterval(
-            () => this.flushProfileFrames(),
-            this.profileFlushMs,
-          );
+          profileFlushTimer = setInterval(() => this.flushProfileFrames(), this.profileFlushMs);
 
           this.applyZoom();
           this.updateInspector();
@@ -1452,9 +1399,9 @@
             const refs = Array.from(reactivityStore.refs.values()).sort(
               (a, b) => b.tracks - a.tracks,
             );
-            const components = Array.from(
-              reactivityStore.components.values(),
-            ).sort((a, b) => a.id - b.id);
+            const components = Array.from(reactivityStore.components.values()).sort(
+              (a, b) => a.id - b.id,
+            );
             const edges = Array.from(reactivityStore.edges.values())
               .sort((a, b) => b.tracks - a.tracks)
               .map((edge) => ({
@@ -1587,18 +1534,14 @@
             this.profileMaxMs = max;
             this.profileAvgMs = avg;
             this.profileFps = avg > 0 ? Math.round(1000 / avg) : "-";
-            this.profileLast =
-              this.profileFrames[this.profileFrames.length - 1];
+            this.profileLast = this.profileFrames[this.profileFrames.length - 1];
             this.profileStatus = "live";
           },
           pushProfileFrame(frame) {
             const maxFrames = 120;
             this.profileFrames.push(frame);
             if (this.profileFrames.length > maxFrames) {
-              this.profileFrames.splice(
-                0,
-                this.profileFrames.length - maxFrames,
-              );
+              this.profileFrames.splice(0, this.profileFrames.length - maxFrames);
             }
             this.recalcProfileStats();
             this.$nextTick(() => {
@@ -1612,10 +1555,7 @@
             const maxFrames = 120;
             this.profileFrames.push(...frames);
             if (this.profileFrames.length > maxFrames) {
-              this.profileFrames.splice(
-                0,
-                this.profileFrames.length - maxFrames,
-              );
+              this.profileFrames.splice(0, this.profileFrames.length - maxFrames);
             }
             this.recalcProfileStats();
             this.$nextTick(() => {
@@ -1749,10 +1689,7 @@
               this.parentByKey = indexed.parents;
               this.childrenByKey = indexed.children;
               this.snapshotText = JSON.stringify(msg.snapshot, null, 2);
-              if (
-                this.selectedKey &&
-                !this.latestSnapshot.layout?.[this.selectedKey]
-              ) {
+              if (this.selectedKey && !this.latestSnapshot.layout?.[this.selectedKey]) {
                 this.selectedKey = null;
               }
               this.updateInspector();
@@ -1787,15 +1724,9 @@
             addRow(
               rows,
               "parent",
-              parentKey
-                ? `${parentKey} (${parentNode?.type ?? "?"})`
-                : "(none)",
+              parentKey ? `${parentKey} (${parentNode?.type ?? "?"})` : "(none)",
             );
-            addRow(
-              rows,
-              "children",
-              childKeys.length ? childKeys.join(", ") : "(none)",
-            );
+            addRow(rows, "children", childKeys.length ? childKeys.join(", ") : "(none)");
 
             const layoutRows = [];
             addRowIf(
@@ -1820,10 +1751,8 @@
             addRowIf(layoutRows, "minHeight", fmt(style?.minHeight));
             addRowIf(layoutRows, "maxWidth", fmt(style?.maxWidth));
             addRowIf(layoutRows, "maxHeight", fmt(style?.maxHeight));
-            const hasMargin =
-              margin.top || margin.right || margin.bottom || margin.left;
-            const hasPadding =
-              padding.top || padding.right || padding.bottom || padding.left;
+            const hasMargin = margin.top || margin.right || margin.bottom || margin.left;
+            const hasPadding = padding.top || padding.right || padding.bottom || padding.left;
             if (this.showMargin && hasMargin) {
               addRowIf(layoutRows, "margin", JSON.stringify(margin));
             }
@@ -1831,11 +1760,7 @@
               addRowIf(layoutRows, "padding", JSON.stringify(padding));
             }
             if (style?.layoutBoundary !== undefined) {
-              addRowIf(
-                layoutRows,
-                "layoutBoundary",
-                fmt(style?.layoutBoundary),
-              );
+              addRowIf(layoutRows, "layoutBoundary", fmt(style?.layoutBoundary));
             }
             if (layoutRows.length > 0) {
               addSection(rows, "layout");
@@ -1868,8 +1793,7 @@
               id: index,
               ...row,
             }));
-            this.styleDetailsOpen =
-              layoutRows.length > 0 || styleRows.length > 0;
+            this.styleDetailsOpen = layoutRows.length > 0 || styleRows.length > 0;
           },
           applyZoom() {
             const previewStage = this.$refs.previewStage;

@@ -2,7 +2,7 @@
  * btuin core entry point
  */
 
-export { createApp, App } from "./runtime";
+export { createApp, App, resetProcessHasActiveMount } from "./runtime";
 export { defineComponent } from "./components";
 export * from "./view";
 export * from "./hooks/";

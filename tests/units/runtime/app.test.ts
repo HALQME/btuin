@@ -1,8 +1,9 @@
-import { describe, it, expect, afterEach, beforeAll } from "bun:test";
+import { describe, it, expect, afterEach, beforeAll, beforeEach } from "bun:test";
 import { ref } from "@/reactivity";
 import { Block, Text } from "@/view/primitives";
 import type { AppType as App, KeyEvent, TerminalAdapter } from "@/types";
 import { disposeSingletonCapture } from "@/terminal/capture";
+import { resetProcessHasActiveMount } from "@/runtime/app";
 
 const keyHandlers: any[] = [];
 
@@ -40,6 +41,10 @@ describe("createApp", () => {
 
   beforeAll(async () => {
     ({ app } = await import("@/runtime/app"));
+  });
+
+  beforeEach(() => {
+    resetProcessHasActiveMount();
   });
 
   afterEach(() => {

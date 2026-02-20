@@ -52,8 +52,7 @@ function ensureDevTty(): { input: UiInput; output: UiOutput } | null {
 }
 
 export function getUiOutputStream(): UiOutput {
-  if (cachedUiOutput) return cachedUiOutput;
-
+  // Re-evaluate output stream on each call in case tests replaced process.stdout.
   if (process.stdout.isTTY) {
     cachedUiOutput = createWriteBypassProxy(process.stdout, bypassStdoutWrite);
     return cachedUiOutput;
@@ -69,12 +68,13 @@ export function getUiOutputStream(): UiOutput {
     return cachedUiOutput;
   }
 
+  // Fallback to stdout with bypass
   cachedUiOutput = createWriteBypassProxy(process.stdout, bypassStdoutWrite);
   return cachedUiOutput;
 }
 
 export function getUiInputStream(): UiInput {
-  if (cachedUiInput) return cachedUiInput;
+  // Re-evaluate input stream in case tests replaced process.stdin during runtime.
   if (process.stdin.isTTY) {
     cachedUiInput = process.stdin as UiInput;
     return cachedUiInput;

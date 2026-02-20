@@ -40,6 +40,7 @@ export class LifecycleManager {
       updaters.isMounted(false);
     } finally {
       updaters.isUnmounting(false);
+      // Clear process mount flag
       updaters.processHasActiveMount(false);
       updaters.renderMode("fullscreen");
       updaters.inlineCleanupOnExit(false);
@@ -80,7 +81,12 @@ export class LifecycleManager {
       terminal.clearScreen();
     }
     if (output) {
-      Bun.stdout.write(output.endsWith("\n") ? output : `${output}\n`);
+      // Write to process.stdout so tests that monkeypatch process.stdout.write capture it.
+      try {
+        process.stdout.write(output.endsWith("\n") ? output : `${output}\n`);
+      } catch {
+          Bun.stdout.write(output.endsWith("\n") ? output : `${output}\n`);
+      }
     }
 
     platform.exit(code);

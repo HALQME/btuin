@@ -1,17 +1,26 @@
-import { describe, it, expect, afterEach, beforeAll } from "bun:test";
+import { describe, it, expect, afterEach, beforeAll, beforeEach } from "bun:test";
 import { Block, Text } from "@/view/primitives";
 import type { AppType as App, TerminalAdapter } from "@/types";
+import { resetProcessHasActiveMount } from "@/runtime/app";
+import { resetLayoutCache } from "@/layout";
+import { resetDirtyTracking } from "@/view";
 
 describe("inline mode output passthrough", () => {
   let appInstance: App;
   let app: typeof import("@/runtime/app").app;
 
-  afterEach(() => {
-    appInstance?.unmount();
-  });
-
   beforeAll(async () => {
     ({ app } = await import("@/runtime/app"));
+  });
+
+  beforeEach(() => {
+    resetProcessHasActiveMount();
+    resetLayoutCache();
+    resetDirtyTracking();
+  });
+
+  afterEach(() => {
+    appInstance?.unmount();
   });
 
   it("clears UI, prints stdout, then re-renders", async () => {

@@ -19,14 +19,13 @@
     "test": "bun test",
     "test:zig": "cd packages/core/src/layout-engine && zig build test",
     "test:watch": "bun test --watch",
-    "lint": "oxlint packages/*/src tests",
-    "lint:fix": "oxlint packages/*/src tests --fix",
-    "format": "oxfmt packages/*/src tests",
-    "check": "tsc --noEmit",
+    "lint": "bunx oxlint packages/*/src tests",
+    "lint:fix": "bunx oxlint packages/*/src tests --fix",
+    "format": "bunx oxfmt packages/*/src tests",
+    "check": "bunx tsc --noEmit",
     "precommit": "bun run format && bun run lint:fix && bun run check",
-    "bench": "cd packages/core/src/layout-engine && zig build bench",
     "clean": "rm -rf node_modules packages/*/node_modules packages/core/src/layout-engine/zig-out packages/core/src/layout-engine/.zig-cache",
-    "profiler": "bun test ./packages/devtools/src/profiler*.spec.ts"
+    "profiler": "bun test ./profiler/**/profiler*.spec.ts"
   },
   "devDependencies": {
     "@types/bun": "^1.3.5",

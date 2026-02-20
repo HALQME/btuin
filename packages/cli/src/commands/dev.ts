@@ -57,40 +57,6 @@ export async function runDev(options: DevCommandOptions) {
   }
 
   const env: Record<string, string | undefined> = {};
-  if (options.devtools.enabled) {
-    const devtoolsOptions: import("../devtools/types").DevtoolsOptions = {
-      enabled: true,
-      server: {
-        host: options.tcp.enabled ? options.tcp.host : "127.0.0.1",
-        port: 0, // find ephemeral port
-      },
-    };
-
-    try {
-      const listener = Bun.listen({
-        hostname: devtoolsOptions.server!.host ?? "127.0.0.1",
-        port: 0,
-        socket: {
-          open() {},
-          data() {},
-          close() {},
-          error() {},
-        },
-      });
-      devtoolsOptions.server!.port = listener.port;
-      listener.stop(true);
-    } catch (e) {
-      console.error("[btuin] Failed to find a free port for devtools:", e);
-    }
-
-    const pluginConfig = [
-      {
-        module: "@btuin/cli/devtools/controller",
-        options: devtoolsOptions,
-      },
-    ];
-    env.BTUIN_PLUGINS = JSON.stringify(pluginConfig);
-  }
 
   runHotReloadProcess({
     command: "bun",

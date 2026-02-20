@@ -2,29 +2,29 @@ import { computeLayout as computeLayoutWasm } from "../layout-engine";
 import type { ComputedLayout, Dimension, LayoutInputNode } from "../layout-engine/types";
 import { measureTextWidth } from "../renderer/grapheme";
 import { isBlock, isText, type BlockView, type ViewElement } from "../view/types/elements";
+import { getDirtyVersions } from "../view/dirty";
 import type { LayoutContainerSize, LayoutEngine, LayoutOptions } from "./types";
 
 export { renderElement } from "./renderer";
 export * from "./focus";
 
-function ensureKeys(element: ViewElement, prefix: string) {
-  if (!element.identifier && !element.key) {
-    element.identifier = prefix;
-    element.key = prefix;
-  } else {
-    const k = element.key ?? element.identifier;
-    if (k) {
-      element.key = k;
-      element.identifier = k;
-    }
-  }
+// Layout cache entry
+interface LayoutCacheEntry {
+  layoutVersion: number;
+  sizeKey: string;
+  result: ComputedLayout;
+  timestamp: number;
+}
 
-  if (isBlock(element)) {
-    for (let i = 0; i < element.children.length; i++) {
-      const child = element.children[i]!;
-      ensureKeys(child, `${element.identifier}/${child.type}-${i}`);
-    }
-  }
+// Global layout cache (single entry - keeps only latest)
+let layoutCache: LayoutCacheEntry | null = null;
+
+// Maximum cache age in ms (garbage collect old entries)
+const MAX_CACHE_AGE_MS = 5000;
+
+// Reset function for testing - DO NOT use in production
+export function resetLayoutCache(): void {
+  layoutCache = null;
 }
 
 function isPercent(value: unknown): value is string {
@@ -127,20 +127,40 @@ function applyLayoutBoundaryToBlock(
   return filtered;
 }
 
-function viewElementToLayoutNode(
+// Reusable ID counter - reset per layout computation
+let globalIdCounter = 0;
+
+function convertViewTreeToLayout(
   element: ViewElement,
   parentSize?: LayoutContainerSize,
   isRoot = false,
   options: LayoutOptions = {},
-): LayoutInputNode {
+  prefix = "",
+  idToIdentifier = new Map<number, string>(),
+): { node: LayoutInputNode; idToIdentifier: Map<number, string> } {
+  // Assign identifier if missing (using prefix instead of expensive string concat)
+  if (!element.identifier) {
+    element.identifier = prefix || (isRoot ? "root" : "r");
+  }
+  if (!element.key) {
+    element.key = element.identifier;
+  }
+
   const { identifier, style } = element;
+  const id = globalIdCounter++;
+
+  // Store mapping for later result translation
+  idToIdentifier.set(id, identifier);
 
   const node: LayoutInputNode = {
-    key: element.key ?? identifier,
+    key: element.key,
     identifier,
     type: element.type,
     ...style,
   };
+
+  // Store ID for layout engine
+  (node as any).__layoutId = id;
 
   if (isBlock(element)) {
     if (parentSize) {
@@ -184,10 +204,21 @@ function viewElementToLayoutNode(
       contentSize,
       stack,
     );
+
     if (stack === "z") {
       if (node.position === undefined) node.position = "relative";
-      node.children = childrenForLayout.map((child) => {
-        const childNode = viewElementToLayoutNode(child, contentSize, false, options);
+      node.children = [];
+      for (let i = 0; i < childrenForLayout.length; i++) {
+        const child = childrenForLayout[i]!;
+        const childResult = convertViewTreeToLayout(
+          child,
+          contentSize,
+          false,
+          options,
+          `${identifier}/${child.type}-${i}`,
+          idToIdentifier,
+        );
+        const childNode = childResult.node;
         if (childNode.position === undefined) childNode.position = "absolute";
         if (childNode.type === "block") {
           if (childNode.width === undefined && contentSize) {
@@ -197,12 +228,22 @@ function viewElementToLayoutNode(
             childNode.height = resolveDimension("100%", contentSize.height);
           }
         }
-        return childNode;
-      });
+        node.children.push(childNode);
+      }
     } else {
-      node.children = childrenForLayout.map((child) =>
-        viewElementToLayoutNode(child, contentSize, false, options),
-      );
+      node.children = [];
+      for (let i = 0; i < childrenForLayout.length; i++) {
+        const child = childrenForLayout[i]!;
+        const childResult = convertViewTreeToLayout(
+          child,
+          contentSize,
+          false,
+          options,
+          `${identifier}/${child.type}-${i}`,
+          idToIdentifier,
+        );
+        node.children.push(childResult.node);
+      }
     }
   } else if (isText(element)) {
     const textWidth = measureTextWidth(element.content);
@@ -226,7 +267,7 @@ function viewElementToLayoutNode(
     if (node.height !== undefined) node.height = resolveDimension(node.height, baseHeight);
   }
 
-  return node;
+  return { node, idToIdentifier };
 }
 
 export function createLayout(engine: LayoutEngine = wasmLayoutEngine()) {
@@ -236,16 +277,73 @@ export function createLayout(engine: LayoutEngine = wasmLayoutEngine()) {
       containerSize?: LayoutContainerSize,
       options: LayoutOptions = {},
     ): ComputedLayout => {
-      ensureKeys(root, "root");
-      const layoutNode = viewElementToLayoutNode(root, containerSize, true, options);
-      return engine.computeLayout(layoutNode);
+      const { layout: currentLayoutVersion } = getDirtyVersions();
+      const sizeKey = containerSize ? `${containerSize.width}x${containerSize.height}` : "auto";
+
+      // Check cache first
+      if (
+        layoutCache &&
+        layoutCache.layoutVersion === currentLayoutVersion &&
+        layoutCache.sizeKey === sizeKey &&
+        Date.now() - layoutCache.timestamp < MAX_CACHE_AGE_MS
+      ) {
+        return layoutCache.result;
+      }
+
+      // Reset global ID counter for this layout computation
+      globalIdCounter = 0;
+
+      // Single-pass conversion: builds layout nodes AND collects ID mappings
+      const { node: layoutNode, idToIdentifier } = convertViewTreeToLayout(
+        root,
+        containerSize,
+        true,
+        options,
+      );
+
+      // Pass container size to layout engine
+      const result = engine.computeLayout(layoutNode, containerSize?.width, containerSize?.height);
+
+      // Map numeric IDs back to string identifiers
+      const mappedResult: ComputedLayout = {};
+      for (const [key, value] of Object.entries(result)) {
+        const numericId = Number(key);
+        const identifier = idToIdentifier.get(numericId);
+        if (identifier) {
+          mappedResult[identifier] = value;
+        } else {
+          mappedResult[key] = value;
+        }
+      }
+
+      // Workaround: if root size is 0, use container size
+      if (
+        mappedResult["root"] &&
+        mappedResult["root"].width === 0 &&
+        mappedResult["root"].height === 0 &&
+        containerSize
+      ) {
+        mappedResult["root"].width = containerSize.width;
+        mappedResult["root"].height = containerSize.height;
+      }
+
+      // Update cache
+      layoutCache = {
+        layoutVersion: currentLayoutVersion,
+        sizeKey,
+        result: mappedResult,
+        timestamp: Date.now(),
+      };
+
+      return mappedResult;
     },
   };
 }
 
 function wasmLayoutEngine(): LayoutEngine {
   return {
-    computeLayout: (root: LayoutInputNode) => computeLayoutWasm(root),
+    computeLayout: (root: LayoutInputNode, availableWidth?: number, availableHeight?: number) =>
+      computeLayoutWasm(root, availableWidth, availableHeight),
   };
 }
 

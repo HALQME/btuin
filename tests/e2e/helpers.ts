@@ -1,4 +1,13 @@
 import type { KeyEvent, PlatformAdapter, TerminalAdapter } from "@/types";
+import { resetProcessHasActiveMount } from "@/runtime/app";
+import { resetLayoutCache } from "@/layout";
+import { resetDirtyTracking } from "@/view";
+
+export function resetTestState(): void {
+  resetProcessHasActiveMount();
+  resetLayoutCache();
+  resetDirtyTracking();
+}
 
 export type MockTerminal = TerminalAdapter & {
   output: string;

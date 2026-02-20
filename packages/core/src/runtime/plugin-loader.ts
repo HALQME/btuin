@@ -24,7 +24,8 @@ export async function loadPluginsFromEnv(): Promise<AppPlugin[]> {
       return [];
     }
   } catch (e) {
-    console.error("[btuin] Failed to parse BTUIN_PLUGINS env var:", e);
+    const err = e instanceof Error ? e : new Error(String(e));
+    console.error("[btuin] Failed to parse BTUIN_PLUGINS env var:", err);
     return [];
   }
 
@@ -41,7 +42,8 @@ export async function loadPluginsFromEnv(): Promise<AppPlugin[]> {
       const plugin = await factory(config.options);
       loadedPlugins.push(plugin);
     } catch (e) {
-      console.error(`[btuin] Failed to load plugin from ${config.module}:`, e);
+      const err = e instanceof Error ? e : new Error(String(e));
+      console.error(`[btuin] Failed to load plugin from ${config.module}:`, err);
     }
   }
 

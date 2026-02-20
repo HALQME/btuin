@@ -86,6 +86,7 @@ describe("Output Capture", () => {
       expect(captured[0]).toBe("hello world\n");
 
       unpatch();
+      stopCapture();
       console.log("not captured");
       expect(captured.length).toBe(1);
 

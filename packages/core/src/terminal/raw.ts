@@ -173,7 +173,16 @@ export function setupRawMode() {
   const input = getUiInputStream();
   activeInputStream = input;
 
-  if (!input.isTTY || typeof input.setRawMode !== "function") return;
+  // If the input stream is not TTY or doesn't support setRawMode, still attach
+  // the data handler so tests that mock stdin can emit 'data' events and be
+  // processed by the parser. Only call setRawMode when it's available.
+  if (!input.isTTY || typeof input.setRawMode !== "function") {
+    input.setEncoding?.("utf8");
+    input.on("data", handleData);
+    process.once("exit", cleanupWithoutClear);
+    terminalState.setRawModeActive(true);
+    return;
+  }
 
   installFatalErrorSafetyNet();
   input.setRawMode(true);

@@ -1,9 +1,13 @@
-import { describe, it, expect } from "bun:test";
+import { describe, it, expect, beforeEach } from "bun:test";
 import { createApp } from "@/index";
 import { Block, Text } from "@/view/primitives";
-import { createMockPlatform, createMockTerminal } from "./helpers";
+import { createMockPlatform, createMockTerminal, resetTestState } from "./helpers";
 
 describe("Resize integration", () => {
+  beforeEach(() => {
+    resetTestState();
+  });
+
   it("clears screen and re-renders on resize", async () => {
     const terminal = createMockTerminal();
     const platform = createMockPlatform();

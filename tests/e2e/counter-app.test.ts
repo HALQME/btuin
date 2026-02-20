@@ -1,11 +1,16 @@
-import { describe, it, expect, beforeAll } from "bun:test";
+import { describe, it, expect, beforeAll, beforeEach } from "bun:test";
 import { counterAppConfig } from "./counter";
 import { sanitizeAnsi } from "@/renderer";
 import { createApp } from "@/index";
-import { createMockPlatform, createMockTerminal } from "./helpers";
+import { createMockPlatform, createMockTerminal, resetTestState } from "./helpers";
 
 describe("Counter Example App with Mock Terminal", () => {
   beforeAll(() => Bun.gc(true));
+
+  beforeEach(() => {
+    resetTestState();
+  });
+
   it("should increment and decrement counter on arrow key press", async () => {
     const terminal = createMockTerminal();
     const platform = createMockPlatform();

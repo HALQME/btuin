@@ -1,4 +1,4 @@
-export { App, app, createApp } from "./app";
+export { App, app, createApp, resetProcessHasActiveMount } from "./app";
 export { createErrorContext, createErrorHandler } from "./error-boundary";
 export { createDefaultPlatformAdapter } from "./platform-adapter";
 export { createDefaultTerminalAdapter } from "./terminal-adapter";

@@ -336,8 +336,9 @@ fn layoutChildren(nodes: []Node, parent: *Node, x: f32, y: f32, available_width:
         const child_width = if (is_row) child_main else if (is_stretch) cross_size else child_cross;
         const child_height = if (is_row) if (is_stretch) cross_size else child_cross else child_main;
 
-        _ = child_width;
-        _ = child_height;
+        // Update child's resolved dimensions before computing its layout
+        child.resolved_width = child_width;
+        child.resolved_height = child_height;
         computeNodeLayout(nodes, child_idx, child_x, child_y, temp_buffer);
 
         current_pos += child_main + gap;

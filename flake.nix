@@ -16,56 +16,7 @@
         # Bun
         bun = pkgs.bun;
 
-        # Zig
-        zig = pkgs.zig;
-
         # Task helper scripts
-        task-build-ffi = pkgs.writeShellScriptBin "build-ffi" ''
-          echo "Building Zig layout-engine..."
-          cd packages/core/src/layout-engine
-
-          # Build for current platform
-          zig build -Doptimize=ReleaseFast
-
-          # Create expected output structure
-          mkdir -p target/release
-
-          # Copy library to expected location
-          if [ -f "zig-out/lib/liblayout-engine.dylib" ]; then
-            cp zig-out/lib/liblayout-engine.dylib target/release/
-            cp zig-out/lib/liblayout-engine.dylib ../../../
-          elif [ -f "zig-out/lib/liblayout-engine.so" ]; then
-            cp zig-out/lib/liblayout-engine.so target/release/
-            cp zig-out/lib/liblayout-engine.so ../../../
-          elif [ -f "zig-out/lib/layout-engine.dll" ]; then
-            cp zig-out/lib/layout-engine.dll target/release/
-            cp zig-out/lib/layout-engine.dll ../../../
-          fi
-
-          echo "✓ Built liblayout-engine"
-        '';
-
-        task-build-ffi-all = pkgs.writeShellScriptBin "build-ffi-all" ''
-          echo "Building Zig layout-engine for all platforms..."
-          cd packages/core/src/layout-engine
-          zig build release
-          echo "✓ Built all platform binaries"
-        '';
-
-        task-test-ffi = pkgs.writeShellScriptBin "test-ffi" ''
-          echo "Running Zig layout-engine tests..."
-          cd packages/core/src/layout-engine
-          zig build test
-          echo "✓ FFI tests passed"
-        '';
-
-        task-bench-ffi = pkgs.writeShellScriptBin "bench-ffi" ''
-          echo "Running Zig layout-engine benchmarks..."
-          cd packages/core/src/layout-engine
-          zig build bench
-          echo "✓ Benchmarks complete"
-        '';
-
         task-lint = pkgs.writeShellScriptBin "lint" ''
           exec bunx oxlint packages/*/src tests "$@"
         '';
@@ -107,11 +58,7 @@
 
         task-clean = pkgs.writeShellScriptBin "clean" ''
           rm -rf node_modules packages/*/node_modules
-          rm -rf packages/core/src/layout-engine/zig-out
-          rm -rf packages/core/src/layout-engine/.zig-cache
-          rm -rf packages/core/src/layout-engine/target
-          rm -f packages/core/liblayout-engine.*
-          echo "Cleaned build artifacts"
+          echo "Cleaned node_modules"
         '';
 
         task-install = pkgs.writeShellScriptBin "install-all" ''
@@ -129,13 +76,6 @@
           buildInputs = [
             # Core tools
             bun
-            zig
-
-            # Build tasks
-            task-build-ffi
-            task-build-ffi-all
-            task-test-ffi
-            task-bench-ffi
 
             # Code quality tasks
             task-lint

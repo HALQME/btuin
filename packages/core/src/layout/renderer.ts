@@ -245,5 +245,13 @@ export function renderElement(
     drawTextClipped(buffer, y, x + w - 1, chars.tr, borderStyle, elementClip);
     drawTextClipped(buffer, y + h - 1, x, chars.bl, borderStyle, elementClip);
     drawTextClipped(buffer, y + h - 1, x + w - 1, chars.br, borderStyle, elementClip);
+
+    // Draw title on the top border line, e.g. ┌─ title ────┐
+    if (outline.title && w > 4) {
+      const maxTitleLen = w - 4; // reserve 2 corners + "─ " prefix + " " suffix
+      const raw = outline.title;
+      const title = raw.length > maxTitleLen ? raw.slice(0, maxTitleLen) : raw;
+      drawTextClipped(buffer, y, x + 2, title, borderStyle, elementClip);
+    }
   }
 }

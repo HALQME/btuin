@@ -263,4 +263,4 @@ const app = createApp({
   },
 });
 
-await app.mount();
+app.mount();

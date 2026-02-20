@@ -10,8 +10,16 @@ import { LoopManager } from "./loop";
 import type { AppContext } from "./context";
 import type { App, AppConfig, CreateAppOptions, MountOptions } from "./types";
 import { loadPluginsFromEnv } from "./plugin-loader";
+import { createConsoleCapture } from "../terminal/capture";
+import { appendFileSync, mkdirSync } from "node:fs";
+import nodePath from "node:path";
 
 let processHasActiveMount = false;
+
+// Reset function for testing - DO NOT use in production
+export function resetProcessHasActiveMount(): void {
+  processHasActiveMount = false;
+}
 
 export function App<State>(root: Component<State>, options: CreateAppOptions = {}): App {
   const state: AppContext["state"] = {
@@ -81,13 +89,19 @@ export function App<State>(root: Component<State>, options: CreateAppOptions = {
   async function mount(mountOptions: MountOptions = {}) {
     if (state.isMounted) return;
 
+    // Historically only one app per process was allowed. Keep that behavior
+    // by throwing if another mount is active. Tests that need multiple mounts
+    // should explicitly reset state between runs.
     if (processHasActiveMount) {
       throw new Error("Only one app may be mounted at a time per process.");
     }
     processHasActiveMount = true;
 
     let handleError: ReturnType<typeof createErrorHandler> = (context) => {
-      const message = context.error.stack ?? context.error.message;
+      const message =
+        context.error && (context.error as any).stack
+          ? (context.error as any).stack
+          : String((context.error as any)?.message ?? context.error ?? "");
       Bun.stderr.write(`[btuin] error(${context.phase}): ${message}\n`);
     };
 
@@ -98,6 +112,7 @@ export function App<State>(root: Component<State>, options: CreateAppOptions = {
       );
 
       const plugins = await loadPluginsFromEnv();
+
       context.loopManager = new LoopManager(context, handleError, plugins);
 
       const rows = mountOptions.rows ?? 0;
