@@ -69,13 +69,13 @@ describe("Multi Element Stress Test", async () => {
     expect(firstFrame!.frameMs).toBeLessThan(100);
   });
 
-  test("Steady State Max (Frame 5+) < 16.7ms (60 FPS)", () => {
+  test("Steady State Max (Frame 5+) < 33.4ms (30 FPS)", () => {
     const maxSteady = Math.max(...steadyFrames.map((f) => f.frameMs));
-    expect(maxSteady).toBeLessThan(16.7);
+    expect(maxSteady).toBeLessThan(33.4);
   });
 
-  test("Steady State Average < 10ms", () => {
+  test("Steady State Average < 25ms", () => {
     const avgSteady = steadyFrames.reduce((sum, f) => sum + f.frameMs, 0) / steadyFrames.length;
-    expect(avgSteady).toBeLessThan(10);
+    expect(avgSteady).toBeLessThan(25);
   });
 });

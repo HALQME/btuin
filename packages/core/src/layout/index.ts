@@ -1,4 +1,4 @@
-import { computeLayout as computeLayoutWasm } from "../layout-engine";
+import { computeLayout as computeLayoutJS } from "../layout-engine";
 import type { ComputedLayout, Dimension, LayoutInputNode } from "../layout-engine/types";
 import { measureTextWidth } from "../renderer/grapheme";
 import { isBlock, isText, type BlockView, type ViewElement } from "../view/types/elements";
@@ -270,7 +270,7 @@ function convertViewTreeToLayout(
   return { node, idToIdentifier };
 }
 
-export function createLayout(engine: LayoutEngine = wasmLayoutEngine()) {
+export function createLayout(engine: LayoutEngine = jsLayoutEngine()) {
   return {
     layout: (
       root: ViewElement,
@@ -340,10 +340,10 @@ export function createLayout(engine: LayoutEngine = wasmLayoutEngine()) {
   };
 }
 
-function wasmLayoutEngine(): LayoutEngine {
+function jsLayoutEngine(): LayoutEngine {
   return {
     computeLayout: (root: LayoutInputNode, availableWidth?: number, availableHeight?: number) =>
-      computeLayoutWasm(root, availableWidth, availableHeight),
+      computeLayoutJS(root, availableWidth, availableHeight),
   };
 }
 
